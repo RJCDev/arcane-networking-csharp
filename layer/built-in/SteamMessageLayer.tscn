@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://clske63svueds"]
+
+[ext_resource type="Script" uid="uid://chsflp8fqi6er" path="res://addons/arcane_networking/layer/steam/SteamMessageLayer.cs" id="1_40x88"]
+
+[node name="SteamMessageLayer" type="Node"]
+script = ExtResource("1_40x88")

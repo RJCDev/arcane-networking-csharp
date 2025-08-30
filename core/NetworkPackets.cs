@@ -1,0 +1,125 @@
+using Godot;
+using MessagePack;
+using MessagePack.Resolvers;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Reflection;
+
+namespace ArcaneNetworking
+{
+   
+    public enum ModifyNode : byte
+    {
+        Instantiate,
+        Modify,
+        TransferOwner,
+    }
+
+    /// <summary>
+    /// Contains packet types
+    /// Arcane Networking can understand.
+    /// </summary>
+    public interface Packet;
+    public enum ConnectionState : byte
+    {
+        Handshake,
+        Disconnected,
+    }
+
+    /// Packet that is sent when we first connect to a connection
+    [MessagePackObject]
+    public struct ConnectionStatePacket : Packet
+    {
+        // The state change
+        [Key(0)]
+        public ConnectionState connState;
+
+        /// Auth payload
+        [Key(1)]
+        public byte[] payload;
+    }
+
+    // Ping Pong packet
+    [MessagePackObject]
+    public struct PingPongPacket : Packet
+    {
+
+    }
+
+    // Packet that calls a method with the specified arguents
+    [MessagePackObject]
+    public struct RPCPacket : Packet
+    {
+        // Caller NetworkObject guid
+        [Key(0)]
+        public uint CallerNetID;
+
+        // Compoenent Index
+        [Key(1)]
+        public int CallerCompIndex;
+
+        // (Property, Method, etc.)
+        [Key(2)]
+        public ushort CallerMethodID;
+
+        // If we should relay to all the clients
+        [Key(3)]
+        public bool ShouldRelay;
+
+        // Arguments to pass to the RPC method
+        [Key(4)]
+        public object[] Args;
+
+    }
+
+    // Instantiates an object over the network
+    [MessagePackObject]
+    public struct SpawnNodePacket : Packet
+    {
+        [Key(0)]
+        public uint NetID;
+
+        [Key(1)]
+        public uint prefabID;
+
+        [Key(2)]
+        public Vector3 position;
+
+        [Key(3)]
+        public Vector3 rotation;
+
+        [Key(4)]
+        public Vector3 scale;
+    }
+
+    [MessagePackObject]
+    public struct ModifyNodePacket : Packet
+    {
+        [Key(0)]
+        public uint NetID;
+
+        [Key(1)]
+        public bool enabled;
+
+        [Key(2)]
+        public bool destroy;
+    }
+
+    // Loads a world over the network
+    public struct LoadLevelPacket : Packet
+    {
+        // Which world should we load?
+
+        [Key(0)]
+        public int LevelID;
+
+        // Should we unload the previous world? (Disable packets from and to users from that world)
+        [Key(1)]
+        public bool UnloadLast;
+
+    }
+
+}
+

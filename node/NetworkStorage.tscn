@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8oi1nbdio4fi"]
+
+[ext_resource type="Script" uid="uid://l3j3iecno3h8" path="res://addons/arcane_networking/node/NetworkStorage.cs" id="1_wcfd4"]
+
+[node name="NetworkStorage" type="Node"]
+script = ExtResource("1_wcfd4")

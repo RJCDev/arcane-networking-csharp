@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="NetworkRegistry" load_steps=2 format=3 uid="uid://m3itahuijcn5"]
+
+[ext_resource type="Script" uid="uid://0k2owsl2e3vq" path="res://addons/arcane_networking/plugin/NetworkRegistry.cs" id="1_utmm0"]
+
+[resource]
+script = ExtResource("1_utmm0")
+MethodRPCs = Dictionary[int, String]({
+0: "NetworkedAnimationPlayer.Play",
+1: "NetworkedAnimationPlayer.PlayBackwards",
+2: "NetworkedAnimationPlayer.Seek",
+3: "NetworkedAnimationPlayer.SetSpeed",
+4: "NetworkedAnimationPlayer.Stop"
+})
+PacketIDs = Dictionary[int, String]({
+0: "ArcaneNetworking.ConnectionStatePacket",
+1: "ArcaneNetworking.PingPongPacket",
+2: "ArcaneNetworking.RPCPacket",
+3: "ArcaneNetworking.SpawnNodePacket",
+4: "ArcaneNetworking.ModifyNodePacket",
+5: "ArcaneNetworking.LoadLevelPacket"
+})

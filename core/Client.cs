@@ -1,0 +1,242 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+
+namespace ArcaneNetworking;
+
+public enum ConnetionStatus
+{
+    Connected,
+    Connecting,
+    Disconnected,
+    Diconnecting,
+}
+
+public partial class Client
+{   
+    // Packet Handling
+    static readonly Dictionary<ushort, Action<Packet, uint>> packetHandlers = [];
+
+    /// List of networked object nodes that have references to their object in them, guids are keys
+    public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
+
+    // Connection to the server
+    public static NetworkConnection serverConnection = null;
+
+    /// <summary>
+    /// Registers a function to handle a packet of type T.
+    /// </summary>
+    public static void RegisterPacketHandler<T>(Action<T, uint> handler) where T : Packet
+    {
+        // Wrap the handler so it can fit into Action<Packet>
+        packetHandlers[NetworkStorage.Singleton.PacketToID(typeof(T))] = (packet, connID) => handler((T)packet, connID);
+    }
+    internal static void PacketInvoke(ushort funcByte, Packet packet, uint fromConnection)
+    {
+        if (packetHandlers.TryGetValue(funcByte, out var handler))
+        {
+            handler(packet, fromConnection);
+        }
+        else
+        {
+            GD.PrintErr($"No handler registered for packet type {packet.GetType()}");
+        }
+    }
+    internal static void RegisterInternalHandlers()
+    {
+        // Invokes
+        MessageLayer.Active.OnClientConnect += OnClientConnected; // Client is authenticated
+        MessageLayer.Active.OnClientDisconnect += OnClientDisconnect; // Client has disconnected
+        MessageLayer.Active.OnClientReceive += OnClientReceive; // Client received bytes
+
+        // Packet Handlers
+        RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
+        RegisterPacketHandler<ModifyNodePacket>(OnModify);
+        RegisterPacketHandler<PingPongPacket>(OnPong);
+        RegisterPacketHandler<RPCPacket>(OnRPC);
+        RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
+    }
+
+    /// <summary>
+    /// Send Logic for simple packets
+    /// </summary>
+    public static void Send<T>(T packet, Channels channel = Channels.Reliable)
+    {
+        NetworkWriter writer = NetworkPool.GetWriter();
+        NetworkPacker.Pack(packet, writer);
+
+        MessageLayer.Active.Send(writer.ToArraySegment(), channel, serverConnection);
+
+        NetworkPool.Recycle(writer);
+    }
+
+    static void OnClientConnected()
+    {
+
+    }
+    static void OnClientDisconnect()
+    {
+        
+    }
+    static void OnClientReceive(ArraySegment<byte> bytes)
+    {
+        var reader = NetworkPool.GetReader(bytes.Array);
+
+        if (reader.Read(out dynamic packetHeader)) // Do we have a valid header?
+        {
+            if (reader.Read(out Packet packet)) // Invoke our packet handler
+            {
+                PacketInvoke(packetHeader, packet, 0);
+            }
+
+            else GD.PrintErr("Packet was invalid on client receive!");
+        }
+        else GD.PrintErr("Packet header was invalid on client receive!");
+    }
+
+    /// <summary>
+    /// Connect to the specified "host" and "port".
+    /// If port is left as -1, we will not attempt to connect via a port, assumed to be DNS address
+    /// The auth string can be used for the server to "Remember" the player if disconnected. On first connect this won't be needed as the server will generate it for you.
+    /// </summary>
+    public static void Connect(string host, int port = -1)
+    {
+        if (serverConnection != null)
+        {
+            GD.PrintErr("Cannot attempt another connection right now. Currently connecting / connected to server");
+            return;
+        }
+
+        // Create Connection and store it (even if it isn't valid yet, we will store data about its authentication state)
+        serverConnection = new(port == -1 ? host : host + ":" + port, 0);
+
+        // Setup our MessageLayer to the server
+        MessageLayer.Active.Connect(serverConnection);        
+    }
+
+    public static void Stop()
+    {
+        foreach (var netObject in NetworkedNodes)
+        {
+            OnModify(new ModifyNodePacket() { NetID = netObject.Key, enabled = true, destroy = true }, 0);
+        }
+        serverConnection = null;
+    }
+  
+    ////////////////////////// Internal Packet Callbacks
+    static void OnRPC(RPCPacket packet, uint fromConnection)
+    {
+        NetworkedNode node;
+        
+        // Get the NetworkedNode
+        if (!NetworkedNodes.TryGetValue(packet.CallerNetID, out node))
+        {
+            GD.PrintErr("Caller Object GUID Is NOT found on the CLIENT!");
+            return;
+        }
+
+        // Obtain the method using the ID
+        MethodInfo method = NetworkStorage.Singleton.IDToMethod(packet.CallerMethodID);
+
+        if (!Attribute.IsDefined(method, typeof(MethodRPCAttribute))) { GD.PrintErr("RPC Method IS NOT VALID"); return; } // Sanity Check
+
+        // Run the RPC
+        if (method != null)
+        {
+            method.Invoke(node, packet.Args);
+        }
+        else
+        {
+            GD.PrintErr("Packet could not process method from packet! ");
+        }
+
+        // If we got this far the packet is successful. If we are the server, check if we should relay to other clients
+    } 
+    static void OnPong(PingPongPacket packet, uint fromConnection) => serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime; // Get the round trip time
+    static void OnSpawn(SpawnNodePacket packet, uint fromConnection)
+    {
+        Node spawnedObject;
+        NetworkedNode netNode = null;
+
+        //object already exists
+        if (NetworkedNodes.ContainsKey(packet.NetID)) return;
+
+        else
+        {
+            // We are not the server, instantiate
+            if (!NetworkManager.AmIServer)
+            {
+                spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
+
+                // Finds its networked node, it should be a child of this spawned object
+                netNode = spawnedObject.FindChild<NetworkedNode>();
+
+                if (netNode == null)
+                {
+                    GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
+                    return;
+                }
+
+            }
+
+            // We are the server as well as a client, don't instantiate twice, just track it in the dictionary. We can always assume this is valid
+            else
+                spawnedObject = NetworkedNodes[packet.NetID];
+
+            NetworkedNodes.Add(packet.NetID, netNode);
+        }
+
+        // Occupy Data
+        netNode.NetID = packet.NetID;
+
+        // Adds child to the root of the game world
+        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+    }
+
+    static void OnLoadLevel(LoadLevelPacket packet, uint fromConnection)
+    {
+        try
+        {
+            NetworkManager.manager.WorldManager.LoadWorld(packet.LevelID, packet.UnloadLast);
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr("Load World Packet Failed To Process");
+            GD.PrintErr(e);
+        }
+    }
+
+    /// <summary>
+    /// Used for modifying a net object (disabling, destroying, etc.)
+    /// </summary>
+    public static void OnModify(ModifyNodePacket packet, uint fromConnection)
+    {
+        if (FindNetworkedNode(packet.NetID, out NetworkedNode netObject))
+        {
+            // This means its visibility can be changed
+            if (netObject.Node.HasMethod("show"))
+                netObject.Node.Set("visible", packet.enabled);
+
+            if (packet.destroy)
+            {
+                // Remove from tree if we want to remove this NetworkedObject (keep reference in list though)
+                netObject.Node.GetParent().RemoveChild(netObject.Node);
+            }
+        }
+    }
+
+    public static bool FindNetworkedNode(uint netID, out NetworkedNode netObject)
+    {
+        if (!NetworkedNodes.TryGetValue(netID, out NetworkedNode networkObject))
+        {
+            GD.PrintErr("Error retrieving CLIENT NetworkedObject:" + netID);
+            netObject = null;
+            return false;
+        }
+        netObject = networkObject;
+        return true;
+    }
+
+  
+}

@@ -1,0 +1,31 @@
+using System;
+using Godot;
+
+namespace ArcaneNetworking;
+
+public enum AuthorityMode
+{
+    Client,
+    Server,
+}
+
+public enum SendTime
+{
+    Disabled,
+    Process,
+    Physics,
+    Manual,
+}
+
+/// <summary>
+/// A component that works under a networked node. It can send RPCs over the network.
+/// </summary>
+public abstract partial class NetworkedComponent : Node
+{
+    public NetworkedNode NetworkedNode;
+
+    [ExportGroup("Send Config")]
+    [Export] public AuthorityMode AuthorityMode = AuthorityMode.Server;
+
+        
+}
