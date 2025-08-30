@@ -85,13 +85,13 @@ namespace ArcaneNetworking
         public uint prefabID;
 
         [Key(2)]
-        public Vector3 position;
+        public float[] position;
 
         [Key(3)]
-        public Vector3 rotation;
+        public float[] rotation;
 
         [Key(4)]
-        public Vector3 scale;
+        public float[] scale;
     }
 
     [MessagePackObject]

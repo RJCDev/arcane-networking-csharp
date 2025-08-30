@@ -16,7 +16,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
 
     // The ID of this 2 way connection
     readonly uint connectionID = id;
-    readonly string connectionEndPoint = endpoint;
+    string connectionEndPoint = endpoint;
 
     // The player object that is owned by this connection
     public Node playerObject = null;
@@ -31,6 +31,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public ulong lastPingTime, rtt;
 
     public uint GetID() => connectionID;
+    internal void SetEndPoint(string endpoint) => connectionEndPoint = endpoint;
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));
 
@@ -38,21 +39,26 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     {
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
+        GD.Print("[NetworkConnection] GetWriter(): " + packet.GetType());
+
         var NetworkWriter = NetworkPool.GetWriter();
 
         try
         {
+            GD.Print("[NetworkConnection] Pack.. " + packet.GetType());
+
             NetworkPacker.Pack(packet, NetworkWriter);
 
-            MessageLayer.Active.Send(NetworkWriter.ToArraySegment(), channel);
+            GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
+
+            MessageHandler.Enqueue(channel, NetworkWriter, this);
+
+            GD.Print("[NetworkConnection] Done! " + packet.GetType());
+
         }
         catch (Exception e)
         {
             GD.PrintErr("Error sending packet to connection: " + connectionID + " " + e.Message);
-        }
-        finally
-        {
-            NetworkPool.Recycle(NetworkWriter);
         }
 
 

@@ -31,7 +31,7 @@ public partial class NetworkStorage : Node
     
         try
         {
-            _registry = GD.Load<NetworkRegistry>("res://addons/arcane_networking/plugin/registry/NetworkRegistry.tres");
+            _registry = GD.Load<NetworkRegistry>("res://addons/arcane-networking/plugin/registry/NetworkRegistry.tres");
             // Convert type names back into real System.Type
             foreach (var kv in _registry.PacketIDs)
             {
@@ -47,21 +47,24 @@ public partial class NetworkStorage : Node
 
             foreach (var id in _registry.MethodRPCs)
             {
-                string[] typeMethod = id.Value.Split(".");
+                int indexOfMethodStart = id.Value.LastIndexOf(".");
+
+                string typeName = id.Value.Substring(0, indexOfMethodStart);
+                string methodName = id.Value.Substring(indexOfMethodStart + 1);
 
                 // Get the Type (search all loaded assemblies)
-                var type = Type.GetType(typeMethod[0]);
+                var type = Type.GetType(typeName);
 
                 if (type == null)
-                    throw new InvalidOperationException($"Could not find type '{typeMethod[0]}'");
+                    throw new InvalidOperationException($"Could not find type '{typeName}'");
 
                 // Get the method
-                var method = type.GetMethod(typeMethod[1],
+                var method = type.GetMethod(methodName,
                     BindingFlags.Instance | BindingFlags.Static |
-                    BindingFlags.Public | BindingFlags.NonPublic);
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 
                 if (method == null)
-                    throw new InvalidOperationException($"Could not find method '{typeMethod[1]}' on type '{typeMethod[0]}'");
+                    throw new InvalidOperationException($"Could not find method '{methodName}' on type '{typeName}'");
 
                 RpcMethods.Add(id.Key, method);
                 

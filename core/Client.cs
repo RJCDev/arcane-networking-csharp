@@ -40,7 +40,7 @@ public partial class Client
         }
         else
         {
-            GD.PrintErr($"No handler registered for packet type {packet.GetType()}");
+            GD.PrintErr($"[Client] No handler registered for packet type {packet.GetType()}");
         }
     }
     internal static void RegisterInternalHandlers()
@@ -63,29 +63,33 @@ public partial class Client
     /// </summary>
     public static void Send<T>(T packet, Channels channel = Channels.Reliable)
     {
-        NetworkWriter writer = NetworkPool.GetWriter();
-        NetworkPacker.Pack(packet, writer);
+        serverConnection.Send(packet, channel);
 
-        MessageLayer.Active.Send(writer.ToArraySegment(), channel, serverConnection);
-
-        NetworkPool.Recycle(writer);
+        GD.Print("[Client] Send: " + packet.GetType());
     }
 
     static void OnClientConnected()
     {
+        NetworkManager.AmIClient = true;
+        serverConnection.isAuthenticated = true;
 
+        GD.Print("[Client] Client Has Connected!");
     }
     static void OnClientDisconnect()
     {
+        serverConnection = null;
         
+        GD.Print("[Client] Client Has Disconnected..");
     }
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
+        GD.Print("[Client] Receive Bytes: " + bytes.Array.Length);
+
         var reader = NetworkPool.GetReader(bytes.Array);
 
-        if (reader.Read(out dynamic packetHeader)) // Do we have a valid header?
+        if (reader.Read(out ushort packetHeader)) // Do we have a valid header?
         {
-            if (reader.Read(out Packet packet)) // Invoke our packet handler
+            if (reader.Read(out Packet packet, NetworkStorage.Singleton.IDToPacket(packetHeader))) // Invoke our packet handler
             {
                 PacketInvoke(packetHeader, packet, 0);
             }
@@ -110,17 +114,19 @@ public partial class Client
 
         // Create Connection and store it (even if it isn't valid yet, we will store data about its authentication state)
         serverConnection = new(port == -1 ? host : host + ":" + port, 0);
-
+        
         // Setup our MessageLayer to the server
-        MessageLayer.Active.Connect(serverConnection);        
+        MessageLayer.Active.StartClient(serverConnection);    
     }
 
-    public static void Stop()
+    public static void Disconnect()
     {
         foreach (var netObject in NetworkedNodes)
         {
             OnModify(new ModifyNodePacket() { NetID = netObject.Key, enabled = true, destroy = true }, 0);
         }
+
+        MessageLayer.Active.StopClient();
         serverConnection = null;
     }
   
@@ -169,29 +175,30 @@ public partial class Client
             {
                 spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
 
-                // Finds its networked node, it should be a child of this spawned object
-                netNode = spawnedObject.FindChild<NetworkedNode>();
-
                 if (netNode == null)
                 {
                     GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
                     return;
                 }
+                // Finds its networked node, it should be a child of this spawned object
+                netNode = spawnedObject.FindChild<NetworkedNode>();
 
+                // Adds child to the root of the game world
+                NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
             }
 
-            // We are the server as well as a client, don't instantiate twice, just track it in the dictionary. We can always assume this is valid
+            // We are the server as well as a client, don't instantiate twice, we can just get the info locally from the server
             else
-                spawnedObject = NetworkedNodes[packet.NetID];
-
+            {
+                netNode = Server.NetworkedNodes[packet.NetID];
+            }
+            
             NetworkedNodes.Add(packet.NetID, netNode);
         }
 
         // Occupy Data
         netNode.NetID = packet.NetID;
 
-        // Adds child to the root of the game world
-        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
     }
 
     static void OnLoadLevel(LoadLevelPacket packet, uint fromConnection)

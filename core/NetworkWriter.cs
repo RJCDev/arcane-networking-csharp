@@ -46,8 +46,6 @@ namespace ArcaneNetworking
 
             written.CopyTo(Buffer.AsSpan(Position));
             Position += written.Length;
-            
-            GD.Print(Position);
         }
 
         public ArraySegment<byte> ToArraySegment() =>

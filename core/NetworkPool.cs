@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace ArcaneNetworking;
 
@@ -12,17 +13,35 @@ public static class NetworkPool
     static readonly ConcurrentBag<NetworkWriter> writerPool = [];
     static readonly ConcurrentBag<NetworkReader> readerPool = [];
 
+    public static int GetWriterPoolSize()
+    {
+        int allBytes = 0;
+        writerPool.ToList().ForEach(x => allBytes += x.Buffer.Length);
+        return allBytes;
+    } 
+
+    public static int GetReaderPoolSize()
+    {
+        int allBytes = 0;
+        readerPool.ToList().ForEach(x => allBytes += x.Buffer.Length);
+        return allBytes;
+    } 
+
     public static NetworkWriter GetWriter()
     {
         if (!writerPool.TryTake(out NetworkWriter writer))
         {
             writer = new NetworkWriter();
+
+            GD.Print("[NetworkWriter] Obtaining NEW Network Writer");
         }
         else
         {
             writer.Reset();
+
+            GD.Print("[NetworkWriter] Obtaining Network Writer From Pool.");
         }
-        
+
         return writer;
     }
 
@@ -31,10 +50,14 @@ public static class NetworkPool
         if (!readerPool.TryTake(out NetworkReader reader))
         {
             reader = new NetworkReader(forBytes);
+
+            GD.Print("[NetworkReader] Obtaining NEW Network Reader");
         }
         else
         {
             reader.Reset(forBytes);
+
+            GD.Print("[NetworkReader] Obtaining Network Reader From Pool. Length: " + forBytes.Length);
         }
         
         return reader;

@@ -1,5 +1,6 @@
 using Godot;
-using ArcaneNetworking;
+
+namespace ArcaneNetworking;
 
 public partial class NetworkedAnimationPlayer : NetworkedComponent
 {
@@ -20,10 +21,10 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     {
         AnimationPlayer.SpeedScale = freezeSeek ? 0 : 1;
         AnimationPlayer.Seek(seconds);
-    } 
+    }
 
     [MethodRPC]
-    public void SetSpeed(float timeScale) => AnimationPlayer.SpeedScale = timeScale; 
+    public void SetSpeed(float timeScale) => AnimationPlayer.SpeedScale = timeScale;
 
     [MethodRPC]
     public void PlayBackwards(string animationName) => AnimationPlayer.PlayBackwards(animationName);

@@ -9,12 +9,12 @@ namespace ArcaneNetworking;
 /// It can have child components that send RPC calls over the network, and is referenced internaly by its guid.
 /// By itself, this node does nothing, it requires child components to send data.
 /// </summary>
-[GlobalClass]
-public abstract partial class NetworkedNode : Node
+public partial class NetworkedNode : Node
 {
     [ExportGroup("Network Identity")]
 
     /// The node that is under this NetworkedNode's control
+    /// 
     public Node Node
     {
         get
@@ -72,6 +72,7 @@ public abstract partial class NetworkedNode : Node
             if (child is NetworkedComponent)
             {
                 NetworkedComponents.Add(child as NetworkedComponent);
+                (child as NetworkedComponent).NetworkedNode = this;
             }
         }
     }

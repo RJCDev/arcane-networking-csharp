@@ -25,7 +25,7 @@ public partial class Weaver : EditorPlugin
             };
 
             // Save Registry
-            string path = "res://addons/arcane_networking/plugin/registry/NetworkRegistry.tres";
+            string path = "res://addons/arcane-networking/plugin/registry/NetworkRegistry.tres";
 
             registry.TakeOverPath(path); // Force write
             Error error = ResourceSaver.Save(registry, path);
@@ -61,7 +61,7 @@ public partial class Weaver : EditorPlugin
 
         if (!ProjectSettings.HasSetting("autoload/NetworkStorage"))
         {
-            AddAutoloadSingleton("NetworkStorage", "res://addons/arcane_networking/node/NetworkStorage.tscn"); // Make sure we don't duplicate
+            AddAutoloadSingleton("NetworkStorage", "res://addons/arcane-networking/node/NetworkStorage.tscn"); // Make sure we don't duplicate
         }
 
     }

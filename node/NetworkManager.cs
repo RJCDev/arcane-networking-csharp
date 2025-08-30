@@ -1,7 +1,8 @@
-using ArcaneNetworking;
 using Godot;
 using Godot.Collections;
 using System;
+
+namespace ArcaneNetworking;
 
 public enum DisconectBehavior
 {
@@ -63,11 +64,13 @@ public partial class NetworkManager : Node
     }
     public void StartServer(bool headless = false)
     {
-        GD.Print("Starting Server! ");
-        
-        Server.Start();
 
         if (!headless) Connect("localhost");
+
+        Server.Start();
+
+        GD.Print("Starting Server! ");
+
     }
     
 

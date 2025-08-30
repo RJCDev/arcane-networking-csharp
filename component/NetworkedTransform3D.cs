@@ -1,18 +1,19 @@
 using Godot;
-using ArcaneNetworking;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+
+namespace ArcaneNetworking;
 
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedComponent
 {
     Node3D TransformNode;
-    [ExportGroup("Send Rate")]
     [Export] public SendTime SendTime = SendTime.Physics;
 
-    [ExportGroup("Send Channel")]
     [Export] public Channels SendChannel = Channels.Reliable;
 
-    [ExportCategory("Selections")]
+    [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition;
     [Export] public bool SyncRotation;
     [Export] public bool SyncScale;
@@ -27,8 +28,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [Export] public float hardPosError = 5f;
     [Export] public float HardRotError = 2f;
 
-    public Vector3 PositionError = Vector3.Zero;
-    public Vector3 RotationError = Vector3.Zero;
+    public Vector3 OldPos, OldScale;
+    public Vector3 OldRot;
 
     // Queue of Snapshots (Used for Cubic Interpolation)
     public TransformSnapshot[] CurrentState = new TransformSnapshot[2];
@@ -39,31 +40,82 @@ public partial class NetworkedTransform3D : NetworkedComponent
         {
             GD.PushError("(Network Transform) Networked Node's Parent is NOT a Node3D!");
         }
-        else TransformNode = NetworkedNode.Node as Node3D;
+        else
+        {
+            TransformNode = NetworkedNode.Node as Node3D;
+
+            // Set Defaults
+            OldPos = TransformNode.GlobalPosition;
+            OldScale = TransformNode.Scale;
+            OldRot = TransformNode.GlobalRotation;
+        }
+
     }
     public override void _PhysicsProcess(double delta)
     {
-        // Process the interpolation
-        TransformSnapshot current = CurrentState[0].TransformWith(CurrentState[1], InterpSpeed);
 
-        TransformNode.GlobalPosition = current.Pos;
-        TransformNode.GlobalPosition = current.Pos;
-        TransformNode.GlobalPosition = current.Pos;
+        // Update Position
+        if (NetworkedNode.AmIOwner)
+        {
+            Changed changes = Changed.None;
+            List<float> valuesChanged = [];
+
+            // Pos
+            if (OldPos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+            if (OldPos.X != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+            if (OldPos.X != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+
+            // Rot
+            if (OldRot.X != TransformNode.Quaternion.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.Quaternion.X); }
+            if (OldRot.Y != TransformNode.Quaternion.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.Quaternion.Y); }
+            if (OldRot.Z != TransformNode.Quaternion.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.Quaternion.Z); }
+
+            // Scale
+            if (OldScale != TransformNode.Scale) { changes |= Changed.Scale; valuesChanged.Add(TransformNode.Scale.X); valuesChanged.Add(TransformNode.Scale.Y); valuesChanged.Add(TransformNode.Scale.Z); }
+
+            // Send RPC if changes occured
+            if (changes != Changed.None)
+            {
+                if (NetworkManager.AmIClient) GD.Print("[Client] Sending NetworkedTransform3D RPC");
+                if (NetworkManager.AmIServer) GD.Print("[Server] Sending NetworkedTransform3D RPC");
+                
+                Set(changes, [.. valuesChanged]);
+            }
+        }
+
+        //TransformNode.Translate(new Vector3((float)delta, 0, 0));
+
+        if (CurrentState[0] != CurrentState[1])
+        {
+            // Process the interpolation
+            TransformSnapshot current = CurrentState[0].TransformWith(CurrentState[1], InterpSpeed);
+
+            TransformNode.GlobalPosition = current.Pos;
+            TransformNode.GlobalRotation = current.Rot;
+            TransformNode.Scale = current.Scale;
+        }
+        
+
+       
     }
 
     // Actually apply the changed part of the transform (each value changed is the delta of change, valuesChanged is paddded)
+    [MethodRPC]
     public void Set(Changed changed, float[] valuesChanged)
     {
         // Record our local position so we can interpolate between this and the new one (cubic)
         CurrentState[0] = new()
         {
             Pos = TransformNode.GlobalPosition,
-            Rot = TransformNode.GlobalBasis.GetRotationQuaternion(),
+            Rot = TransformNode.GlobalRotation,
             Scale = TransformNode.Scale
         };
 
         // Read the "Current" snapshot we just got
         CurrentState[1] = ReadSnapshot(changed, valuesChanged);
+
+        if (NetworkManager.AmIClient) GD.Print("[Receiving] Sending NetworkedTransform3D RPC");
+        if (NetworkManager.AmIServer) GD.Print("[Receiving] Sending NetworkedTransform3D RPC");
     }
 
     /// <summary>
@@ -80,7 +132,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : 0,
         };
 
-        Quaternion prevRot = new()
+        Vector3 prevRot = new()
         {
             X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : 0,
             Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : 0,
@@ -116,9 +168,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         RotY = 1 << 5,
         RotZ = 1 << 6,
         Scale = 1 << 7,
-
-        Pos = PosX | PosY | PosZ,
-        Rot = RotX | RotY | RotZ
     }
 
 
@@ -126,7 +175,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public struct TransformSnapshot
     {
         public Vector3 Pos;
-        public Quaternion Rot;
+        public Vector3 Rot;
         public Vector3 Scale;
 
         /// <summary>
@@ -142,8 +191,32 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 Scale = Scale.Lerp(other.Scale, amount)
             };
         }
-    }
 
+        public override bool Equals([NotNullWhen(true)] object obj)
+        {
+            if (obj is TransformSnapshot s)
+            {
+                return Pos == s.Pos && Rot == s.Rot && Scale == s.Scale;
+            }
+            else return false;
+            
+        }
+        public static bool operator ==(TransformSnapshot left, TransformSnapshot right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(TransformSnapshot left, TransformSnapshot right)
+        {
+            return !(left == right);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode(), Scale.GetHashCode());
+        }
+
+    }
 
 }
 

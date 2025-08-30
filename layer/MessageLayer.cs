@@ -40,7 +40,7 @@ namespace ArcaneNetworking
 
         /// ON SERVER ->
         /// <summary>Called by server MessageLayer when a client is connected to the server.</summary>
-        public Action<uint> OnServerConnect;
+        public Action<NetworkConnection> OnServerConnect;
 
         /// <summary>Called by server MessageLayer when a client disconnects to the server.</summary>
         public Action<uint> OnServerDisconnect;
@@ -51,72 +51,34 @@ namespace ArcaneNetworking
         /// <summary>Called by MessageLayer when the server receieves from a client.</summary>
         public Action<ArraySegment<byte>, uint> OnServerReceive;
 
-        // Message processing timing
-        ulong lastProcessTime, lastPingPongTime;
-
-        // Process loop
-        public override void _Process(double delta)
-        {
-            double msElapsed = Time.GetTicksMsec() - lastProcessTime;
-
-            // Regular packets
-            if (msElapsed > NetworkManager.manager.NetworkRate)
-            {
-                Poll();
-
-                lastProcessTime = Time.GetTicksMsec();
-
-                if (NetworkManager.manager.EnableDebug)
-                {
-                    NetworkDebug.ClcltPckSz(msElapsed);
-                }
-            }
-
-            // At the interval set, attempt to check for packets, and also flush any packets in the queue
-            double msElapsedPing = Time.GetTicksMsec() - lastPingPongTime;
-
-            // Queue Ping Pong Packets
-            if (msElapsedPing > NetworkManager.manager.PingPongRate)
-            {
-                lastPingPongTime = Time.GetTicksMsec();
-
-                if (NetworkManager.AmIServer)
-                {
-                    foreach (var connection in Server.Connections)
-                    {
-                        connection.Value.Ping();
-                    }
-                }
-                else if (NetworkManager.AmIClient)
-                {
-                    Client.serverConnection.Ping();
-                }
+        public override void _Process(double delta) => MessageHandler.Process();
 
 
-            }
+        public abstract void StartServer();
 
-        }
+        public abstract void StopServer();
 
         public abstract void Poll();
         /// <summary>
         /// Attempts a connection with an endpoint
         /// Here is where we pass in an empty NetworkConnection to our MessageLayer to attemp to connect
         /// </summary>
-        public abstract bool Connect(NetworkConnection host);
+        public abstract bool StartClient(NetworkConnection host);
 
         /// <summary>
         /// Disconnects from another connection if they are valid
         /// </summary>
         /// <returns>Valid URI MessageLayer?</returns>
-        public abstract bool Disconnect(NetworkConnection other);
+        public abstract void StopClient();
 
         /// SEND / RECEIVE \\\
 
         /// <summary>
-        /// Sends raw data to the MessageLayer
+        /// Sends raw data to the MessageLayer and routes it to the connections specified
         /// Channel Ids: 0 = RPCs, 1 = VOIP, 2 = Pings
         /// </summary>
-        public abstract void Send(ArraySegment<byte> bytes, Channels channel, params NetworkConnection[] connnectionsToSendTo);
+        public abstract void SendToConnections(ArraySegment<byte> bytes, Channels channel, params NetworkConnection[] connnectionsToSendTo);
+        
 
     }
 

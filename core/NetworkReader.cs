@@ -40,18 +40,27 @@ namespace ArcaneNetworking
         /// Reads a message object from the current position.
         /// Advances Position based on how much was consumed.
         /// </summary>
-        public bool Read<T>(out T read)
+        public bool Read<T>(out T read, Type concreteType = default)
         {
             try
             {
                 var segment = new ReadOnlyMemory<byte>(Buffer, Position, Buffer.Length - Position);
+                var reader = new MessagePackReader(segment);
 
-                // Need to know how many bytes were consumed
-                // MessagePack lets you get this via the `out int readSize` overload
-                T msg = MessagePackSerializer.Deserialize<T>(segment, out int readSize);
+                object msg;
 
-                Position += readSize;
-                read = msg;
+                // Read in the type
+                if (concreteType != default)
+                {
+                    msg = MessagePackSerializer.Deserialize(concreteType, ref reader);
+                }
+                else // Read in a T
+                {
+                    msg = MessagePackSerializer.Deserialize<T>(ref reader);
+                }
+
+                Position += (int)reader.Consumed;
+                read = (T)msg;
 
                 return true;
             }

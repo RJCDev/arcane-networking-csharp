@@ -41,7 +41,7 @@ public partial class Server : Node
         }
         else
         {
-            Console.WriteLine($"No handler registered for packet type {packet.GetType()}");
+            Console.WriteLine($"[Client] No handler registered for packet type {packet.GetType()}");
         }
     }
     internal static void RegisterInternalHandlers()
@@ -52,25 +52,23 @@ public partial class Server : Node
         MessageLayer.Active.OnServerReceive += OnServerReceive;
 
         // Packet Handlers
-        //RegisterPacketHandler<SpawnNodePacket>(OnSpawn); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
+        RegisterPacketHandler<SpawnNodePacket>((_, _) => { }); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
-        RegisterPacketHandler<PingPongPacket>(OnPong);
+        RegisterPacketHandler<PingPongPacket>(OnPing);
         RegisterPacketHandler<RPCPacket>(OnRPC);
         RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
     }
 
-    
+
     /// <summary>
     /// Send Logic for simple packets
     /// </summary>
     public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable)
     {
-        NetworkWriter writer = NetworkPool.GetWriter();
-        NetworkPacker.Pack(packet, writer);
+        conn.Send(packet, channel);
+        
+         GD.Print("[Server] Send: " + packet.GetType());
 
-        MessageLayer.Active.Send(writer.ToArraySegment(), channel, conn);
-
-        NetworkPool.Recycle(writer);
     }
 
     /// <summary>
@@ -89,21 +87,27 @@ public partial class Server : Node
         foreach (var client in world.ManagedConnections.Values) Send(packet, client, channel);
     }
 
-    static void OnServerConnect(uint connID)
+    static void OnServerConnect(NetworkConnection connection)
     {
+        AddClient(connection);
 
+        GD.Print("[Server] Client Has Connected!");
     }
     static void OnServerDisconnect(uint connID)
     {
-        
+        RemoveClient(Connections[connID], NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
+
+        GD.Print("[Server] Client Has Disconnected..");
     }
     static void OnServerReceive(ArraySegment<byte> bytes, uint connID)
     {
+        GD.Print("[Server] Receive Bytes: " + bytes.Array.Length);
+        
         var reader = NetworkPool.GetReader(bytes.Array);
 
         if (reader.Read(out ushort packetHeader)) // Do we have a valid header?
         {
-            if (reader.Read(out Packet packet)) // Invoke our packet handler
+            if (reader.Read(out Packet packet, NetworkStorage.Singleton.IDToPacket(packetHeader))) // Invoke our packet handler
             {
                 PacketInvoke(packetHeader, packet, connID);
             }
@@ -114,7 +118,7 @@ public partial class Server : Node
         else GD.PrintErr("Packet header was invalid on server receive!");
     }
 
-    
+
     /// <summary>
     /// Starts the server
     /// if headless, then it will ONLY start the server
@@ -122,7 +126,11 @@ public partial class Server : Node
     /// </summary>
     public static void Start()
     {
+        MessageLayer.Active.StartServer();
+
         NetworkManager.AmIServer = true;
+
+        GD.Print("[Server] Server Has Started!");
     }
     public static void Stop()
     {
@@ -132,6 +140,10 @@ public partial class Server : Node
         }
 
         Connections.Clear();
+
+        MessageLayer.Active.StopServer();
+
+        GD.Print("[Server] Server Has Stopped..");
     }
 
     ////////////////////////// Internal Packet Callbacks
@@ -167,8 +179,9 @@ public partial class Server : Node
 
     }
 
-    static void OnPong(PingPongPacket packet, uint fromConnection)
+    static void OnPing(PingPongPacket packet, uint fromConnection)
     {
+        GD.Print("[Server] Recieved Ping!");
         Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime; // Get the round trip time
         Send(new PingPongPacket(), Connections[fromConnection]); // Resend PingPing
     } 
@@ -190,6 +203,7 @@ public partial class Server : Node
             GD.PrintErr(e);
         }
     }
+   
     /// <summary>
     /// Spawns a Node on the server and relays to all connections
     /// </summary>
@@ -204,14 +218,15 @@ public partial class Server : Node
 
         if (netNode == null)
         {
-            GD.PrintErr("Networked Node ID: " + CurrentNodeID + " Prefab ID: " + prefabID + " Is Missing A NetworkSyncronizer!!");
+            GD.PrintErr("Node ID: " + CurrentNodeID + " Prefab ID: " + prefabID + " Is Missing A Networked Node!!");
+            spawnedObject.Free();
             return null;
         }
 
-        NetworkedNodes.Add(CurrentNodeID++, netNode);
+        NetworkedNodes.Add(CurrentNodeID, netNode);
 
         // Occupy Data
-        netNode.NetID = CurrentNodeID;
+        netNode.NetID = CurrentNodeID++;
 
         uint netOwner = owner != null ? owner.GetID() : 0;
 
@@ -219,7 +234,7 @@ public partial class Server : Node
 
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
-        // Adds the spawned object to the game world
+        // Adds the spawned object to the game world if headless, else wait for client
         NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
 
         // Set Transform
@@ -229,13 +244,15 @@ public partial class Server : Node
             (spawnedObject as Node3D).GlobalBasis = basis;
         }
 
+        var quat = basis.GetRotationQuaternion().Normalized();
+
         SpawnNodePacket packet = new()
         {
             NetID = netNode.NetID,
             prefabID = prefabID,
-            position = position,
-            rotation = basis.GetEuler(),
-            scale = scale
+            position = [position.X, position.Y, position.Z],
+            rotation = [quat.X, quat.Y, quat.Z],
+            scale = [scale.X, scale.Y, scale.Z]
 
         };
 

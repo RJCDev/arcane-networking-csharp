@@ -46,6 +46,7 @@ public class MethodRPCAttribute : Attribute, IMethodDecorator
         {
             throw new NotNetworkOwnerException("Instance is not owner of NetworkObject!");
         }
+
         ushort StorageMethodID = NetworkStorage.Singleton.MethodToID((MethodInfo)Method);
 
         // Create the packet
@@ -59,7 +60,7 @@ public class MethodRPCAttribute : Attribute, IMethodDecorator
         };
 
         // You are JUST a client, send to server host
-        if (NetworkManager.AmIClient && !NetworkManager.AmIServer)
+        if (NetworkManager.AmIClient)
         {
             Client.Send(packet, SendChannel);
 
