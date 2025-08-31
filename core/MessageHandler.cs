@@ -30,12 +30,9 @@ public static class MessageHandler
         {
             while (MessageQueue.Count > 0)
             {
-                GD.Print("[MessageManager] Flush... ");
-
                 var message = MessageQueue.Dequeue();
-                MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, message.connections);
 
-                GD.Print("[MessageManager] Flush Done! ");
+                MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, message.connections);
 
                 NetworkPool.Recycle(message.writer);
             }
@@ -55,16 +52,18 @@ public static class MessageHandler
 
             if (NetworkManager.AmIClient)
             {
-                Client.serverConnection.Ping();
+                //GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
 
-                GD.Print("[Client] Pinging!");
+                Client.serverConnection.Ping();
+                
             }
             if (NetworkManager.AmIServer)
             {
                 foreach (var connection in Server.Connections)
                 {
+                    //GD.Print("[Server] Pinging At:" + Time.GetTicksMsec());
+
                     connection.Value.Ping();
-                    GD.Print("[Server] Pinging!");
                 }
             }
 

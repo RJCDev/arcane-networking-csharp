@@ -26,47 +26,40 @@ public partial class SteamMessageLayer : MessageLayer
 
     internal IntPtr[] ReceiveBuffer = new nint[64];
 
-    public override void StartServer()
+    public override void StartServer(bool isHeadless)
     {
-        SteamServer.StartServer();
+        // Local Server Connection
+        if (!isHeadless)
+        {
+            SteamNetworkingIdentity _ = new();
+            SteamNetworkingSockets.CreateSocketPair(out var ClientToServer, out var ServerToClient, false, ref _, ref _);
+
+            SteamServer.StartServer(ServerToClient); // Start Local Server
+            SteamClient.SetLocal(ClientToServer); // Set Local Client Connection To Server
+
+        }
+        else SteamServer.StartServer();
     }
+
     public override void StopServer()
     {
         SteamServer.StopServer();
     }
 
-
     public override bool StartClient(NetworkConnection other)
     {
-        // Local Server Connection
-        if (other.GetEndpointAs<string>() == "localhost")
+        if (other.GetEndpointAs<string>() == "localhost") // Local Connection
         {
-            other.SetEndPoint(SteamUser.GetSteamID().m_SteamID.ToString()); // Set the endpoint to your steamID
-            uint steam32 = (uint)other.GetEndpointAs<ulong>(); // Get 32 bit SteamID for connection ID
-            other.isLocalConnection = true;
-
-            NetworkConnection localServerToLocalClient = new(other.GetEndPoint(), steam32);
-
-            // Create steam socket pair
-            SteamNetworkingIdentity _ = new();
-            SteamNetworkingSockets.CreateSocketPair(out SteamClient.ConnectionToServer, out var LocalConnection, true, ref _ , ref _);
-
-            SteamServer.ClientsConnected.Add(steam32, LocalConnection);
-
-            Active.OnServerConnect?.Invoke(localServerToLocalClient);
-            Active.OnClientConnect?.Invoke();
-
-            return true;
-
+            other.SetEndPoint(SteamUser.GetSteamID().m_SteamID.ToString());
+            other.isLocalConnection = true; 
         }
-        // Connecting to other steam user connection
         if (ulong.TryParse(other.GetEndPoint(), out ulong SteamId))
         {
             CSteamID serverID = new(SteamId);
 
             if (!serverID.IsValid())
             {
-                GD.PrintErr("[Steam MessageLayer] NetworkConnection other was NOT a valid SteamID");
+                GD.PrintErr("[Steam] NetworkConnection other was NOT a valid SteamID");
                 return false;
             }
         }
@@ -91,10 +84,11 @@ public partial class SteamMessageLayer : MessageLayer
     {
         foreach (NetworkConnection connection in connnectionsToSendTo)
         {
-
             // Run invokes (send is for debug)
             if (NetworkManager.AmIServer) OnServerSend?.Invoke(bytes, connection.GetID());
             if (NetworkManager.AmIClient) OnClientSend?.Invoke(bytes);
+
+            HSteamNetConnection steamConnectionToSend = connection.isLocalConnection ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connection.GetID()];
 
             GCHandle handle = default;
             try
@@ -105,23 +99,18 @@ public partial class SteamMessageLayer : MessageLayer
                 // get pointer to the offset inside the pinned array
                 IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(bytes.Array, bytes.Offset);
 
-                // call Steam
-                EResult result = SteamNetworkingSockets.SendMessageToConnection(NetworkManager.AmIClient ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connection.GetID()]
-                    , ptr,
+                EResult result = SteamNetworkingSockets.SendMessageToConnection(steamConnectionToSend, // Send Message Over SteamNetworkingSockets
+                    ptr,
                     (uint)bytes.Count,
                     sendType == Channels.Reliable ? 0 : 8,
                     out long msgNum
-
                 );
 
-                if (result == EResult.k_EResultOK)
-                GD.Print($"[Steam MessageLayer] Sent {bytes.Count} bytes (msgNum {msgNum})");
-                else
-                    GD.PushWarning($"[Steam MessageLayer] Failed to send, result: {result}");
+                //GD.Print("[Steam] Sending: " + (uint)bytes.Count + "b To: " + connection.GetID());
+                if (result != EResult.k_EResultOK) GD.PushWarning($"[Steam] Failed to send because: {result}");
             }
             catch (Exception e)
             {
-                GD.Print("[Steam MessageLayer] Message Failed To Send!!");
                 GD.Print(e.Message);
             }
             finally

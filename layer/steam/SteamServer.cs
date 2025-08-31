@@ -11,6 +11,8 @@ namespace ArcaneNetworkingSteam;
 public class SteamServer
 {
     internal HSteamListenSocket ServerListenSocket;
+
+    internal HSteamNetPollGroup ClientPollGroup;
     internal Dictionary<uint, HSteamNetConnection> ClientsConnected = [];
     protected Callback<SteamNetConnectionStatusChangedCallback_t> ConnectionCallback;
 
@@ -18,20 +20,40 @@ public class SteamServer
     {
         // Callbacks
         ConnectionCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged);
-
     }
 
-    public void StartServer()
+
+    public void StartServer(HSteamNetConnection localConnection = default)
     {
         ServerListenSocket = SteamNetworkingSockets.CreateListenSocketP2P(0, 0, null);
 
+        ClientPollGroup = SteamNetworkingSockets.CreatePollGroup();
+
+        if (localConnection != default)
+        {
+            uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
+
+            NetworkConnection incoming = new(SteamUser.GetSteamID().m_SteamID.ToString(), steam32, null);
+            ClientsConnected.Add(steam32, localConnection);
+
+            SteamNetworkingSockets.SetConnectionPollGroup(localConnection, ClientPollGroup);
+
+            GD.Print("[Steam Server] Setup Local Connection To Server!");
+
+            MessageLayer.Active.OnServerConnect?.Invoke(incoming); // Invoke to the High-Level API that this Connection in the MessageLayer is connected
+
+           
+        }
+
         GD.Print("[Steam Server] Server Started! ");
+    
     }
 
     public void StopServer()
     {
         SteamNetworkingSockets.CloseListenSocket(ServerListenSocket);
     }
+
     /// <summary>
     /// Called when the steam socket connection changes
     /// </summary>
@@ -49,6 +71,8 @@ public class SteamServer
                     // Accept the client
                     SteamNetworkingSockets.AcceptConnection(info.m_hConn);
 
+                    SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, ClientPollGroup);
+
                     NetworkConnection incoming = new(info.m_info.m_identityRemote.GetSteamID().ToString(), steam32, null);
                     ClientsConnected.Add(steam32, info.m_hConn);
 
@@ -65,7 +89,9 @@ public class SteamServer
 
                 GD.PrintErr("Connection closed..." + info.m_info.m_identityRemote.GetSteamID());
 
+                SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, HSteamNetPollGroup.Invalid);
                 SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
+
                 MessageLayer.Active.OnServerDisconnect?.Invoke(steam32);
 
                 ClientsConnected.Remove(steam32);
@@ -77,41 +103,38 @@ public class SteamServer
 
     public void PollMessages(SteamMessageLayer layer)
     {
-        foreach (var connection in ClientsConnected)
+        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(ClientPollGroup, layer.ReceiveBuffer, layer.ReceiveBuffer.Length);
+
+
+        for (int i = 0; i < msgCount; i++)
         {
-            int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(ClientsConnected[connection.Key], layer.ReceiveBuffer, layer.ReceiveBuffer.Length);
+            SteamNetworkingMessage_t netMessage =
+                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceiveBuffer[i]);
 
-            for (int i = 0; i < msgCount; i++)
+
+            try
             {
-                SteamNetworkingMessage_t netMessage =
-                    Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceiveBuffer[i]);
-                try
-                {
-                    byte[] buffer = ArrayPool<byte>.Shared.Rent(netMessage.m_cbSize);
-                    Marshal.Copy(netMessage.m_pData, buffer, 0, netMessage.m_cbSize);
-                    var segment = new ArraySegment<byte>(buffer, 0, netMessage.m_cbSize);
+                byte[] buffer = ArrayPool<byte>.Shared.Rent(netMessage.m_cbSize);
+                Marshal.Copy(netMessage.m_pData, buffer, 0, netMessage.m_cbSize);
+                var segment = new ArraySegment<byte>(buffer, 0, netMessage.m_cbSize);
 
-                    if (NetworkManager.AmIClient)
-                        MessageLayer.Active.OnClientReceive?.Invoke(segment);
+                MessageLayer.Active.OnServerReceive?.Invoke(
+                    segment,
+                    (uint)netMessage.m_identityPeer.GetSteamID().m_SteamID);
 
-                    if (NetworkManager.AmIServer)
-                        MessageLayer.Active.OnServerReceive?.Invoke(
-                            segment,
-                            (uint)netMessage.m_identityPeer.GetSteamID().m_SteamID);
-
-                    GD.Print("[SteamClient] Message Received");
-                }
-                catch (Exception e)
-                {
-                    GD.PushWarning("[SteamClient] Packet Was Invalid Or Empty!?");
-                    GD.PrintErr(e);
-                }
-                finally
-                {
-                    SteamNetworkingMessage_t.Release(layer.ReceiveBuffer[i]); // Tell Steam to free the buffer
-                }
+                //GD.Print("[SteamServer] Message Received! Count: " + msgCount);
+            }
+            catch (Exception e)
+            {
+                GD.PushWarning("[SteamServer] Packet Was Invalid Or Empty!?");
+                GD.PrintErr(e);
+            }
+            finally
+            {
+                SteamNetworkingMessage_t.Release(layer.ReceiveBuffer[i]); // Tell Steam to free the buffer
             }
         }
+    
         
     }
 

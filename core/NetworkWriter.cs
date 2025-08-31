@@ -10,6 +10,8 @@ namespace ArcaneNetworking
         internal byte[] Buffer;
         public int Position { get; private set; }
 
+        public int MaxAllocationBytes = 65535;
+
         public int RemainingBytes => Buffer.Length - Position;
 
         public NetworkWriter(int initialCapacity = 1500)

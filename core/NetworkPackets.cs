@@ -3,13 +3,13 @@ using MessagePack;
 using MessagePack.Resolvers;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 
 namespace ArcaneNetworking
 {
-   
     public enum ModifyNode : byte
     {
         Instantiate,
@@ -45,7 +45,18 @@ namespace ArcaneNetworking
     [MessagePackObject]
     public struct PingPongPacket : Packet
     {
+        ///<summary> 0 = Ping, 1 = Pong </summary>
+        [Key(0)]
+        public byte PingPong; 
+    }
 
+    public enum TypeByte : byte
+    {
+        Byte,
+        UnsignedInt,
+        Int,
+        Long,
+        Object
     }
 
     // Packet that calls a method with the specified arguents
@@ -68,9 +79,9 @@ namespace ArcaneNetworking
         [Key(3)]
         public bool ShouldRelay;
 
-        // Arguments to pass to the RPC method
+        // Serialized arguments
         [Key(4)]
-        public object[] Args;
+        public ArraySegment<byte> Args;
 
     }
 

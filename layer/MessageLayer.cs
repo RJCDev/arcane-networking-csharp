@@ -54,7 +54,7 @@ namespace ArcaneNetworking
         public override void _Process(double delta) => MessageHandler.Process();
 
 
-        public abstract void StartServer();
+        public abstract void StartServer(bool isHeadless);
 
         public abstract void StopServer();
 

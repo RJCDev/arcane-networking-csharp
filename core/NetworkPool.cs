@@ -13,6 +13,7 @@ public static class NetworkPool
     static readonly ConcurrentBag<NetworkWriter> writerPool = [];
     static readonly ConcurrentBag<NetworkReader> readerPool = [];
 
+
     public static int GetWriterPoolSize()
     {
         int allBytes = 0;
@@ -33,13 +34,12 @@ public static class NetworkPool
         {
             writer = new NetworkWriter();
 
-            GD.Print("[NetworkWriter] Obtaining NEW Network Writer");
+            //GD.Print("[NetworkWriter] Obtaining NEW Network Writer");
         }
         else
         {
             writer.Reset();
-
-            GD.Print("[NetworkWriter] Obtaining Network Writer From Pool.");
+            //GD.Print("[NetworkWriter] Obtaining Network Writer From Pool and RESETING POSITION.");
         }
 
         return writer;
@@ -51,13 +51,13 @@ public static class NetworkPool
         {
             reader = new NetworkReader(forBytes);
 
-            GD.Print("[NetworkReader] Obtaining NEW Network Reader");
+            //GD.Print("[NetworkReader] Obtaining NEW Network Reader");
         }
         else
         {
             reader.Reset(forBytes);
 
-            GD.Print("[NetworkReader] Obtaining Network Reader From Pool. Length: " + forBytes.Length);
+            //GD.Print("[NetworkReader] Obtaining Network Reader From Pool. Length: " + forBytes.Length);
         }
         
         return reader;

@@ -39,22 +39,21 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     {
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
-        GD.Print("[NetworkConnection] GetWriter(): " + packet.GetType());
+        //GD.Print("[NetworkConnection] GetWriter(): " + packet.GetType());
 
         var NetworkWriter = NetworkPool.GetWriter();
 
         try
         {
-            GD.Print("[NetworkConnection] Pack.. " + packet.GetType());
+            //GD.Print("[NetworkConnection] Pack.. " + packet.GetType());
 
             NetworkPacker.Pack(packet, NetworkWriter);
 
-            GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
+            //GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
 
             MessageHandler.Enqueue(channel, NetworkWriter, this);
 
-            GD.Print("[NetworkConnection] Done! " + packet.GetType());
-
+            //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
         catch (Exception e)
         {
@@ -65,32 +64,10 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     }
 
     /// Ping connection
-    public void Ping()
+    public void Ping(bool pong = false)
     {
-        lastPingTime = Time.GetTicksMsec(); // Payload = [0] is ping, Payload = [1] is pong
-        Send(new PingPongPacket() { }, Channels.Reliable);
+        lastPingTime = Time.GetTicksMsec();
+        Send(new PingPongPacket() { PingPong = (byte)(pong ? 1 : 0), }, Channels.Reliable);
     
-    }
-
-    internal static NetworkConnection[] GetAllConnections()
-    {
-        NetworkConnection[] allConnections = [.. Server.Connections.Values];
-
-        if (NetworkManager.AmIClient) // Client
-        {
-            return [Client.serverConnection];
-        }
-        else if (NetworkManager.AmIHeadless) // Headless
-        {
-            return allConnections;
-        }
-        else // Server + Client
-        {
-            // Add clientconnection to end of servers
-            Array.Resize(ref allConnections, allConnections.Length + 1);
-            allConnections[allConnections.Length - 1] = Client.serverConnection;
-
-            return allConnections;
-        }
     }
 }

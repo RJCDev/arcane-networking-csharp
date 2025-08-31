@@ -1,6 +1,7 @@
 using ArcaneNetworking;
 using Godot;
 using System;
+using System.Collections;
 
 public partial class NetworkDebug : Node
 {
@@ -10,33 +11,52 @@ public partial class NetworkDebug : Node
     [Export] public Label IsAuthenticatedLabel;
     
 
-    static long bytesDwnCntr = 0, bytesUpCntr = 0;
+    static Queue bytesDownCounter, bytesUpCounter;
     public static double KbpsDwn = 0, KbpsUp = 0;
 
-    public static void OnPacketIn(ArraySegment<byte> data) => bytesDwnCntr += data.Count;
-    public static void OnPacketOut(ArraySegment<byte> data) => bytesUpCntr += data.Count;
+
+    double timeCounter = 0;
+
+    public static void OnClientPacketIn(ArraySegment<byte> data) => bytesDownCounter.Enqueue(data.Count);
+
+    public static void OnClientPacketOut(ArraySegment<byte> data) => bytesUpCounter.Enqueue(data.Count);
 
     public override void _Ready()
     {
-        MessageLayer.Active.OnClientSend += OnPacketOut;
-        MessageLayer.Active.OnClientReceive += OnPacketIn;
+        MessageLayer.Active.OnClientSend += OnClientPacketOut;
+        MessageLayer.Active.OnClientReceive += OnClientPacketIn;
+
+        bytesDownCounter = new Queue();
+        bytesUpCounter = new Queue();
     }
 
-    public void ClcltPckSz(double msElapsed)
+    public void ClcltPckSz()
     {
-        if (msElapsed <= 0) return;
+        if (timeCounter < 1.0) return; // Less than 1 second, do nothing
 
-        // Bytes/sec
-        double downBps = bytesDwnCntr * 1000.0 / msElapsed;
-        double upBps = bytesUpCntr * 1000.0 / msElapsed;
+        // Convert to kilobits/sec
+        int bytesDownAverage = 0;
+        int bytesDownSamples = bytesDownCounter.Count;
 
-        // Convert to kilobits/sec (divide by 1024, then multiply by 8)
-        KbpsDwn = downBps * 8.0 / 1024.0;
-        KbpsUp = upBps * 8.0 / 1024.0;
+        if (bytesDownSamples > 0)
+        {
+            while (bytesDownCounter.Count > 0) bytesDownAverage += (int)bytesDownCounter.Dequeue();
+            bytesDownAverage /= bytesDownSamples;
+        }
 
-        // Reset counters
-        bytesDwnCntr = 0;
-        bytesUpCntr = 0;
+        int bytesUpAverage = 0;
+        int bytesUpSamples = bytesUpCounter.Count;
+            
+        if (bytesUpSamples > 0)
+        {
+            while (bytesUpCounter.Count > 0) bytesUpAverage += (int)bytesUpCounter.Dequeue();
+            bytesUpAverage /= bytesUpSamples;
+        }
+
+        KbpsDwn = bytesDownAverage / 1024.0;
+        KbpsUp = bytesUpAverage / 1024.0;
+
+        timeCounter = 0.0;
 
     }
 
@@ -44,15 +64,16 @@ public partial class NetworkDebug : Node
     {
         if (Client.serverConnection == null) return;
 
-        rwBuffers.Text = "Read Buffer: " + NetworkPool.GetReaderPoolSize() + "b |" + "Write Buffer: " + NetworkPool.GetWriterPoolSize() + "b"; 
-        
-        kbps.Text = "Up: " + KbpsUp + "kbps | Down: " + KbpsDwn + " kbps";
+        rwBuffers.Text = "Read: " + NetworkPool.GetReaderPoolSize() + "b |" + "Write: " + NetworkPool.GetWriterPoolSize() + "b";
+
+        kbps.Text = "Up: " + Math.Round(KbpsUp, 4) + "kbps | Down: " + Math.Round(KbpsDwn, 4) + " kbps";
         RTTLabel.Text = Client.serverConnection.rtt.ToString() + " MS";
         AmIClientLabel.Text = "Client? " + NetworkManager.AmIClient.ToString();
         AmIServerLabel.Text = "Server? " + NetworkManager.AmIServer.ToString();
         IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
 
-        ClcltPckSz(delta * 1000);
+        timeCounter+=delta;
+        ClcltPckSz();
     }
 }
 

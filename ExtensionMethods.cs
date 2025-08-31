@@ -10,6 +10,7 @@ using System.Text;
 
 namespace ArcaneNetworking;
 
+
 public static class ExtensionMethods
 {
     public static Guid GenerateGUID(this string hashData)
@@ -39,7 +40,7 @@ public static class ExtensionMethods
 
             return null;
         }
-        
+
     }
 
     public static T FindParent<T>(this Node Child) where T : Node
@@ -62,7 +63,7 @@ public static class ExtensionMethods
         {
             if (child is T)
             {
-                
+
                 return child as T;
             }
             else
@@ -71,7 +72,7 @@ public static class ExtensionMethods
                 if (result != null) return result as T;
             }
         }
-        
+
         return result as T;
     }
     public static Type GetUnderlyingType(MemberInfo member)
@@ -163,7 +164,7 @@ public static class ExtensionMethods
     //     {
     //         GD.PrintErr(field.Name + " Error Setting Field: " + ex.Message);
     //     }
-        
+
 
     // }
     // public static void SaveDataToState(IStateObject ObjectInstance, NetObjectState_t State, MemberInfo field)
@@ -200,9 +201,9 @@ public static class ExtensionMethods
     //             }
     //         }
 
-           
 
-           
+
+
     //     }
     //     catch (Exception e)
     //     {

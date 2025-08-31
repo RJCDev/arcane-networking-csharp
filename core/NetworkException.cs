@@ -19,13 +19,13 @@ public class SystemPacketPayloadException : Exception
 
 // Exception for making sure that the RPC method body doesn't run on the client
 [Serializable]
-public class RPCNotServerException : Exception
+public class RPCDontRunAsClientException : Exception
 {
     // Constructors
-    public RPCNotServerException() 
+    public RPCDontRunAsClientException() 
         : base() 
     { }
-    public RPCNotServerException(string message)
+    public RPCDontRunAsClientException(string message)
         : base(message)
     { }
 }
@@ -43,3 +43,15 @@ public class NotNetworkOwnerException : Exception
     { }
 }
 
+// Exception for when trying to call an RPC as a client that is server authorative
+[Serializable]
+public class RPCServerAuthorityException : Exception
+{
+    // Constructors
+    public RPCServerAuthorityException() 
+        : base() 
+    { }
+    public RPCServerAuthorityException(string message)
+        : base(message)
+    { }
+}

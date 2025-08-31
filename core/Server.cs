@@ -1,9 +1,13 @@
 using Godot;
+using MessagePack;
 using MessagePack.Formatters;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 
 namespace ArcaneNetworking;
 
@@ -54,7 +58,7 @@ public partial class Server : Node
         // Packet Handlers
         RegisterPacketHandler<SpawnNodePacket>((_, _) => { }); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
-        RegisterPacketHandler<PingPongPacket>(OnPing);
+        RegisterPacketHandler<PingPongPacket>(OnPingPong);
         RegisterPacketHandler<RPCPacket>(OnRPC);
         RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
     }
@@ -67,7 +71,7 @@ public partial class Server : Node
     {
         conn.Send(packet, channel);
         
-         GD.Print("[Server] Send: " + packet.GetType());
+        //GD.Print("[Server] Send: " + packet.GetType());
 
     }
 
@@ -101,21 +105,23 @@ public partial class Server : Node
     }
     static void OnServerReceive(ArraySegment<byte> bytes, uint connID)
     {
-        GD.Print("[Server] Receive Bytes: " + bytes.Array.Length);
-        
+        //GD.Print("[Server] Receive Bytes: " + bytes.Array.Length);
+
         var reader = NetworkPool.GetReader(bytes.Array);
 
         if (reader.Read(out ushort packetHeader)) // Do we have a valid header?
         {
             if (reader.Read(out Packet packet, NetworkStorage.Singleton.IDToPacket(packetHeader))) // Invoke our packet handler
             {
-                PacketInvoke(packetHeader, packet, connID);
+                if (packet is RPCPacket)
+                PacketInvoke(packetHeader, packet, connID); 
             }
-                
 
             else GD.PrintErr("Packet was invalid on server receive!");
         }
         else GD.PrintErr("Packet header was invalid on server receive!");
+
+        NetworkPool.Recycle(reader);
     }
 
 
@@ -124,9 +130,9 @@ public partial class Server : Node
     /// if headless, then it will ONLY start the server
     /// else it will start the server and the client, and sort out the connections accordingly
     /// </summary>
-    public static void Start()
+    public static void Start(bool isHeadless)
     {
-        MessageLayer.Active.StartServer();
+        MessageLayer.Active.StartServer(isHeadless);
 
         NetworkManager.AmIServer = true;
 
@@ -163,13 +169,18 @@ public partial class Server : Node
         if (!Attribute.IsDefined(method, typeof(MethodRPCAttribute))) { GD.PrintErr("RPC Method IS NOT VALID"); return; } // Sanity Check
 
         // Run the RPC
-        if (method != null)
+        try
         {
-            method.Invoke(node, packet.Args);
+            dynamic[] args = new dynamic[packet.Args.Count];
+            // Attempt to parse args
+            for (int i = 0; i < packet.Args.Count; i++) args[i] = MessagePackSerializer.Deserialize<dynamic>(packet.Args[i]);
+
+            method.Invoke(node.NetworkedComponents[packet.CallerCompIndex], args);
         }
-        else
+        catch (Exception e)
         {
-            GD.PrintErr("Packet could not process method from packet! ");
+            GD.PrintErr("[Server] Packet could not process method from packet! ");
+            GD.PrintErr(e);
         }
 
         // Relay to Clients
@@ -179,11 +190,16 @@ public partial class Server : Node
 
     }
 
-    static void OnPing(PingPongPacket packet, uint fromConnection)
+    static void OnPingPong(PingPongPacket packet, uint fromConnection)
     {
-        GD.Print("[Server] Recieved Ping!");
-        Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime; // Get the round trip time
-        Send(new PingPongPacket(), Connections[fromConnection]); // Resend PingPing
+        // Send back if it was a ping
+        if (packet.PingPong == 0)
+        {
+            GD.Print("[Server] Sending Pong! " + Time.GetTicksMsec());
+            Connections[fromConnection].Ping(true); // Send Pong if it was a Ping, if it was a Pong
+        }
+        else // This was a pong, we need to record the RTT
+            Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime; 
     } 
 
     static void OnModify(ModifyNodePacket packet, uint fromConnection)

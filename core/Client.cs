@@ -1,7 +1,12 @@
 using Godot;
+using MessagePack;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 
 namespace ArcaneNetworking;
 
@@ -53,7 +58,7 @@ public partial class Client
         // Packet Handlers
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
-        RegisterPacketHandler<PingPongPacket>(OnPong);
+        RegisterPacketHandler<PingPongPacket>(OnPingPong);
         RegisterPacketHandler<RPCPacket>(OnRPC);
         RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
     }
@@ -65,7 +70,7 @@ public partial class Client
     {
         serverConnection.Send(packet, channel);
 
-        GD.Print("[Client] Send: " + packet.GetType());
+        //GD.Print("[Client] Send: " + packet.GetType());
     }
 
     static void OnClientConnected()
@@ -83,10 +88,12 @@ public partial class Client
     }
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
-        GD.Print("[Client] Receive Bytes: " + bytes.Array.Length);
+        //GD.Print("[Client] Receive Bytes: " + bytes.Array.Length);
 
         var reader = NetworkPool.GetReader(bytes.Array);
 
+        //GD.Print("[Client] Recieve Length: " + bytes.Array.Length);
+        
         if (reader.Read(out ushort packetHeader)) // Do we have a valid header?
         {
             if (reader.Read(out Packet packet, NetworkStorage.Singleton.IDToPacket(packetHeader))) // Invoke our packet handler
@@ -97,6 +104,8 @@ public partial class Client
             else GD.PrintErr("Packet was invalid on client receive!");
         }
         else GD.PrintErr("Packet header was invalid on client receive!");
+
+        NetworkPool.Recycle(reader);
     }
 
     /// <summary>
@@ -148,58 +157,74 @@ public partial class Client
         if (!Attribute.IsDefined(method, typeof(MethodRPCAttribute))) { GD.PrintErr("RPC Method IS NOT VALID"); return; } // Sanity Check
 
         // Run the RPC
-        if (method != null)
+        try
         {
-            method.Invoke(node, packet.Args);
+            dynamic[] args = new dynamic[packet.Args.Count];
+            // Attempt to parse args
+            for (int i = 0; i < packet.Args.Count; i++) args[i] = MessagePackSerializer.Deserialize<dynamic>(packet.Args[i]);
+
+            method.Invoke(node.NetworkedComponents[packet.CallerCompIndex], args);
         }
-        else
+        catch (Exception e)
         {
-            GD.PrintErr("Packet could not process method from packet! ");
+            GD.PrintErr("[Client] Packet could not process method from packet! ");
+            GD.PrintErr(e);
         }
+
 
         // If we got this far the packet is successful. If we are the server, check if we should relay to other clients
-    } 
-    static void OnPong(PingPongPacket packet, uint fromConnection) => serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime; // Get the round trip time
-    static void OnSpawn(SpawnNodePacket packet, uint fromConnection)
+    }
+    static void OnPingPong(PingPongPacket packet, uint fromConnection)
     {
-        Node spawnedObject;
-        NetworkedNode netNode = null;
-
-        //object already exists
-        if (NetworkedNodes.ContainsKey(packet.NetID)) return;
-
-        else
+        // Send back if it was a ping
+        if (packet.PingPong == 0)
         {
-            // We are not the server, instantiate
-            if (!NetworkManager.AmIServer)
-            {
-                spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
+            GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
+            serverConnection.Ping(true); // Send Pong if it was a Ping, if it was a Pong
+        }
+        else // This was a pong, we need to record the RTT
+            serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime; 
+    }
+    static void OnSpawn(SpawnNodePacket packet, uint fromConnection)
+        {
+            Node spawnedObject;
+            NetworkedNode netNode = null;
 
-                if (netNode == null)
-                {
-                    GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
-                    return;
-                }
-                // Finds its networked node, it should be a child of this spawned object
-                netNode = spawnedObject.FindChild<NetworkedNode>();
+            //object already exists
+            if (NetworkedNodes.ContainsKey(packet.NetID)) return;
 
-                // Adds child to the root of the game world
-                NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-            }
-
-            // We are the server as well as a client, don't instantiate twice, we can just get the info locally from the server
             else
             {
-                netNode = Server.NetworkedNodes[packet.NetID];
+                // We are not the server, instantiate
+                if (!NetworkManager.AmIServer)
+                {
+                    spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
+
+                    if (netNode == null)
+                    {
+                        GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
+                        return;
+                    }
+                    // Finds its networked node, it should be a child of this spawned object
+                    netNode = spawnedObject.FindChild<NetworkedNode>();
+
+                    // Adds child to the root of the game world
+                    NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+                }
+
+                // We are the server as well as a client, don't instantiate twice, we can just get the info locally from the server
+                else
+                {
+                    netNode = Server.NetworkedNodes[packet.NetID];
+                }
+
+                NetworkedNodes.Add(packet.NetID, netNode);
             }
-            
-            NetworkedNodes.Add(packet.NetID, netNode);
+
+            // Occupy Data
+            netNode.NetID = packet.NetID;
+
         }
-
-        // Occupy Data
-        netNode.NetID = packet.NetID;
-
-    }
 
     static void OnLoadLevel(LoadLevelPacket packet, uint fromConnection)
     {

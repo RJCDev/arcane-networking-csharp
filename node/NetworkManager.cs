@@ -58,18 +58,13 @@ public partial class NetworkManager : Node
     }
     public void Connect(string host, int port = -1)
     {
-        GD.Print("Connecting to server... " + host);
-
         Client.Connect(host, port);
     }
     public void StartServer(bool headless = false)
     {
+        Server.Start(headless);
 
-        if (!headless) Connect("localhost");
-
-        Server.Start();
-
-        GD.Print("Starting Server! ");
+        if (!headless) Client.Connect("localhost");
 
     }
     

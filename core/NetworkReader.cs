@@ -52,11 +52,11 @@ namespace ArcaneNetworking
                 // Read in the type
                 if (concreteType != default)
                 {
-                    msg = MessagePackSerializer.Deserialize(concreteType, ref reader);
+                    msg = MessagePackSerializer.Deserialize(concreteType, ref reader, MessagePackSerializerOptions.Standard);
                 }
                 else // Read in a T
                 {
-                    msg = MessagePackSerializer.Deserialize<T>(ref reader);
+                    msg = MessagePackSerializer.Deserialize<T>(ref reader, MessagePackSerializerOptions.Standard);
                 }
 
                 Position += (int)reader.Consumed;

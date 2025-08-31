@@ -14,25 +14,34 @@ public class SteamClient
 
     protected Callback<SteamNetConnectionStatusChangedCallback_t> ConnectionCallback;
 
-    public CSteamID MySteamID;   
 
     public SteamClient()
     {
-        // Retrieve our steam ID
-        MySteamID = SteamUser.GetSteamID();
-
         // Callbacks
         ConnectionCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged);
     }
 
+    public void SetLocal(HSteamNetConnection conn) => ConnectionToServer = conn;
+
+
     public void StartClient(NetworkConnection connection)
     {
-        RemoteIdentity = new() { m_eType = ESteamNetworkingIdentityType.k_ESteamNetworkingIdentityType_SteamID };
-        RemoteIdentity.SetSteamID(new CSteamID(connection.GetEndpointAs<ulong>()));
+        if (ConnectionToServer == default) // We have no internal connection, we are Remote
+        {
+            RemoteIdentity = new() { m_eType = ESteamNetworkingIdentityType.k_ESteamNetworkingIdentityType_SteamID };
+            RemoteIdentity.SetSteamID(new CSteamID(connection.GetEndpointAs<ulong>()));
 
-        ConnectionToServer = SteamNetworkingSockets.ConnectP2P(ref RemoteIdentity, 0, 0, null);
+            GD.Print("[Steam Client] Connecting to... " + connection.GetEndpointAs<ulong>());
 
-        GD.Print("[Steam Client] Connecting to... " + connection.GetEndpointAs<ulong>());
+            ConnectionToServer = SteamNetworkingSockets.ConnectP2P(ref RemoteIdentity, 0, 0, null);
+        }
+        else // Local Server, simulate callbacks
+        {
+            MessageLayer.Active.OnClientConnect?.Invoke();
+        }
+
+        GD.Print("[Steam Client] Local Client Setup!");
+
     }
 
     public void StopClient()
@@ -50,13 +59,15 @@ public class SteamClient
         switch (info.m_info.m_eState)
         {
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
-            
+
                 if (info.m_info.m_identityRemote.GetSteamID() == RemoteIdentity.GetSteamID())
                 {
                     // We have connected!
                     SteamNetworkingSockets.AcceptConnection(info.m_hConn);
 
                     GD.PushWarning("[Steam Client] Connected To Remote Host: " + info.m_info.m_identityRemote.GetSteamID());
+
+                    MessageLayer.Active.OnClientConnect?.Invoke();
                 }
                 break;
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
@@ -69,28 +80,22 @@ public class SteamClient
 
     public void PollMessages(SteamMessageLayer layer)
     {
-
         int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(ConnectionToServer, layer.ReceiveBuffer, layer.ReceiveBuffer.Length);
 
         for (int i = 0; i < msgCount; i++)
         {
             SteamNetworkingMessage_t netMessage =
                 Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceiveBuffer[i]);
+                
             try
             {
                 byte[] buffer = ArrayPool<byte>.Shared.Rent(netMessage.m_cbSize);
                 Marshal.Copy(netMessage.m_pData, buffer, 0, netMessage.m_cbSize);
                 var segment = new ArraySegment<byte>(buffer, 0, netMessage.m_cbSize);
-                
-                if (NetworkManager.AmIClient)
-                    MessageLayer.Active.OnClientReceive?.Invoke(segment);
 
-                if (NetworkManager.AmIServer)
-                    MessageLayer.Active.OnServerReceive?.Invoke(
-                        segment,
-                        (uint)netMessage.m_identityPeer.GetSteamID().m_SteamID);
+                MessageLayer.Active.OnClientReceive?.Invoke(segment);
 
-                GD.Print("[SteamClient] Message Received");
+                //GD.Print("[SteamClient] Message Received! Count: " + msgCount);
             }
             catch (Exception e)
             {

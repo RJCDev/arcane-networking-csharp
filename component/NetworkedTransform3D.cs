@@ -53,7 +53,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
     }
     public override void _PhysicsProcess(double delta)
     {
-
         // Update Position
         if (NetworkedNode.AmIOwner)
         {
@@ -62,40 +61,34 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
             // Pos
             if (OldPos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
-            if (OldPos.X != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.X); }
-            if (OldPos.X != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+            if (OldPos.X != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
+            if (OldPos.X != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
 
             // Rot
-            if (OldRot.X != TransformNode.Quaternion.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.Quaternion.X); }
-            if (OldRot.Y != TransformNode.Quaternion.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.Quaternion.Y); }
-            if (OldRot.Z != TransformNode.Quaternion.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.Quaternion.Z); }
+            if (OldRot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
+            if (OldRot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
+            if (OldRot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
 
             // Scale
             if (OldScale != TransformNode.Scale) { changes |= Changed.Scale; valuesChanged.Add(TransformNode.Scale.X); valuesChanged.Add(TransformNode.Scale.Y); valuesChanged.Add(TransformNode.Scale.Z); }
 
             // Send RPC if changes occured
             if (changes != Changed.None)
-            {
-                if (NetworkManager.AmIClient) GD.Print("[Client] Sending NetworkedTransform3D RPC");
-                if (NetworkManager.AmIServer) GD.Print("[Server] Sending NetworkedTransform3D RPC");
-                
                 Set(changes, [.. valuesChanged]);
+
+        }
+        else
+        {
+            if (CurrentState[0] != CurrentState[1])
+            {
+                // Process the interpolation
+                TransformSnapshot current = CurrentState[0].TransformWith(CurrentState[1], InterpSpeed);
+
+                TransformNode.GlobalPosition = current.Pos;
+                TransformNode.GlobalRotation = current.Rot;
+                TransformNode.Scale = current.Scale;
             }
         }
-
-        //TransformNode.Translate(new Vector3((float)delta, 0, 0));
-
-        if (CurrentState[0] != CurrentState[1])
-        {
-            // Process the interpolation
-            TransformSnapshot current = CurrentState[0].TransformWith(CurrentState[1], InterpSpeed);
-
-            TransformNode.GlobalPosition = current.Pos;
-            TransformNode.GlobalRotation = current.Rot;
-            TransformNode.Scale = current.Scale;
-        }
-        
-
        
     }
 
@@ -110,12 +103,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
             Rot = TransformNode.GlobalRotation,
             Scale = TransformNode.Scale
         };
-
         // Read the "Current" snapshot we just got
         CurrentState[1] = ReadSnapshot(changed, valuesChanged);
-
-        if (NetworkManager.AmIClient) GD.Print("[Receiving] Sending NetworkedTransform3D RPC");
-        if (NetworkManager.AmIServer) GD.Print("[Receiving] Sending NetworkedTransform3D RPC");
     }
 
     /// <summary>
