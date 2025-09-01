@@ -37,7 +37,7 @@ namespace ArcaneNetworking
             var bufferWriter = new ArrayBufferWriter<byte>();
             var mpWriter = new MessagePackWriter(bufferWriter);
 
-            MessagePackSerializer.Serialize(ref mpWriter, obj, MessagePackSerializerOptions.Standard);
+            MessagePackSerializer.Serialize<T>(ref mpWriter, obj, MessagePackSerializerOptions.Standard);
 
             mpWriter.Flush();
 

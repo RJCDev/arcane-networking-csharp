@@ -107,6 +107,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         CurrentState[1] = ReadSnapshot(changed, valuesChanged);
     }
 
+
     /// <summary>
     /// Read a snapshot from values changed
     /// </summary>

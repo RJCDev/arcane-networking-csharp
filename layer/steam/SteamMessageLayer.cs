@@ -3,6 +3,7 @@ using Godot;
 using MessagePack;
 using Steamworks;
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -80,15 +81,29 @@ public partial class SteamMessageLayer : MessageLayer
         SteamClient.PollMessages(this);
     }
 
-    public override void SendToConnections(ArraySegment<byte> bytes, Channels sendType, params NetworkConnection[] connnectionsToSendTo)
+    public override void SendToConnections(ArraySegment<byte> bytes, Channels sendType, params uint[] connnectionsToSendTo)
     {
-        foreach (NetworkConnection connection in connnectionsToSendTo)
+        // TODO Abstract this into MessageLayer //
+        //                                      //
+        var connectionsSending = connnectionsToSendTo;
+        if (connectionsSending.Length == 0) // Assume default case (Client is sending to server, or Server is sending to ALL)
+        {
+            if (NetworkManager.AmIServer) connectionsSending = [.. Server.Connections.Keys];
+            else connectionsSending = [Client.serverConnection.GetID()];
+        } 
+        //                                     //
+        // TODO Abstract this into MessageLayer//
+
+        // If its not 0, just use the connections provided
+
+        foreach (uint connID in connectionsSending)
         {
             // Run invokes (send is for debug)
-            if (NetworkManager.AmIServer) OnServerSend?.Invoke(bytes, connection.GetID());
+            if (NetworkManager.AmIServer) OnServerSend?.Invoke(bytes, connID);
             if (NetworkManager.AmIClient) OnClientSend?.Invoke(bytes);
 
-            HSteamNetConnection steamConnectionToSend = connection.isLocalConnection ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connection.GetID()];
+            // Get SteamNetConnection handle to send to
+            HSteamNetConnection steamConnectionToSend = NetworkManager.AmIClient ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connID];
 
             GCHandle handle = default;
             try

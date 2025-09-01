@@ -73,7 +73,12 @@ public partial class NetworkManager : Node
     {
         if (MsgLayer != null)
         {
+            // Instantiate Message Layer
             AddChild(MessageLayer.Active = MsgLayer.Instantiate<MessageLayer>());
+            
+            // Register internal handlers for packets
+            Client.RegisterInternalHandlers();
+            Server.RegisterInternalHandlers();
         }
         else
         {

@@ -90,7 +90,8 @@ public partial class NetworkedNode : Node
 
     void OnChildAdded(Node child)
     {
-        if (child is NetworkedComponent) NetworkedComponents.Add(child as NetworkedComponent);
+        // Make SURE we insert it at the correct index
+        if (child is NetworkedComponent) NetworkedComponents.Insert(child.GetIndex(), child as NetworkedComponent);
         else return;
     }
 }

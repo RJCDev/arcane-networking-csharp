@@ -1,7 +1,5 @@
 using Godot;
 using MessagePack;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,12 +17,11 @@ public enum ConnetionStatus
 }
 
 public partial class Client
-{   
-    // Packet Handling
-    static readonly Dictionary<ushort, Action<Packet, uint>> packetHandlers = [];
+{
+    internal static readonly Dictionary<int, Action<Packet>> PacketInvokes = [];
 
     /// List of networked object nodes that have references to their object in them, guids are keys
-    public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
+    internal static readonly Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
 
     // Connection to the server
     public static NetworkConnection serverConnection = null;
@@ -32,16 +29,19 @@ public partial class Client
     /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
-    public static void RegisterPacketHandler<T>(Action<T, uint> handler) where T : Packet
+    public static void RegisterPacketHandler<T>(Action<T> handler) where T : Packet
     {
         // Wrap the handler so it can fit into Action<Packet>
-        packetHandlers[NetworkStorage.Singleton.PacketToID(typeof(T))] = (packet, connID) => handler((T)packet, connID);
+        Type packetType = typeof(T);
+        string packetFullName = packetType.DeclaringType.FullName + "::" + packetType.Name;
+        
+        PacketInvokes[NetworkStorage.StableHash(packetFullName)] = (packet) => handler((T)packet);
     }
-    internal static void PacketInvoke(ushort funcByte, Packet packet, uint fromConnection)
+    internal static void PacketInvoke(int packetHash, Packet packet)
     {
-        if (packetHandlers.TryGetValue(funcByte, out var handler))
+        if (PacketInvokes.TryGetValue(packetHash, out var handler))
         {
-            handler(packet, fromConnection);
+            handler(packet);
         }
         else
         {
@@ -59,7 +59,6 @@ public partial class Client
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
-        RegisterPacketHandler<RPCPacket>(OnRPC);
         RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
     }
 
@@ -86,6 +85,13 @@ public partial class Client
         
         GD.Print("[Client] Client Has Disconnected..");
     }
+    
+    /// <summary>
+    /// <para> Header always has [byte] for type first. (0 = Packet, 1 = RPC, 2 = Stream) </para>
+    /// <para> Packet has [byte][int] for hash </para>
+    /// <para> RPC Header has [byte][int] for hash </para>
+    /// <para> Stream has [byte][data][data][data] etc. </para>
+    /// </summary>
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
         //GD.Print("[Client] Receive Bytes: " + bytes.Array.Length);
@@ -93,17 +99,46 @@ public partial class Client
         var reader = NetworkPool.GetReader(bytes.Array);
 
         //GD.Print("[Client] Recieve Length: " + bytes.Array.Length);
-        
-        if (reader.Read(out ushort packetHeader)) // Do we have a valid header?
+
+        if (reader.Read(out byte packetHeader)) // Do we have a valid header?
         {
-            if (reader.Read(out Packet packet, NetworkStorage.Singleton.IDToPacket(packetHeader))) // Invoke our packet handler
+            if (reader.Read(out int hash))
             {
-                PacketInvoke(packetHeader, packet, 0);
+                switch (hash)
+                {
+                    case 0: // Regular Packet
+
+                        if (reader.Read(out Packet packet, NetworkStorage.PacketTypes[hash])) // Invoke our packet handler
+                        {
+                            PacketInvoke(packetHeader, packet);
+                        }
+
+                        break;
+                    
+                    
+                    case 1: // RPC Packet
+
+                        if (reader.Read(out RPCPacket rpcPacket))
+                        {
+                            if (NetworkStorage.RPCMethods.TryGetValue(hash, out var unpack))
+                            {
+                                // Invoke Weaved Method
+                                unpack(NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex], hash);
+                            }
+                            else
+                            {
+                                GD.PrintErr("RPC Method Hash not found! " + hash);   
+                            }
+                            
+                        }
+                        
+                    break;
+                }
             }
 
-            else GD.PrintErr("Packet was invalid on client receive!");
+            else GD.PrintErr("[Client] Packet was invalid on receive!");
         }
-        else GD.PrintErr("Packet header was invalid on client receive!");
+        else GD.PrintErr("[Client] Packet header was invalid on receive!");
 
         NetworkPool.Recycle(reader);
     }
@@ -132,7 +167,7 @@ public partial class Client
     {
         foreach (var netObject in NetworkedNodes)
         {
-            OnModify(new ModifyNodePacket() { NetID = netObject.Key, enabled = true, destroy = true }, 0);
+            OnModify(new ModifyNodePacket() { NetID = netObject.Key, enabled = true, destroy = true });
         }
 
         MessageLayer.Active.StopClient();
@@ -140,41 +175,8 @@ public partial class Client
     }
   
     ////////////////////////// Internal Packet Callbacks
-    static void OnRPC(RPCPacket packet, uint fromConnection)
-    {
-        NetworkedNode node;
-        
-        // Get the NetworkedNode
-        if (!NetworkedNodes.TryGetValue(packet.CallerNetID, out node))
-        {
-            GD.PrintErr("Caller Object GUID Is NOT found on the CLIENT!");
-            return;
-        }
 
-        // Obtain the method using the ID
-        MethodInfo method = NetworkStorage.Singleton.IDToMethod(packet.CallerMethodID);
-
-        if (!Attribute.IsDefined(method, typeof(MethodRPCAttribute))) { GD.PrintErr("RPC Method IS NOT VALID"); return; } // Sanity Check
-
-        // Run the RPC
-        try
-        {
-            dynamic[] args = new dynamic[packet.Args.Count];
-            // Attempt to parse args
-            for (int i = 0; i < packet.Args.Count; i++) args[i] = MessagePackSerializer.Deserialize<dynamic>(packet.Args[i]);
-
-            method.Invoke(node.NetworkedComponents[packet.CallerCompIndex], args);
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("[Client] Packet could not process method from packet! ");
-            GD.PrintErr(e);
-        }
-
-
-        // If we got this far the packet is successful. If we are the server, check if we should relay to other clients
-    }
-    static void OnPingPong(PingPongPacket packet, uint fromConnection)
+    static void OnPingPong(PingPongPacket packet)
     {
         // Send back if it was a ping
         if (packet.PingPong == 0)
@@ -185,7 +187,7 @@ public partial class Client
         else // This was a pong, we need to record the RTT
             serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime; 
     }
-    static void OnSpawn(SpawnNodePacket packet, uint fromConnection)
+    static void OnSpawn(SpawnNodePacket packet)
         {
             Node spawnedObject;
             NetworkedNode netNode = null;
@@ -226,7 +228,7 @@ public partial class Client
 
         }
 
-    static void OnLoadLevel(LoadLevelPacket packet, uint fromConnection)
+    static void OnLoadLevel(LoadLevelPacket packet)
     {
         try
         {
@@ -242,7 +244,7 @@ public partial class Client
     /// <summary>
     /// Used for modifying a net object (disabling, destroying, etc.)
     /// </summary>
-    public static void OnModify(ModifyNodePacket packet, uint fromConnection)
+    public static void OnModify(ModifyNodePacket packet)
     {
         if (FindNetworkedNode(packet.NetID, out NetworkedNode netObject))
         {

@@ -71,17 +71,11 @@ namespace ArcaneNetworking
         [Key(1)]
         public int CallerCompIndex;
 
-        // (Property, Method, etc.)
         [Key(2)]
-        public ushort CallerMethodID;
+        public uint ArgCount;
 
-        // If we should relay to all the clients
-        [Key(3)]
-        public bool ShouldRelay;
-
-        // Serialized arguments
-        [Key(4)]
-        public ArraySegment<byte> Args;
+        // Arguments are written into a buffer AFTER this packet has been serialized
+        //public ArraySegment<byte> Args;
 
     }
 

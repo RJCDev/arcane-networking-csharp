@@ -1,8 +1,6 @@
 using Godot;
 using MessagePack;
 using MessagePack.Formatters;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +12,7 @@ namespace ArcaneNetworking;
 public partial class Server : Node
 {
     // Packet Handling
-    static readonly Dictionary<ushort, Action<Packet, uint>> packetHandlers = [];
+    static readonly Dictionary<int, Action<Packet, uint>> PacketInvokes = [];
 
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
     static uint CurrentNodeID = 0;
@@ -29,23 +27,26 @@ public partial class Server : Node
 
     public static bool AllConnectionsAuthenticated => Connections.All(x => x.Value.isAuthenticated == true);
 
-     /// <summary>
+    /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
     public static void RegisterPacketHandler<T>(Action<T, uint> handler) where T : Packet
     {
         // Wrap the handler so it can fit into Action<Packet>
-        packetHandlers[NetworkStorage.Singleton.PacketToID(typeof(T))] = (packet, connID) => handler((T)packet, connID);
+        Type packetType = typeof(T);
+        string packetFullName = packetType.DeclaringType.FullName + "::" + packetType.Name;
+        
+        PacketInvokes[NetworkStorage.StableHash(packetFullName)] = (packet, connID) => handler((T)packet, connID);
     }
-    static void PacketInvoke(ushort packetID, Packet packet, uint connID)
+    internal static void PacketInvoke(int packetHash, Packet packet, uint fromConnection)
     {
-        if (packetHandlers.TryGetValue(packetID, out var handler))
+        if (PacketInvokes.TryGetValue(packetHash, out var handler))
         {
-            handler(packet, connID);
+            handler(packet, fromConnection);
         }
         else
         {
-            Console.WriteLine($"[Client] No handler registered for packet type {packet.GetType()}");
+            GD.PrintErr($"[Server] No handler registered for packet type {packet.GetType()}");
         }
     }
     internal static void RegisterInternalHandlers()
@@ -59,7 +60,6 @@ public partial class Server : Node
         RegisterPacketHandler<SpawnNodePacket>((_, _) => { }); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
-        RegisterPacketHandler<RPCPacket>(OnRPC);
         RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
     }
 
@@ -105,21 +105,51 @@ public partial class Server : Node
     }
     static void OnServerReceive(ArraySegment<byte> bytes, uint connID)
     {
-        //GD.Print("[Server] Receive Bytes: " + bytes.Array.Length);
+       //GD.Print("[Server] Receive Bytes: " + bytes.Array.Length);
 
         var reader = NetworkPool.GetReader(bytes.Array);
 
-        if (reader.Read(out ushort packetHeader)) // Do we have a valid header?
+        //GD.Print("[Server] Recieve Length: " + bytes.Array.Length);
+
+        if (reader.Read(out byte packetHeader)) // Do we have a valid header?
         {
-            if (reader.Read(out Packet packet, NetworkStorage.Singleton.IDToPacket(packetHeader))) // Invoke our packet handler
+            if (reader.Read(out int hash))
             {
-                if (packet is RPCPacket)
-                PacketInvoke(packetHeader, packet, connID); 
+                switch (hash)
+                {
+                    case 0: // Regular Packet
+
+                        if (reader.Read(out Packet packet, NetworkStorage.PacketTypes[hash])) // Invoke our packet handler
+                        {
+                            PacketInvoke(packetHeader, packet, connID);
+                        }
+
+                        break;
+                    
+                    
+                    case 1: // RPC Packet
+
+                        if (reader.Read(out RPCPacket rpcPacket))
+                        {
+                            if (NetworkStorage.RPCMethods.TryGetValue(hash, out var unpack))
+                            {
+                                // Invoke Weaved Method
+                                unpack(NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex], hash);
+                            }
+                            else
+                            {
+                                GD.PrintErr("RPC Method Hash not found! " + hash);   
+                            }
+                            
+                        }
+                        
+                    break;
+                }
             }
 
-            else GD.PrintErr("Packet was invalid on server receive!");
+            else GD.PrintErr("[Server] Packet was invalid on receive!");
         }
-        else GD.PrintErr("Packet header was invalid on server receive!");
+        else GD.PrintErr("[Server] Packet header was invalid on receive!");
 
         NetworkPool.Recycle(reader);
     }
@@ -153,42 +183,6 @@ public partial class Server : Node
     }
 
     ////////////////////////// Internal Packet Callbacks
-    static void OnRPC(RPCPacket packet, uint fromConnection)
-    {
-        NetworkedNode node;
-
-        if (!NetworkedNodes.TryGetValue(packet.CallerNetID, out node))
-        {
-            GD.PrintErr("Caller Object GUID Is NOT found on the SERVER!");
-            return;
-        }
-
-        // Obtain the method using the ID
-        MethodInfo method = NetworkStorage.Singleton.IDToMethod(packet.CallerMethodID);
-
-        if (!Attribute.IsDefined(method, typeof(MethodRPCAttribute))) { GD.PrintErr("RPC Method IS NOT VALID"); return; } // Sanity Check
-
-        // Run the RPC
-        try
-        {
-            dynamic[] args = new dynamic[packet.Args.Count];
-            // Attempt to parse args
-            for (int i = 0; i < packet.Args.Count; i++) args[i] = MessagePackSerializer.Deserialize<dynamic>(packet.Args[i]);
-
-            method.Invoke(node.NetworkedComponents[packet.CallerCompIndex], args);
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("[Server] Packet could not process method from packet! ");
-            GD.PrintErr(e);
-        }
-
-        // Relay to Clients
-        foreach (var conn in Connections.Values)
-
-            conn.Send(packet, Channels.Reliable);
-
-    }
 
     static void OnPingPong(PingPongPacket packet, uint fromConnection)
     {

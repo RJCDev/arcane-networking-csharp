@@ -32,7 +32,8 @@ public static class MessageHandler
             {
                 var message = MessageQueue.Dequeue();
 
-                MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, message.connections);
+                foreach (var connection in message.connections)
+                    MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, connection.GetID());
 
                 NetworkPool.Recycle(message.writer);
             }

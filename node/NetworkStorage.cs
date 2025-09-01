@@ -5,96 +5,35 @@ using System.Linq;
 using System.Reflection;
 using System.ComponentModel;
 using MessagePack;
+using System.Security.Cryptography;
 
 namespace ArcaneNetworking;
+
+public struct RPCMethod
+{
+    public MethodInfo RPC;
+    public Type[] ParameterTypes;
+}
 
 /// <summary>
 /// Storage singleton that takes data from the weaver and produces resources that can be
 /// persistantly stored during runtime
 /// </summary>
-public partial class NetworkStorage : Node
+public static class NetworkStorage
 {
-    // Saved disk object to be loaded
-    private NetworkRegistry _registry;
 
-    // Runtime access loaded from _registry
-    public static Map<ushort, Type> PacketTypes = new();
-    public static Map<ushort, MethodInfo> RpcMethods = new();
+    public static readonly Dictionary<int, Type> PacketTypes = [];
+    public static readonly Dictionary<int, Action<NetworkedComponent, int>> RPCMethods = [];
 
-    public static NetworkStorage Singleton;
-    public NetworkStorage() => Singleton ??= this;
+    static NetworkStorage() { }
 
-    public override void _EnterTree()
+
+    public static int StableHash(string hashString)
     {
-       
-        GD.Print("[Network Storage] Loading Runtime Registry...");
-    
-        try
-        {
-            _registry = GD.Load<NetworkRegistry>("res://addons/arcane-networking/plugin/registry/NetworkRegistry.tres");
-            // Convert type names back into real System.Type
-            foreach (var kv in _registry.PacketIDs)
-            {
-                var type = Type.GetType(kv.Value);
-
-                if (type != null)
-                {
-                    PacketTypes.Add(kv.Key, type);
-
-                    GD.Print("Packet ID: " + kv.Key + " For Packet Type: " + kv.Value + " Has Been Registered");
-                }
-            }
-
-            foreach (var id in _registry.MethodRPCs)
-            {
-                int indexOfMethodStart = id.Value.LastIndexOf(".");
-
-                string typeName = id.Value.Substring(0, indexOfMethodStart);
-                string methodName = id.Value.Substring(indexOfMethodStart + 1);
-
-                // Get the Type (search all loaded assemblies)
-                var type = Type.GetType(typeName);
-
-                if (type == null)
-                    throw new InvalidOperationException($"Could not find type '{typeName}'");
-
-                // Get the method
-                var method = type.GetMethod(methodName,
-                    BindingFlags.Instance | BindingFlags.Static |
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-
-                if (method == null)
-                    throw new InvalidOperationException($"Could not find method '{methodName}' on type '{typeName}'");
-
-                RpcMethods.Add(id.Key, method);
-                
-                
-                GD.Print("Method ID: " + id.Key + " For Type: " + id.Value + " Has Been Registered");
-
-            }
-
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("NetworkRegistry could not be loaded! Arcane Networking will not be able to retrieve IDs for RPCs or Packets.");
-            GD.PrintErr(e);
-            GetTree().Quit();
-        }
+        var hash = MD5.HashData(System.Text.Encoding.UTF8.GetBytes(hashString));
+        return BitConverter.ToInt32(hash, 0);
     }
 
-    public override void _Ready()
-    {
-        // Register internal handlers for packets
-        Client.RegisterInternalHandlers();
-        Server.RegisterInternalHandlers();
-    }
-
-
-    public MethodInfo IDToMethod(ushort rpcID) => RpcMethods.Forward[rpcID];
-    public ushort MethodToID(MethodInfo method) => RpcMethods.Reverse[method];
-
-    public Type IDToPacket(ushort packetID) => PacketTypes.Forward[packetID];
-    public ushort PacketToID(Type packetType) => PacketTypes.Reverse[packetType];
 
 }
 
