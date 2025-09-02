@@ -23,7 +23,9 @@ public static class NetworkStorage
 {
 
     public static readonly Dictionary<int, Type> PacketTypes = [];
-    public static readonly Dictionary<int, Action<NetworkedComponent, int>> RPCMethods = [];
+
+    // MethodHash, Action<Component, CallerNetID>
+    public static readonly Dictionary<int, Action<NetworkedComponent, uint>> RPCMethods = [];
 
     static NetworkStorage() { }
 

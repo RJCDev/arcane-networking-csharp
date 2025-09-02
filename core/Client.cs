@@ -123,7 +123,7 @@ public partial class Client
                             if (NetworkStorage.RPCMethods.TryGetValue(hash, out var unpack))
                             {
                                 // Invoke Weaved Method
-                                unpack(NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex], hash);
+                                unpack(NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex], rpcPacket.CallerNetID);
                             }
                             else
                             {

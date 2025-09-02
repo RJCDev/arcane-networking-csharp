@@ -1,60 +1,110 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using Fody;
+using System.Security.Cryptography;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
 
-using ArcaneNetworking;
-
-
 namespace ArcaneWeaver;
 
-public class Weaver : BaseModuleWeaver
+public static class Weaver
 {
-    public override void Execute()
+    static ModuleDefinition ModuleDefinition;
+
+    public static int Main(string[] args)
     {
-        foreach (var type in ModuleDefinition.Types)
+        if (args.Length == 1 && args[0].EndsWith(".dll"))
         {
-            // Hash if packet
-            if (type.BaseType.FullName == typeof(Packet).BaseType.FullName)
+            string targetPath = args[0];
+            string tempPath = Path.Combine(Path.GetTempPath(), Path.GetFileName(targetPath));
+
+            try
             {
-                InjectPacketHashRegister(type);
-            }
-            // Make sure its on a networkedcomponent
-            if (type.BaseType.FullName == typeof(NetworkedComponent).FullName)
-            {
-                // Hash MethodRPC Methods
-                foreach (var method in type.Methods)
+                // Copy original DLL to a temp file
+                File.Copy(targetPath, tempPath, true);
+
+                // Open temp DLL for read/write
+                using (var fs = new FileStream(tempPath, System.IO.FileMode.Open, System.IO.FileAccess.ReadWrite, System.IO.FileShare.ReadWrite))
                 {
-                    if (!method.CustomAttributes.Any(a => a.AttributeType.Name == "MethodRPCAttribute")) continue; // Check for attribute
+                    ModuleDefinition = ModuleDefinition.ReadModule(fs);
 
-                    var invokeHandler = GenerateRPCUpackAndInvokeHandler(type, method); // Create invoker method first
-                    int methodHash = InjectMethodRPCHashRegister(method, invokeHandler); // Inject NetworkStorage register packet handler
+                    foreach (var type in ModuleDefinition.Types)
+                    {
+                        // Packet hashing
+                        if (type.BaseType?.FullName == "ArcaneNetworking.Packet")
+                            InjectPacketHashRegister(type);
 
-                    var packMethod = GeneratePackMethod(type, method, methodHash); // Create a pack method that can be inserted behind RPC logic
-                    InjectRPCPreMethod(method, packMethod); // inject it behind RPC logic
+                        // RPC method weaving
+                        if (type.BaseType?.FullName == "NetworkedComponent.Packet")
+                        {
+                            foreach (var method in type.Methods)
+                            {
+                                if (!method.CustomAttributes.Any(a => a.AttributeType.Name == "MethodRPCAttribute"))
+                                    continue;
 
+                                var invokeHandler = GenerateRPCUpackAndInvokeHandler(type, method);
+                                int methodHash = InjectMethodRPCHashRegister(method, invokeHandler);
+                                var packMethod = GeneratePackMethod(type, method, methodHash);
+                                InjectRPCPreMethod(method, packMethod);
+                            }
+                        }
+                    }
+
+                    // Rewind stream and write changes
+                    fs.Seek(0, SeekOrigin.Begin);
+                    ModuleDefinition.Write(fs);
                 }
+
+                // Overwrite original DLL after weaving
+                File.Copy(tempPath, targetPath, true);
+                File.Delete(tempPath);
+
+                Console.WriteLine("[Weaver] Successfully weaved: " + targetPath);
+                return 0;
             }
-
-
+            catch (Exception e)
+            {
+                Console.WriteLine("[Weaver] Failed to weave: " + e);
+                return 1;
+            }
         }
 
+        Console.WriteLine("[Weaver] Invalid arguments.");
+        return 1;
+    }
+
+    static int StableHash(string hashString)
+    {
+        var hash = MD5.HashData(System.Text.Encoding.UTF8.GetBytes(hashString));
+        return BitConverter.ToInt32(hash, 0);
+    }
+
+    static TypeReference GetTypeReferenceByFullName(string FullName)
+    {
+        // module = your target ModuleDefinition
+        // Find the type inside the loaded assembly
+        var registryTypeDef = ModuleDefinition.Types.FirstOrDefault(t => t.FullName == FullName);
+
+        if (registryTypeDef == null)
+            throw new Exception("Could not find Type: " + FullName + " in Project Acssembly!");
+
+        // Import a reference to it
+        return ModuleDefinition.ImportReference(registryTypeDef);
     }
     /// <summary>
     /// Injects a register method in NetworkStorage static constructor that registers packet IDs
     /// </summary>
-    int InjectPacketHashRegister(TypeDefinition type)
+    static int InjectPacketHashRegister(TypeDefinition type)
     {
-        var registryRef = ModuleDefinition.ImportReference(typeof(NetworkStorage)).Resolve();
-        var packetDictionary = ModuleDefinition.ImportReference(registryRef.Fields.First(f => f.Name == "PacketTypes"));
-        int hash = NetworkStorage.StableHash(type.DeclaringType.FullName);
+        var networkStorageDef = GetTypeReferenceByFullName("ArcaneNetworking.NetworkStorage").Resolve();
+        var packetDictionary = ModuleDefinition.ImportReference(networkStorageDef.Fields.First(f => f.Name == "PacketTypes"));
+        int hash = StableHash(type.FullName);
 
         ////////////// WE ARE WEAVING THE STATIC CONSTRUCTOR NOW /////////////////
 
-        var il = registryRef.GetStaticConstructor().Body.GetILProcessor(); // Start Method Processing
+        var il = networkStorageDef.GetStaticConstructor().Body.GetILProcessor(); // Start Method Processing
 
         // Load dictionary
         il.Emit(OpCodes.Ldsfld, packetDictionary);
@@ -79,13 +129,13 @@ public class Weaver : BaseModuleWeaver
     }
 
     // <summary>
-    /// Injects a register method in NetworkStorage static constructor that registers RPC method IDs
+    /// Injects a register method in NetworkStorage static constructor that registers RPC method
     /// </summary>
-    int InjectMethodRPCHashRegister(MethodDefinition method, MethodDefinition invoker)
+    static int InjectMethodRPCHashRegister(MethodDefinition method, MethodDefinition invoker)
     {
-        var registryDef = ModuleDefinition.ImportReference(typeof(NetworkStorage)).Resolve();
+        var registryDef = GetTypeReferenceByFullName("ArcaneNetworking.NetworkStorage").Resolve();
         var rpcDictField = registryDef.Fields.First(f => f.Name == "RPCMethods");
-        int hash = NetworkStorage.StableHash(method.DeclaringType.FullName + "::" + method.Name);
+        int hash = StableHash(method.DeclaringType.FullName + "::" + method.Name);
 
         // In static ctor:
         var cctor = registryDef.GetStaticConstructor();
@@ -97,20 +147,36 @@ public class Weaver : BaseModuleWeaver
         // Push hash
         il.Emit(OpCodes.Ldc_I4, hash);
 
-        // Construct delegate: new Action<NetworkedComponent,uint>(null, &Unpack_Method)
-        var actionCtor = ModuleDefinition.ImportReference(
-            typeof(Action<NetworkedComponent, uint>).GetConstructor([typeof(object), typeof(IntPtr)])
-        );
+        var networkedcomponentType = ModuleDefinition.Types.First(t => t.FullName == "ArcaneNetworking.NetworkedComponent");
+
+        // Import Action<,>
+        var actionTypeRef = ModuleDefinition.ImportReference(typeof(Action<,>));
+        var genericAction = new GenericInstanceType(actionTypeRef);
+        genericAction.GenericArguments.Add(ModuleDefinition.ImportReference(networkedcomponentType));
+        genericAction.GenericArguments.Add(ModuleDefinition.ImportReference(typeof(uint)));
+
+        // Import Dictionary<int, Action<NetworkedComponent>>
+        var dictTypeRef = ModuleDefinition.ImportReference(typeof(Dictionary<,>));
+        var genericDict = new GenericInstanceType(dictTypeRef);
+        genericDict.GenericArguments.Add(ModuleDefinition.TypeSystem.Int32);
+        genericDict.GenericArguments.Add(genericAction);
+
+        // Get the Add method from the generic Dictionary type
+        var addMethodDef = dictTypeRef.Resolve().Methods
+            .First(m => m.Name == "Add" && m.Parameters.Count == 2);
+
+        // Create the ctor reference for Action<NetworkedComponent, uint>(object, IntPtr)
+        var actionCtor = genericAction.Resolve()
+            .Methods.First(m => m.IsConstructor && m.Parameters.Count == 2 &&
+                                m.Parameters[0].ParameterType.FullName == "System.Object" &&
+                                m.Parameters[1].ParameterType.FullName == "System.IntPtr");
+
 
         il.Emit(OpCodes.Ldnull); // target (static method)
         il.Emit(OpCodes.Ldftn, invoker); // method pointer
-        il.Emit(OpCodes.Newobj, actionCtor);
+        il.Emit(OpCodes.Newobj, actionCtor); // The constructor for creating a Action<NetworkedComponent>
 
-        // Add to dictionary
-        var dictAdd = ModuleDefinition.ImportReference(
-            typeof(Dictionary<int, Action<NetworkedComponent, uint>>).GetMethod("Add")
-        );
-        il.Emit(OpCodes.Callvirt, dictAdd);
+        il.Emit(OpCodes.Callvirt, addMethodDef); // Add to dictionary
 
         return hash;
     }
@@ -118,10 +184,10 @@ public class Weaver : BaseModuleWeaver
     // <summary>
     /// Injects instructions behind an RPC method 
     /// </summary>
-    void InjectRPCPreMethod(MethodDefinition method, MethodDefinition packMethod)
+    static void InjectRPCPreMethod(MethodDefinition method, MethodDefinition packMethod)
     {
         bool isServerCommand = (bool)method.CustomAttributes
-        .First(x => x.AttributeType.FullName == typeof(MethodRPCAttribute).FullName)
+        .First(x => x.AttributeType.FullName == "ArcaneNetworking.MethodRPCAttribute")
         .ConstructorArguments[1].Value;
 
         var il = method.Body.GetILProcessor();
@@ -140,12 +206,12 @@ public class Weaver : BaseModuleWeaver
     /// Generates a (packMethod) that pack the arguments that are sent into an RPC, as well as the packet type (RPC = 1),
     /// and the RPC data.
     /// </summary>
-    MethodDefinition GeneratePackMethod(TypeDefinition component, MethodDefinition rpc, int methodHash)
+    static MethodDefinition GeneratePackMethod(TypeDefinition component, MethodDefinition rpc, int methodHash)
     {
-        int packetHash = NetworkStorage.StableHash(component.DeclaringType.FullName + "::" + component.Name);
+        int packetHash = StableHash(component.DeclaringType.FullName + "::" + component.Name);
 
         // Get From MethodRPC Attribute args
-        var rpcAttr = rpc.CustomAttributes.First(x => x.AttributeType.FullName == typeof(MethodRPCAttribute).FullName);
+        var rpcAttr = rpc.CustomAttributes.First(x => x.AttributeType.FullName == "ArcaneNetworking.MethodRPCAttribute");
         var channelAttrib = rpcAttr.ConstructorArguments[0].Value;
         var sendTimeAttrib = rpcAttr.ConstructorArguments[1].Value;
         var connsToSendAttrib = rpcAttr.ConstructorArguments[2].Value;
@@ -156,12 +222,12 @@ public class Weaver : BaseModuleWeaver
             .ToArray();
 
         // Import TypeReferences
-        var rpcPacketType = ModuleDefinition.ImportReference(typeof(RPCPacket));
-        var netComponentType = ModuleDefinition.ImportReference(typeof(NetworkedComponent));
-        var netNodeType = ModuleDefinition.ImportReference(typeof(NetworkedNode));
-        var writerType = ModuleDefinition.ImportReference(typeof(NetworkWriter));
-        var poolType = ModuleDefinition.ImportReference(typeof(NetworkPool));
-        var messageLayerType = ModuleDefinition.ImportReference(typeof(MessageLayer));
+        var rpcPacketType = GetTypeReferenceByFullName("ArcaneNetworking.RPCPacket");
+        var netComponentType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkedComponent");
+        var netNodeType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkedNode");
+        var writerType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkWriter");
+        var poolType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkPool");
+        var messageLayerType = GetTypeReferenceByFullName("ArcaneNetworking.MessageLayer");
 
         // Get FieldReferences
         var netNodeField = ModuleDefinition.ImportReference(
@@ -191,7 +257,7 @@ public class Weaver : BaseModuleWeaver
                 m.Name == "SendToConnections" &&
                 m.Parameters.Count == 3 &&
                 m.Parameters[0].ParameterType.FullName == ModuleDefinition.ImportReference(typeof(ArraySegment<byte>)).FullName &&
-                m.Parameters[1].ParameterType.FullName == ModuleDefinition.ImportReference(typeof(Channels)).FullName &&
+                m.Parameters[1].ParameterType.FullName == ModuleDefinition.ImportReference(typeof(int)).FullName &&
                 m.Parameters[2].ParameterType.FullName == ModuleDefinition.ImportReference(typeof(uint[])).FullName
             )
         );
@@ -303,7 +369,7 @@ public class Weaver : BaseModuleWeaver
         il.Emit(OpCodes.Call, getWriterBufferMethod); // Call writer.ToArraySegment()
 
         // Load channel
-        int channelVal = (int)(Channels)channelAttrib;
+        int channelVal = (int)channelAttrib;
         il.Emit(OpCodes.Ldc_I4, channelVal);  // Push Channels enum
 
         // Create a local to store the array
@@ -341,13 +407,13 @@ public class Weaver : BaseModuleWeaver
         return packMethod;
     }
 
-    MethodDefinition GenerateRPCUpackAndInvokeHandler(TypeDefinition component, MethodDefinition rpc)
+    static MethodDefinition GenerateRPCUpackAndInvokeHandler(TypeDefinition component, MethodDefinition rpc)
     {
         var arraySegByteType = ModuleDefinition.ImportReference(typeof(ArraySegment<byte>));
-        var ncType = ModuleDefinition.ImportReference(typeof(NetworkedComponent));
-        var readerType = ModuleDefinition.ImportReference(typeof(NetworkReader));
-        var poolType = ModuleDefinition.ImportReference(typeof(NetworkPool));
-        var rpcPacketType = ModuleDefinition.ImportReference(typeof(RPCPacket));
+        var ncType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkedComponent");
+        var readerType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkReader");
+        var poolType = GetTypeReferenceByFullName("ArcaneNetworking.NetworkPool"); ;
+        var rpcPacketType = GetTypeReferenceByFullName("ArcaneNetworking.RPCPacket");
 
         // Pool methods
         var poolGetReader = ModuleDefinition.ImportReference(
@@ -452,26 +518,6 @@ public class Weaver : BaseModuleWeaver
 
         return unpack;
     }
-    public override void Cancel()
-    {
-    }
-
-    public override void AfterWeaving()
-    {
-    }
-
-    public override IEnumerable<string> GetAssembliesForScanning()
-    {
-        // Provide extra assemblies Fody needs to resolve references against.
-        return
-        [
-            "mscorlib",
-            "System",
-            "System.Core",
-            "netstandard"
-        ];
-    }
-
 
 
 }

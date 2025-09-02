@@ -1,5 +1,0 @@
-g:\arcane-weaver\obj\Debug\netstandard2.0\Arcane Weaver.csproj.AssemblyReference.cache
-g:\arcane-weaver\obj\Debug\netstandard2.0\Arcane Weaver.GeneratedMSBuildEditorConfig.editorconfig
-g:\arcane-weaver\obj\Debug\netstandard2.0\Arcane Weaver.AssemblyInfoInputs.cache
-g:\arcane-weaver\obj\Debug\netstandard2.0\Arcane Weaver.AssemblyInfo.cs
-g:\arcane-weaver\obj\Debug\netstandard2.0\Arcane Weaver.csproj.CoreCompileInputs.cache
