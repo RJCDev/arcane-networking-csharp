@@ -54,31 +54,23 @@ public partial class NetworkManager : Node
     public NetworkManager()
     {
         manager ??= this;
-
     }
-    public void Connect(string host, int port = -1)
-    {
-        Client.Connect(host, port);
-    }
-    public void StartServer(bool headless = false)
-    {
-        Server.Start(headless);
 
-        if (!headless) Client.Connect("localhost");
-
-    }
-    
+    // Helper methods
+    public void StartServer(bool headless = false) => Server.Start(headless);
+    public void Connect(string host, int port = -1) => Client.Connect(host, port);
+    public void Connect(string host) => Client.Connect(host, -1);
 
     public override void _EnterTree()
     {
+      
         if (MsgLayer != null)
         {
             // Instantiate Message Layer
             AddChild(MessageLayer.Active = MsgLayer.Instantiate<MessageLayer>());
-            
-            // Register internal handlers for packets
-            Client.RegisterInternalHandlers();
-            Server.RegisterInternalHandlers();
+
+            ArcaneNetworking.Init(); // Initialize our networking protocol
+
         }
         else
         {

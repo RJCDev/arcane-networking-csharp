@@ -9,14 +9,14 @@ public static class NetworkPacker
     public static void Pack<T>(T packet, NetworkWriter writer)
     {
         // Write header
+        int packetHash = ExtensionMethods.StableHash(packet.GetType().FullName);
         writer.Write((byte)0);
-        writer.Write(NetworkStorage.StableHash(packet.GetType().DeclaringType.ToString()));
+        writer.Write(packetHash);
         writer.Write(packet);
     }
 
     public static ushort Unpack<T>(NetworkReader reader, out T packet)
     {
-        
         try
         {
             // Attempt to read packet message

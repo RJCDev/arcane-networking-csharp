@@ -37,10 +37,11 @@ public class SteamClient
         }
         else // Local Server, simulate callbacks
         {
+            
+            GD.Print("[Steam Client] Local Client Setup!");
+
             MessageLayer.Active.OnClientConnect?.Invoke();
         }
-
-        GD.Print("[Steam Client] Local Client Setup!");
 
     }
 

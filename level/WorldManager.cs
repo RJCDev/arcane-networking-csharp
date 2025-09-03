@@ -19,9 +19,6 @@ public partial class WorldManager : Node
 	// Worlds currently loaded, they can be active or inactive
 	public Array<NetworkedWorld> LoadedWorlds = new Array<NetworkedWorld>();
 
-	// THe world currently active on this client
-	public NetworkedWorld ActiveWorld = null;
-
 	/// <summary>
 	/// Unloads all of the networked worlds
 	/// </summary>
@@ -36,30 +33,58 @@ public partial class WorldManager : Node
 		OnFinishedLoad?.Invoke(0);
 	}
 
-	public void LoadWorld(int levelID, bool unloadLast = true, NetworkConnection forConnection = null)
+	public void LoadWorldClient(int levelID, bool unloadLast = true)
 	{
+		if (!NetworkManager.AmIClient) return;
+
+		NetworkedWorld world = null;
+
 		OnStartLoad?.Invoke(levelID);
+
+		GD.Print("[Client][World Manager] Loading World " + levelID);
+
+		if (NetworkManager.AmIClient && !NetworkManager.AmIServer)
+		{
+			// Add world to scene tree
+			world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();
+			GetTree().Root.AddChild(world);
+			LoadedWorlds.Add(world);
+		}
+		else world = LoadedWorlds[LoadedWorlds.Count]; // Get latest world loaded on server
+
+		// Move player object to new world on client
+		Client.serverConnection.playerObject.Reparent(world);
+
+		world.ClientInit();
+
+		GD.Print("[Client][World Manager] Loaded!!");
+
+		OnFinishedLoad?.Invoke(levelID);
+	}
+
+	public void LoadWorldServer(NetworkConnection forConnection, int levelID, bool unloadLast = true)
+	{
+		if (!NetworkManager.AmIServer) return;
+
+		OnStartLoad?.Invoke(levelID);
+
+		GD.Print("[Server][World Manager] Loading World " + levelID);
 
 		// Add world to scene tree
 		NetworkedWorld world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();
 		GetTree().Root.AddChild(world);
-		
+
 		LoadedWorlds.Add(world);
 
+		GD.Print("[Server][World Manager] Loaded!!");
+
 		// Move player object to new world on client
-		(Client.serverConnection.playerObject as Node3D).Reparent(world);
-		
-		if (NetworkManager.AmIServer) // Move client to new world on server
-		{
-			// Only pass in the last active world if we wish to unload it and stop syncronizing connections from it
-			world.MoveConnection(forConnection, unloadLast ? ActiveWorld : null);
-		}
-		if (NetworkManager.AmIClient) 
-		{
-			world.ClientInit();
-		}
-		
-		OnFinishedLoad?.Invoke(levelID);
+		forConnection.playerObject.Reparent(world);
+
+		GD.Print("[Server][World Manager] Moved Player ID: " + forConnection.GetID());
+
+		// Only pass in the last active world if we wish to unload it and stop syncronizing connections from it // TODO
+		world.MoveConnection(forConnection, null);		
 
 	}
 

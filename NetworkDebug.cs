@@ -5,7 +5,7 @@ using System.Collections;
 
 public partial class NetworkDebug : Node
 {
-    [Export] public Label RTTLabel, kbps, rwBuffers;
+    [Export] public Label FPS, RTTLabel, kbps, rwBuffers;
     [Export] public Label AmIClientLabel;
     [Export] public Label AmIServerLabel;
     [Export] public Label IsAuthenticatedLabel;
@@ -64,6 +64,7 @@ public partial class NetworkDebug : Node
     {
         if (Client.serverConnection == null) return;
 
+        FPS.Text = "FPS: " + ((int)Engine.GetFramesPerSecond()).ToString();
         rwBuffers.Text = "Read: " + NetworkPool.GetReaderPoolSize() + "b |" + "Write: " + NetworkPool.GetWriterPoolSize() + "b";
 
         kbps.Text = "Up: " + Math.Round(KbpsUp, 4) + "kbps | Down: " + Math.Round(KbpsDwn, 4) + " kbps";

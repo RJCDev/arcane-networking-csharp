@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 namespace ArcaneNetworking;
 
@@ -28,13 +29,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [Export] public float hardPosError = 5f;
     [Export] public float HardRotError = 2f;
 
-    public Vector3 OldPos, OldScale;
-    public Vector3 OldRot;
 
     // Queue of Snapshots (Used for Cubic Interpolation)
-    public TransformSnapshot[] CurrentState = new TransformSnapshot[2];
+    public TransformSnapshot CurrentState;
 
-    public override void _Ready()
+    public override void _EnterTree()
     {
         if (NetworkedNode.Node is not Node3D)
         {
@@ -42,12 +41,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
         else
         {
-            TransformNode = NetworkedNode.Node as Node3D;
-
             // Set Defaults
-            OldPos = TransformNode.GlobalPosition;
-            OldScale = TransformNode.Scale;
-            OldRot = TransformNode.GlobalRotation;
+            TransformNode = NetworkedNode.Node as Node3D;
+            CurrentState = new TransformSnapshot() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Scale, Scale = TransformNode.GlobalRotation };
         }
 
     }
@@ -60,51 +56,68 @@ public partial class NetworkedTransform3D : NetworkedComponent
             List<float> valuesChanged = [];
 
             // Pos
-            if (OldPos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
-            if (OldPos.X != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
-            if (OldPos.X != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
+            if (CurrentState.Pos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+            if (CurrentState.Pos.X != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
+            if (CurrentState.Pos.X != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
 
             // Rot
-            if (OldRot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
-            if (OldRot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
-            if (OldRot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
+            if (CurrentState.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
+            if (CurrentState.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
+            if (CurrentState.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
 
             // Scale
-            if (OldScale != TransformNode.Scale) { changes |= Changed.Scale; valuesChanged.Add(TransformNode.Scale.X); valuesChanged.Add(TransformNode.Scale.Y); valuesChanged.Add(TransformNode.Scale.Z); }
+            if (CurrentState.Scale != TransformNode.Scale) { changes |= Changed.Scale; valuesChanged.Add(TransformNode.Scale.X); valuesChanged.Add(TransformNode.Scale.Y); valuesChanged.Add(TransformNode.Scale.Z); }
 
             // Send RPC if changes occured
             if (changes != Changed.None)
-                Set(changes, [.. valuesChanged]);
+            {
+                // Send to other
+                Set(AuthorityMode == AuthorityMode.Client ? [Client.serverConnection.GetID()] : [.. Server.Connections.Keys], changes, [.. valuesChanged]);
+            }
 
         }
         else
         {
-            if (CurrentState[0] != CurrentState[1])
+            // Process the interpolation if we aren't owner
+            TransformSnapshot LocalState = new()
             {
-                // Process the interpolation
-                TransformSnapshot current = CurrentState[0].TransformWith(CurrentState[1], InterpSpeed);
+                Pos = TransformNode.GlobalPosition,
+                Rot = TransformNode.GlobalRotation,
+                Scale = TransformNode.Scale
+            };
+            TransformSnapshot current = CurrentState.TransformWith(LocalState, InterpSpeed);
 
-                TransformNode.GlobalPosition = current.Pos;
-                TransformNode.GlobalRotation = current.Rot;
-                TransformNode.Scale = current.Scale;
-            }
+            TransformNode.GlobalPosition = current.Pos;
+            TransformNode.GlobalRotation = current.Rot;
+            TransformNode.Scale = current.Scale;
+            
+            GD.Print("Setting");
         }
        
     }
 
     // Actually apply the changed part of the transform (each value changed is the delta of change, valuesChanged is paddded)
     [MethodRPC]
-    public void Set(Changed changed, float[] valuesChanged)
+    public void Set(uint[] connsToSendTo, Changed changed, float[] valuesChanged)
     {
-        // Record our local position so we can interpolate between this and the new one (cubic)
-        CurrentState[0] = new()
+
+        // Record out local state if we are owner
+        if (NetworkedNode.AmIOwner && AuthorityMode == AuthorityMode.Client)
         {
-            Pos = TransformNode.GlobalPosition,
-            Rot = TransformNode.GlobalRotation,
-            Scale = TransformNode.Scale
-        };
-        // Read the "Current" snapshot we just got
-        CurrentState[1] = ReadSnapshot(changed, valuesChanged);
+            CurrentState = new()
+            {
+                Pos = TransformNode.GlobalPosition,
+                Rot = TransformNode.GlobalRotation,
+                Scale = TransformNode.Scale
+            };
+        }
+        else
+        {
+            // Read the "Current" snapshot we just got
+            CurrentState = ReadSnapshot(changed, valuesChanged);
+        }
+        GD.Print("Set");
+
     }
 
 

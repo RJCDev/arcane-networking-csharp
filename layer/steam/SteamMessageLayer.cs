@@ -21,7 +21,6 @@ public partial class SteamMessageLayer : MessageLayer
         SteamNetworkingUtils.InitRelayNetworkAccess();
     }
 
-
     public SteamClient SteamClient = new();
     public SteamServer SteamServer = new();
 
@@ -52,7 +51,9 @@ public partial class SteamMessageLayer : MessageLayer
         if (other.GetEndpointAs<string>() == "localhost") // Local Connection
         {
             other.SetEndPoint(SteamUser.GetSteamID().m_SteamID.ToString());
-            other.isLocalConnection = true; 
+            other.isLocalConnection = true;
+            
+            SteamServer.SetLocal();
         }
         if (ulong.TryParse(other.GetEndPoint(), out ulong SteamId))
         {
@@ -83,27 +84,18 @@ public partial class SteamMessageLayer : MessageLayer
 
     public override void SendToConnections(ArraySegment<byte> bytes, Channels sendType, params uint[] connnectionsToSendTo)
     {
-        // TODO Abstract this into MessageLayer //
-        //                                      //
         var connectionsSending = connnectionsToSendTo;
-        if (connectionsSending.Length == 0) // Assume default case (Client is sending to server, or Server is sending to ALL)
-        {
-            if (NetworkManager.AmIServer) connectionsSending = [.. Server.Connections.Keys];
-            else connectionsSending = [Client.serverConnection.GetID()];
-        } 
-        //                                     //
-        // TODO Abstract this into MessageLayer//
-
-        // If its not 0, just use the connections provided
+        if (connectionsSending == null) GD.PrintErr($"[Steam] User Didn't Specify connections to send to!");
+        if (connectionsSending.Length == 0) GD.PrintErr($"[Steam] User Didn't Specify connections to send to!");
 
         foreach (uint connID in connectionsSending)
         {
             // Run invokes (send is for debug)
-            if (NetworkManager.AmIServer) OnServerSend?.Invoke(bytes, connID);
-            if (NetworkManager.AmIClient) OnClientSend?.Invoke(bytes);
+            if (connID != 0) OnServerSend?.Invoke(bytes, connID);
+            else OnClientSend?.Invoke(bytes);
 
             // Get SteamNetConnection handle to send to
-            HSteamNetConnection steamConnectionToSend = NetworkManager.AmIClient ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connID];
+            HSteamNetConnection steamConnectionToSend = connID == 0 ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connID];
 
             GCHandle handle = default;
             try

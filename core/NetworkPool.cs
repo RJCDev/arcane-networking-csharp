@@ -45,7 +45,7 @@ public static class NetworkPool
         return writer;
     }
 
-    public static NetworkReader GetReader(byte[] forBytes)
+    public static NetworkReader GetReader(ArraySegment<byte> forBytes)
     {
         if (!readerPool.TryTake(out NetworkReader reader))
         {

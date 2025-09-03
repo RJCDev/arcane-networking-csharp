@@ -11,7 +11,7 @@ namespace ArcaneNetworking
 
         public int MaxAllocationBytes = 65535;
 
-        public NetworkReader(byte[] bytesIn)
+        public NetworkReader(ArraySegment<byte> bytesIn)
         {
             Reset(bytesIn);
         }
@@ -21,14 +21,14 @@ namespace ArcaneNetworking
             Reset();
         }
 
-        public void Reset(byte[] bytes)
+        public void Reset(ArraySegment<byte> bytes)
         {
-            if (bytes.Length > MaxAllocationBytes)
+            if (bytes.Array.Length > MaxAllocationBytes)
                 throw new InvalidOperationException(
-                    $"Incoming buffer too large! ({bytes.Length} > {MaxAllocationBytes})");
+                    $"Incoming buffer too large! ({bytes.Array.Length} > {MaxAllocationBytes})");
 
-            Buffer = bytes;
-            Position = 0;
+            Buffer = bytes.Array;
+            Position = bytes.Offset;
         }
 
         public void Reset()
@@ -52,11 +52,11 @@ namespace ArcaneNetworking
                 // Read in the type
                 if (concreteType != default)
                 {
-                    msg = MessagePackSerializer.Deserialize(concreteType, ref reader, MessagePackSerializerOptions.Standard);
+                    msg = MessagePackSerializer.Deserialize(concreteType, ref reader, MessagePackSerializer.DefaultOptions);
                 }
                 else // Read in a T
                 {
-                    msg = MessagePackSerializer.Deserialize<T>(ref reader, MessagePackSerializerOptions.Standard);
+                    msg = MessagePackSerializer.Deserialize<T>(ref reader, MessagePackSerializer.DefaultOptions);
                 }
 
                 Position += (int)reader.Consumed;
@@ -74,7 +74,8 @@ namespace ArcaneNetworking
 
         }
 
-        public ArraySegment<byte> ToArraySegment() =>
-            new ArraySegment<byte>(Buffer, 0, Position);
+        public ArraySegment<byte> ToArraySegment(int startPos = 0) =>
+            new ArraySegment<byte>(Buffer, startPos, Position);
+
     }
 }

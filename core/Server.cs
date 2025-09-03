@@ -23,6 +23,10 @@ public partial class Server : Node
     /// Dictionary of lists of Networked nodes. Keys are NetworkConnection IDs of clients
     public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
 
+    public static Action<NetworkConnection> OnClientConnect;
+     public static Action<NetworkConnection> OnClientInitialized;
+    public static Action<NetworkConnection> OnClientDisconnect;
+
     public static int GetConnectionCount() => Connections.Count;
 
     public static bool AllConnectionsAuthenticated => Connections.All(x => x.Value.isAuthenticated == true);
@@ -34,9 +38,8 @@ public partial class Server : Node
     {
         // Wrap the handler so it can fit into Action<Packet>
         Type packetType = typeof(T);
-        string packetFullName = packetType.DeclaringType.FullName + "::" + packetType.Name;
-        
-        PacketInvokes[NetworkStorage.StableHash(packetFullName)] = (packet, connID) => handler((T)packet, connID);
+        int packetHash = ExtensionMethods.StableHash(packetType.FullName);
+        PacketInvokes[packetHash] = (packet, connID) => handler((T)packet, connID);
     }
     internal static void PacketInvoke(int packetHash, Packet packet, uint fromConnection)
     {
@@ -60,7 +63,9 @@ public partial class Server : Node
         RegisterPacketHandler<SpawnNodePacket>((_, _) => { }); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
-        RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
+        RegisterPacketHandler<LoadLevelPacket>((_, _) => { }); // Server Authorative. No need to receive LoadLevel because we won't process them anyways
+
+        GD.Print("[Server] Internal Handlers Registered");
     }
 
 
@@ -69,10 +74,9 @@ public partial class Server : Node
     /// </summary>
     public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable)
     {
-        conn.Send(packet, channel);
-        
-        //GD.Print("[Server] Send: " + packet.GetType());
+        GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetID());
 
+        conn.Send(packet, channel);
     }
 
     /// <summary>
@@ -96,54 +100,69 @@ public partial class Server : Node
         AddClient(connection);
 
         GD.Print("[Server] Client Has Connected!");
+
+        OnClientConnect?.Invoke(connection);
     }
     static void OnServerDisconnect(uint connID)
     {
+        OnClientDisconnect?.Invoke(Connections[connID]);
+                
         RemoveClient(Connections[connID], NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
 
         GD.Print("[Server] Client Has Disconnected..");
+
+
     }
     static void OnServerReceive(ArraySegment<byte> bytes, uint connID)
     {
-       //GD.Print("[Server] Receive Bytes: " + bytes.Array.Length);
+        //GD.Print("[Server] Recieve Length: " + bytes.Array.Length);
 
         var reader = NetworkPool.GetReader(bytes.Array);
 
-        //GD.Print("[Server] Recieve Length: " + bytes.Array.Length);
-
         if (reader.Read(out byte packetHeader)) // Do we have a valid header?
         {
-            if (reader.Read(out int hash))
+            //GD.Print("[Server] Header Valid! " + packetHeader);
+
+            if (reader.Read(out int hash)) // Hash (Packet Hash OR RPC Method Hash)
             {
-                switch (hash)
+                //GD.Print("[Server] Hash Valid! " + hash);
+
+                switch (packetHeader)
                 {
                     case 0: // Regular Packet
-
-                        if (reader.Read(out Packet packet, NetworkStorage.PacketTypes[hash])) // Invoke our packet handler
+                        
+                        if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                         {
-                            PacketInvoke(packetHeader, packet, connID);
+                            PacketInvoke(hash, packet, connID);
                         }
 
                         break;
-                    
-                    
+
+
                     case 1: // RPC Packet
 
                         if (reader.Read(out RPCPacket rpcPacket))
                         {
-                            if (NetworkStorage.RPCMethods.TryGetValue(hash, out var unpack))
+                            if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
                             {
-                                // Invoke Weaved Method
-                                unpack(NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex], rpcPacket.CallerNetID);
+                                // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
+
+                                unpack(reader, NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex]);
+                                
+                                //GD.Print("[Server] Unpacked RPC For: " + rpcPacket.CallerNetID);
                             }
                             else
                             {
-                                GD.PrintErr("RPC Method Hash not found! " + hash);   
+                                GD.PrintErr("[Server] RPC Method Hash not found! " + hash);
                             }
-                            
+
                         }
-                        
-                    break;
+                        else
+                        {
+                            GD.PrintErr("[Server] Could not read RPC Packet! " + hash);
+                        }
+
+                        break;
                 }
             }
 
@@ -154,7 +173,6 @@ public partial class Server : Node
         NetworkPool.Recycle(reader);
     }
 
-
     /// <summary>
     /// Starts the server
     /// if headless, then it will ONLY start the server
@@ -162,6 +180,12 @@ public partial class Server : Node
     /// </summary>
     public static void Start(bool isHeadless)
     {
+        if (NetworkManager.AmIServer == true)
+        {
+            GD.PrintErr("[Server] Cannot start another server!! Server is currently Active!");
+            return;
+        }
+
         MessageLayer.Active.StartServer(isHeadless);
 
         NetworkManager.AmIServer = true;
@@ -200,19 +224,6 @@ public partial class Server : Node
     {
 
     }
-    
-    static void OnLoadLevel(LoadLevelPacket packet, uint fromConnection)
-    {
-        try
-        {
-            NetworkManager.manager.WorldManager.LoadWorld(packet.LevelID, packet.UnloadLast);
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("Load World Packet Failed To Process");
-            GD.PrintErr(e);
-        }
-    }
    
     /// <summary>
     /// Spawns a Node on the server and relays to all connections
@@ -220,8 +231,23 @@ public partial class Server : Node
     /// <returns>Node that was spawned</returns>
     public static Node Spawn(uint prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
     {
+
         Node spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)prefabID].Instantiate();
         NetworkedNode netNode;
+
+        // Adds the spawned object to the game world if headless, else wait for client
+        if (NetworkManager.AmIHeadless)
+        {
+            NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+
+            // Set Transform
+            if (spawnedObject is Node3D)
+            {
+                (spawnedObject as Node3D).Position = position;
+                (spawnedObject as Node3D).GlobalBasis = basis;
+            }
+
+        }
 
         // Finds its networked node, it should be a child of this spawned object
         netNode = spawnedObject.FindChild<NetworkedNode>();
@@ -244,15 +270,6 @@ public partial class Server : Node
 
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
-        // Adds the spawned object to the game world if headless, else wait for client
-        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-
-        // Set Transform
-        if (spawnedObject is Node3D)
-        {
-            (spawnedObject as Node3D).Position = position;
-            (spawnedObject as Node3D).GlobalBasis = basis;
-        }
 
         var quat = basis.GetRotationQuaternion().Normalized();
 
@@ -268,6 +285,7 @@ public partial class Server : Node
 
         // Relay to Clients
         SendAll(packet, Channels.Reliable);
+
 
         return spawnedObject;
     }
@@ -316,6 +334,10 @@ public partial class Server : Node
             }
         }
 
+        connection.isAuthenticated = true;
+        
+        OnClientInitialized?.Invoke(connection);
+
     }
 
     public static void RemoveClient(NetworkConnection connection, bool destroyObjects)
@@ -333,7 +355,7 @@ public partial class Server : Node
 
     }
 
-    public static void LoadLevel(NetworkConnection conn, int levelID, bool unloadLast = true)
+    public static void LoadWorld(NetworkConnection forConnection, int levelID, bool unloadLast = true)
     {
         // Tell this connection that to load the level on their client
         LoadLevelPacket packet = new()
@@ -342,7 +364,11 @@ public partial class Server : Node
             UnloadLast = unloadLast,
         };
 
-        Send(packet, conn);
+        // Load on server
+        NetworkManager.manager.WorldManager.LoadWorldServer(forConnection, levelID, unloadLast);
+
+        // Load for connection
+        Send(packet, forConnection);
     }
     
 

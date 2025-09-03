@@ -33,16 +33,10 @@ public class SteamServer
         {
             uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
-            NetworkConnection incoming = new(SteamUser.GetSteamID().m_SteamID.ToString(), steam32, null);
             ClientsConnected.Add(steam32, localConnection);
 
             SteamNetworkingSockets.SetConnectionPollGroup(localConnection, ClientPollGroup);
 
-            GD.Print("[Steam Server] Setup Local Connection To Server!");
-
-            MessageLayer.Active.OnServerConnect?.Invoke(incoming); // Invoke to the High-Level API that this Connection in the MessageLayer is connected
-
-           
         }
 
         GD.Print("[Steam Server] Server Started! ");
@@ -52,6 +46,16 @@ public class SteamServer
     public void StopServer()
     {
         SteamNetworkingSockets.CloseListenSocket(ServerListenSocket);
+    }
+
+    public void SetLocal()
+    {
+        uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
+
+        NetworkConnection incoming = new(SteamUser.GetSteamID().m_SteamID.ToString(), steam32, null);
+        GD.Print("[Steam Server] Setup Local Connection To Server!");
+
+        MessageLayer.Active.OnServerConnect?.Invoke(incoming); // Invoke to the High-Level API that this Connection in the MessageLayer is connected
     }
 
     /// <summary>
@@ -110,7 +114,6 @@ public class SteamServer
         {
             SteamNetworkingMessage_t netMessage =
                 Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceiveBuffer[i]);
-
 
             try
             {

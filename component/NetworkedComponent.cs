@@ -22,6 +22,8 @@ public enum SendTime
 /// </summary>
 public abstract partial class NetworkedComponent : Node
 {
+    public int GetIndex() => NetworkedNode.NetworkedComponents.IndexOf(this);
+
     public NetworkedNode NetworkedNode;
 
     [ExportGroup("Send Config")]

@@ -7,7 +7,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     [Export] AnimationPlayer AnimationPlayer;
 
     [MethodRPC]
-    public void Play(string animationName, bool backwards = false)
+    public void Play(uint[] connsToSendTo, string animationName, bool backwards = false)
     {
         if (AnimationPlayer.CurrentAnimation != animationName)
         {
@@ -17,19 +17,19 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     }
 
     [MethodRPC]
-    public void Seek(double seconds, bool freezeSeek = false)
+    public void Seek(uint[] connsToSendTo, double seconds, bool freezeSeek = false)
     {
         AnimationPlayer.SpeedScale = freezeSeek ? 0 : 1;
         AnimationPlayer.Seek(seconds);
     }
 
     [MethodRPC]
-    public void SetSpeed(float timeScale) => AnimationPlayer.SpeedScale = timeScale;
+    public void SetSpeed(uint[] connsToSendTo, float timeScale) => AnimationPlayer.SpeedScale = timeScale;
 
     [MethodRPC]
-    public void PlayBackwards(string animationName) => AnimationPlayer.PlayBackwards(animationName);
+    public void PlayBackwards(uint[] connsToSendTo, string animationName) => AnimationPlayer.PlayBackwards(animationName);
 
     [MethodRPC]
-    public void Stop() => AnimationPlayer.Stop();
+    public void Stop(uint[] connsToSendTo) => AnimationPlayer.Stop();
 
 }

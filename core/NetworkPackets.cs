@@ -97,6 +97,7 @@ namespace ArcaneNetworking
 
         [Key(4)]
         public float[] scale;
+
     }
 
     [MessagePackObject]
@@ -113,6 +114,7 @@ namespace ArcaneNetworking
     }
 
     // Loads a world over the network
+    [MessagePackObject]
     public struct LoadLevelPacket : Packet
     {
         // Which world should we load?
