@@ -80,7 +80,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(Client.connectionIDToServer, NetworkedNode.OwnerID);
 
                 // Send
-                Set(send, changes, [.. valuesChanged]);
+                if (send != null) Set(send, changes, [.. valuesChanged]);
 
             }
 
