@@ -17,7 +17,7 @@ public partial class WorldManager : Node
 	[Export] public Array<WorldConfig> Worlds;
 
 	// Worlds currently loaded, they can be active or inactive
-	public Array<NetworkedWorld> LoadedWorlds = new Array<NetworkedWorld>();
+	public Dictionary<int, NetworkedWorld> LoadedWorlds = [];
 
 	/// <summary>
 	/// Unloads all of the networked worlds
@@ -27,7 +27,7 @@ public partial class WorldManager : Node
 		OnStartLoad?.Invoke(-1);
 
 		// Remove active networked worlds
-		foreach (var world in LoadedWorlds) world.Cleanup();
+		foreach (var world in LoadedWorlds) world.Value.Cleanup();
 		LoadedWorlds.Clear();
 
 		OnFinishedLoad?.Invoke(0);
@@ -35,24 +35,21 @@ public partial class WorldManager : Node
 
 	public void LoadWorldClient(int levelID, bool unloadLast = true)
 	{
-		if (!NetworkManager.AmIClient) return;
-
+		if (!NetworkManager.AmIClient || (NetworkManager.AmIClient && NetworkManager.AmIServer)) return;
 
 		NetworkedWorld world = null;
 
 		OnStartLoad?.Invoke(levelID);
 
-		if (NetworkManager.AmIClient && !NetworkManager.AmIServer)
+		if (!LoadedWorlds.TryGetValue(levelID, out NetworkedWorld value))
 		{
 			// Add world to scene tree
 			world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();
-
 			GetTree().Root.AddChild(world);
 
-			LoadedWorlds.Add(world);
-
+			LoadedWorlds.Add(levelID, world);
 		}
-		else world = LoadedWorlds[LoadedWorlds.Count - 1]; // Get latest world loaded on server
+		else world = value; // Get the world from loaded
 
 		// Move player object to new world on client
 		Client.serverConnection.playerObject.Reparent(world);
@@ -70,12 +67,17 @@ public partial class WorldManager : Node
 
 		OnStartLoad?.Invoke(levelID);
 
+		NetworkedWorld world;
 
-		// Add world to scene tree
-		NetworkedWorld world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();
-		GetTree().Root.AddChild(world);
+		if (!LoadedWorlds.TryGetValue(levelID, out NetworkedWorld value))
+		{
+			// Add world to scene tree
+			world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();
+			GetTree().Root.AddChild(world);
 
-		LoadedWorlds.Add(world);
+			LoadedWorlds.Add(levelID, world);
+		}
+		else world = value; // Get the world from loaded
 
 		GD.Print("[Server][World Manager] Loaded!!");
 
