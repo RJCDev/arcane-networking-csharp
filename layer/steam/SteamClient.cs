@@ -14,13 +14,6 @@ public class SteamClient
 
     protected Callback<SteamNetConnectionStatusChangedCallback_t> ConnectionCallback;
 
-
-    public SteamClient()
-    {
-        // Callbacks
-        ConnectionCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged);
-    }
-
     public void SetLocal(HSteamNetConnection conn) => ConnectionToServer = conn;
 
 
@@ -34,6 +27,10 @@ public class SteamClient
             GD.Print("[Steam Client] Connecting to... " + connection.GetEndpointAs<ulong>());
 
             ConnectionToServer = SteamNetworkingSockets.ConnectP2P(ref RemoteIdentity, 0, 0, null);
+
+            ConnectionCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged); // Init Callback (VERY IMPORTANT ONLY IF REMOTE)
+            // Else we will get a recuring loop when someone tries to join our "Server" as we are accepting both client and server callbacks on this connection
+
         }
         else // Local Server, simulate callbacks
         {

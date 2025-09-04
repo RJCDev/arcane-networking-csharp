@@ -15,15 +15,11 @@ public class SteamServer
     internal Dictionary<uint, HSteamNetConnection> ClientsConnected = [];
     protected Callback<SteamNetConnectionStatusChangedCallback_t> ConnectionCallback;
 
-    public SteamServer()
-    {
-        // Callbacks
-        ConnectionCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged);
-    }
-
 
     public void StartServer(HSteamNetConnection localConnection = default)
     {
+        ConnectionCallback = Callback<SteamNetConnectionStatusChangedCallback_t>.Create(OnConnectionStatusChanged); // Init Callbacks
+    
         ServerListenSocket = SteamNetworkingSockets.CreateListenSocketP2P(0, 0, null); // Create listen socket
 
         ClientPollGroup = SteamNetworkingSockets.CreatePollGroup(); // Create Poll Group for server
@@ -39,12 +35,15 @@ public class SteamServer
         }
 
         GD.Print("[Steam Server] Server Started! ");
-    
+
+
     }
 
     public void StopServer()
     {
         SteamNetworkingSockets.CloseListenSocket(ServerListenSocket);
+
+        ConnectionCallback.Dispose();
     }
 
     public void InitLocal()
@@ -63,6 +62,7 @@ public class SteamServer
     /// 
     void OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t info)
     {
+
         uint steam32 = (uint)info.m_info.m_identityRemote.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
         // Accept the client
