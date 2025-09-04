@@ -33,7 +33,7 @@ public static class ExtensionMethods
     /// <summary>
     /// Returns the networked node (if any) that resides beneith this node parent
     /// </summary>
-    public static NetworkedNode GetNetNode(this Node parent)
+    public static NetworkedNode GetNetworkedNode(this Node parent)
     {
         try
         {

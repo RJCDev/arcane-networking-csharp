@@ -17,9 +17,6 @@ public partial class NetworkManager : Node
     /// <summary> Layer that is used for network messages </summary>
     [Export] PackedScene MsgLayer;
 
-    /// <summary> Manager that is used for loading Networked Levels </summary>
-    [Export] public WorldManager WorldManager;
-
     /// <summary> Objects that you wish to be networked MUST be present in this dictionary</summary>
     [Export] public Array<PackedScene> NetworkObjectPrefabs = new Array<PackedScene>();
 

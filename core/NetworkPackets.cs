@@ -116,20 +116,5 @@ namespace ArcaneNetworking
         public bool destroy;
     }
 
-    // Loads a world over the network
-    [MessagePackObject]
-    public struct LoadLevelPacket : Packet
-    {
-        // Which world should we load?
-
-        [Key(0)]
-        public int LevelID;
-
-        // Should we unload the previous world? (Disable packets from and to users from that world)
-        [Key(1)]
-        public bool UnloadLast;
-
-    }
-
 }
 

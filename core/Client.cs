@@ -28,6 +28,8 @@ public partial class Client
 
     public static uint connectionIDToServer; // Your connection ID on the server
 
+    public static Action<NetworkedNode> OnClientSpawn;
+
     /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
@@ -62,7 +64,6 @@ public partial class Client
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
-        RegisterPacketHandler<LoadLevelPacket>(OnLoadLevel);
 
         GD.Print("[Client] Internal Handlers Registered");
     }
@@ -233,7 +234,7 @@ public partial class Client
                     return;
                 }
 
-                // Adds child to the root of the game world
+                // Adds to the current loaded world
                 NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
 
                 // Set Transform
@@ -258,24 +259,11 @@ public partial class Client
         
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
             serverConnection.playerObject = spawnedObject; // Set your player object if its yours
-        
+            
+        OnClientSpawn?.Invoke(netNode);
+
         GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
 
-    }
-
-    static void OnLoadLevel(LoadLevelPacket packet)
-    {
-        try
-        {
-            GD.Print("[Client] Loading World " + packet.LevelID);
-
-            NetworkManager.manager.WorldManager.LoadWorldClient(packet.LevelID, packet.UnloadLast);
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("[Client] Load World Packet Failed To Process");
-            GD.PrintErr(e);
-        }
     }
 
     /// <summary>

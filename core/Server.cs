@@ -23,9 +23,11 @@ public partial class Server : Node
     /// Dictionary of lists of Networked nodes. Keys are NetworkConnection IDs of clients
     public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
 
-    public static Action<NetworkConnection> OnClientConnect;
-    public static Action<NetworkConnection> OnClientInitialized;
-    public static Action<NetworkConnection> OnClientDisconnect;
+    public static Action<NetworkConnection> OnServerConnect;
+    public static Action<NetworkConnection> OnServerInitialized;
+    public static Action<NetworkConnection> OnServerDisconnect;
+
+    public static Action<NetworkedNode> OnServerSpawn;
 
     public static uint[] GetConnsExcluding(params uint[] connectionIds) => [.. Connections.Keys.Except(connectionIds)];
 
@@ -57,15 +59,14 @@ public partial class Server : Node
     internal static void RegisterInternalHandlers()
     {
         // Invokes
-        MessageLayer.Active.OnServerConnect += OnServerConnect;
-        MessageLayer.Active.OnServerDisconnect += OnServerDisconnect;
+        MessageLayer.Active.OnServerConnect += OnServerClientConnect;
+        MessageLayer.Active.OnServerDisconnect += OnServerClientDisconnect;
         MessageLayer.Active.OnServerReceive += OnServerReceive;
 
         // Packet Handlers
         RegisterPacketHandler<SpawnNodePacket>((_, _) => { }); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
-        RegisterPacketHandler<LoadLevelPacket>((_, _) => { }); // Server Authorative. No need to receive LoadLevel because we won't process them anyways
 
         GD.Print("[Server] Internal Handlers Registered");
     }
@@ -89,25 +90,17 @@ public partial class Server : Node
         foreach (var client in Connections.Values) Send(packet, client, channel);
     }
 
-    /// <summary>
-    /// Sends a packet to all clients in a specified world
-    /// </summary>
-    public static void SendAllWorld<T>(NetworkedWorld world, T packet, Channels channel = Channels.Reliable)
-    {
-        foreach (var client in world.ManagedConnections.Values) Send(packet, client, channel);
-    }
-
-    static void OnServerConnect(NetworkConnection connection)
+    static void OnServerClientConnect(NetworkConnection connection)
     {
         GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
 
         AddClient(connection);
 
-        OnClientConnect?.Invoke(connection);
+        OnServerConnect?.Invoke(connection);
     }
-    static void OnServerDisconnect(uint connID)
+    static void OnServerClientDisconnect(uint connID)
     {
-        OnClientDisconnect?.Invoke(Connections[connID]);
+        OnServerDisconnect?.Invoke(Connections[connID]);
                 
         RemoveClient(Connections[connID], NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
 
@@ -282,6 +275,8 @@ public partial class Server : Node
 
         GD.Print("[Server] Spawned Networked Node: " + netNode.NetID);
 
+        OnServerSpawn?.Invoke(netNode);
+
         // Relay to Clients
         SendAll(packet, Channels.Reliable);
 
@@ -353,7 +348,7 @@ public partial class Server : Node
 
         connection.isAuthenticated = true;
         
-        OnClientInitialized?.Invoke(connection);
+        OnServerInitialized?.Invoke(connection);
 
     }
 
@@ -372,29 +367,5 @@ public partial class Server : Node
 
     }
 
-    public static void LoadWorld(NetworkConnection forConnection, int levelID, bool unloadLast = true)
-    {
-        // Tell this connection that to load the level on their client
-        LoadLevelPacket packet = new()
-        {
-            LevelID = levelID,
-            UnloadLast = unloadLast,
-        };
-        try
-        {
-            GD.Print("[Server] Loading World " + levelID);
-            // Load on server
-            NetworkManager.manager.WorldManager.LoadWorldServer(forConnection, levelID, unloadLast);
-
-            // Load for connection
-            Send(packet, forConnection);
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("[Server] Failed to load world " + levelID);
-            GD.PrintErr(e);
-        }
-    }
-    
 
 }
