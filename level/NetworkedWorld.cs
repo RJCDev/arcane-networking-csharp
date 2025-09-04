@@ -8,7 +8,7 @@ using static Godot.WebSocketPeer;
 
 namespace ArcaneNetworking;
 
-public abstract partial class NetworkedWorld : Node
+public abstract partial class NetworkedWorld : Node3D
 {
     // Connections managed on this world, only the server has this info, clients don't need to care about other connections
     public Dictionary<ulong, NetworkConnection> ManagedConnections = new Dictionary<ulong, NetworkConnection>();

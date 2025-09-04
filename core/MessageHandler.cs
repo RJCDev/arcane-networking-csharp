@@ -55,7 +55,7 @@ public static class MessageHandler
             {
                 //GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
 
-                Client.serverConnection.Ping();
+                Client.serverConnection.Ping(0);
                 
             }
             if (NetworkManager.AmIServer)
@@ -64,7 +64,7 @@ public static class MessageHandler
                 {
                     //GD.Print("[Server] Pinging At:" + Time.GetTicksMsec());
 
-                    connection.Value.Ping();
+                    connection.Value.Ping(0);
                 }
             }
 

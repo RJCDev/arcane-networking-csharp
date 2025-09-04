@@ -57,7 +57,11 @@ public partial class NetworkManager : Node
     }
 
     // Helper methods
-    public void StartServer(bool headless = false) => Server.Start(headless);
+    public void StartServer(bool headless = false)
+    {
+        Server.Start(headless);
+        if (!headless) Client.Connect("localhost");
+    }
     public void Connect(string host, int port = -1) => Client.Connect(host, port);
     public void Connect(string host) => Client.Connect(host, -1);
 

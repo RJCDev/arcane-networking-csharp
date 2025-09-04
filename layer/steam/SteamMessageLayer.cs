@@ -35,7 +35,7 @@ public partial class SteamMessageLayer : MessageLayer
             SteamNetworkingSockets.CreateSocketPair(out var ClientToServer, out var ServerToClient, false, ref _, ref _);
 
             SteamServer.StartServer(ServerToClient); // Start Local Server
-            SteamClient.SetLocal(ClientToServer); // Set Local Client Connection To Server
+            SteamClient.SetLocal(ClientToServer); // Set Local Client Connection To Server (No callbacks)
 
         }
         else SteamServer.StartServer();
@@ -53,9 +53,10 @@ public partial class SteamMessageLayer : MessageLayer
             other.SetEndPoint(SteamUser.GetSteamID().m_SteamID.ToString());
             other.isLocalConnection = true;
             
-            SteamServer.SetLocal();
+            SteamClient.StartClient(other);
+            SteamServer.InitLocal(); // Invoke client connection callback
         }
-        if (ulong.TryParse(other.GetEndPoint(), out ulong SteamId))
+        else if (ulong.TryParse(other.GetEndPoint(), out ulong SteamId))
         {
             CSteamID serverID = new(SteamId);
 
@@ -64,9 +65,8 @@ public partial class SteamMessageLayer : MessageLayer
                 GD.PrintErr("[Steam] NetworkConnection other was NOT a valid SteamID");
                 return false;
             }
+            SteamClient.StartClient(other);
         }
-
-        SteamClient.StartClient(other);
 
         return true;
     }

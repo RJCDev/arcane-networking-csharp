@@ -78,16 +78,16 @@ public partial class Client
 
     static void OnClientConnected()
     {
+        
+        GD.Print("[Client] Client Has Connected!");
+
         NetworkManager.AmIClient = true;
         serverConnection.isAuthenticated = true;
-
-        GD.Print("[Client] Client Has Connected!");
     }
     static void OnClientDisconnect()
     {
-        serverConnection = null;
-        
         GD.Print("[Client] Client Has Disconnected..");
+        serverConnection = null;        
     }
     
     /// <summary>
@@ -198,27 +198,24 @@ public partial class Client
         // Send back if it was a ping
         if (packet.PingPong == 0)
         {
-            GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
-            serverConnection.Ping(true); // Send Pong if it was a Ping, if it was a Pong
+            //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
+            serverConnection.Ping(1); // Send Pong if it was a Ping, if it was a Pong
         }
         else // This was a pong, we need to record the RTT
             serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime; 
     }
     static void OnSpawn(SpawnNodePacket packet)
     {
-        Node nodeRef = null;
+        Node spawnedObject = null;
         NetworkedNode netNode = null;
 
-        //object already exists
-        GD.Print("[Client] Spawning!");
-
-        if (NetworkedNodes.ContainsKey(packet.NetID)) return;
+        if (NetworkedNodes.ContainsKey(packet.NetID)) return; // Check if we already got this packet
         else
         {
-            // We are a client and not a server, just spawn it normally
+            // We are a client only, just spawn it normally
             if (!NetworkManager.AmIServer && NetworkManager.AmIClient)
             {
-                nodeRef = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
+                spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
 
                 if (netNode == null)
                 {
@@ -226,20 +223,25 @@ public partial class Client
                     return;
                 }
                 // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
-                netNode = nodeRef.FindChild<NetworkedNode>();
+                netNode = spawnedObject.FindChild<NetworkedNode>();
 
                 // Adds child to the root of the game world
-                NetworkManager.manager.GetTree().Root.AddChild(nodeRef);
+                NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+
+                // Set Transform
+                if (spawnedObject is Node3D)
+                {
+                    (spawnedObject as Node3D).Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
+                    (spawnedObject as Node3D).Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
+                    (spawnedObject as Node3D).Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
+                }      
             }
             // We are the server as well as a client, don't instantiate twice, we can just get the info locally from the server
             else if (!NetworkManager.AmIHeadless)
             {
                 // Grab net node from server class
                 netNode = Server.NetworkedNodes[packet.NetID];
-                nodeRef = netNode.Node;
-
-                // Adds the node to the scene tree
-                NetworkManager.manager.GetTree().Root.AddChild(netNode.Node);
+                spawnedObject = netNode.Node;
             }
 
             NetworkedNodes.Add(packet.NetID, netNode);
@@ -248,8 +250,15 @@ public partial class Client
         // Occupy Data
         netNode.NetID = packet.NetID;
 
+
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
-            serverConnection.playerObject = nodeRef; // Set your player object
+            serverConnection.playerObject = spawnedObject; // Set your player object
+
+        
+
+        netNode.Enabled = true; // Set Process enabled
+
+        GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
 
     }
 
@@ -257,6 +266,8 @@ public partial class Client
     {
         try
         {
+            GD.Print("[Client] Loading World " + packet.LevelID);
+
             NetworkManager.manager.WorldManager.LoadWorldClient(packet.LevelID, packet.UnloadLast);
         }
         catch (Exception e)

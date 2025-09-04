@@ -41,8 +41,6 @@ public partial class WorldManager : Node
 
 		OnStartLoad?.Invoke(levelID);
 
-		GD.Print("[Client][World Manager] Loading World " + levelID);
-
 		if (NetworkManager.AmIClient && !NetworkManager.AmIServer)
 		{
 			// Add world to scene tree
@@ -50,7 +48,7 @@ public partial class WorldManager : Node
 			GetTree().Root.AddChild(world);
 			LoadedWorlds.Add(world);
 		}
-		else world = LoadedWorlds[LoadedWorlds.Count]; // Get latest world loaded on server
+		else world = LoadedWorlds[LoadedWorlds.Count - 1]; // Get latest world loaded on server
 
 		// Move player object to new world on client
 		Client.serverConnection.playerObject.Reparent(world);
@@ -68,7 +66,7 @@ public partial class WorldManager : Node
 
 		OnStartLoad?.Invoke(levelID);
 
-		GD.Print("[Server][World Manager] Loading World " + levelID);
+
 
 		// Add world to scene tree
 		NetworkedWorld world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();

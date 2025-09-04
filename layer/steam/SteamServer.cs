@@ -11,7 +11,6 @@ namespace ArcaneNetworkingSteam;
 public class SteamServer
 {
     internal HSteamListenSocket ServerListenSocket;
-
     internal HSteamNetPollGroup ClientPollGroup;
     internal Dictionary<uint, HSteamNetConnection> ClientsConnected = [];
     protected Callback<SteamNetConnectionStatusChangedCallback_t> ConnectionCallback;
@@ -25,9 +24,9 @@ public class SteamServer
 
     public void StartServer(HSteamNetConnection localConnection = default)
     {
-        ServerListenSocket = SteamNetworkingSockets.CreateListenSocketP2P(0, 0, null);
+        ServerListenSocket = SteamNetworkingSockets.CreateListenSocketP2P(0, 0, null); // Create listen socket
 
-        ClientPollGroup = SteamNetworkingSockets.CreatePollGroup();
+        ClientPollGroup = SteamNetworkingSockets.CreatePollGroup(); // Create Poll Group for server
 
         if (localConnection != default)
         {
@@ -48,7 +47,7 @@ public class SteamServer
         SteamNetworkingSockets.CloseListenSocket(ServerListenSocket);
     }
 
-    public void SetLocal()
+    public void InitLocal()
     {
         uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
@@ -108,7 +107,6 @@ public class SteamServer
     public void PollMessages(SteamMessageLayer layer)
     {
         int msgCount = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(ClientPollGroup, layer.ReceiveBuffer, layer.ReceiveBuffer.Length);
-
 
         for (int i = 0; i < msgCount; i++)
         {

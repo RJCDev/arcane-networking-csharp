@@ -28,16 +28,16 @@ public static class ArcaneNetworking
     internal static void RegisterPacket(int hash, Type type)
     {
         PacketTypes.Add(hash, type);
-        GD.Print("[Arcane Networking] Registered Packet: " + hash + " | Type: " + type.FullName);
+        //GD.Print("[Arcane Networking] Registered Packet: " + hash + " | Type: " + type.FullName);
     }
     internal static void RegisterRPC(int hash, RPCUnpackDelegate del)
     {
         RPCMethods.Add(hash, del);
-        GD.Print("[Arcane Networking] Registered RPC: " + hash + " | Invoker: " + del.Method.Name);
+        //GD.Print("[Arcane Networking] Registered RPC: " + hash + " | Invoker: " + del.Method.Name);
     }
     internal static void Init()
     {
-        GD.Print("[Arcane Networking] Arcane Networking Initialized!");
+        //GD.Print("[Arcane Networking] Arcane Networking Initialized!");
         Client.RegisterInternalHandlers();
         Server.RegisterInternalHandlers();
     }

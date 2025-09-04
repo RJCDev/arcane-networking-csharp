@@ -97,9 +97,9 @@ public partial class Server : Node
 
     static void OnServerConnect(NetworkConnection connection)
     {
-        AddClient(connection);
+        GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
 
-        GD.Print("[Server] Client Has Connected!");
+        AddClient(connection);
 
         OnClientConnect?.Invoke(connection);
     }
@@ -138,7 +138,6 @@ public partial class Server : Node
 
                         break;
 
-
                     case 1: // RPC Packet
 
                         if (reader.Read(out RPCPacket rpcPacket))
@@ -147,6 +146,7 @@ public partial class Server : Node
                             {
                                 // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
 
+                                //GD.Print("[Server] Invoking RPC! " + NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents.Count);
                                 unpack(reader, NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex]);
                                 
                                 //GD.Print("[Server] Unpacked RPC For: " + rpcPacket.CallerNetID);
@@ -213,8 +213,8 @@ public partial class Server : Node
         // Send back if it was a ping
         if (packet.PingPong == 0)
         {
-            GD.Print("[Server] Sending Pong! " + Time.GetTicksMsec());
-            Connections[fromConnection].Ping(true); // Send Pong if it was a Ping, if it was a Pong
+            //GD.Print("[Server] Sending Pong! " + Time.GetTicksMsec());
+            Connections[fromConnection].Ping(1); // Send Pong if it was a Ping, if it was a Pong
         }
         else // This was a pong, we need to record the RTT
             Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime; 
@@ -231,23 +231,9 @@ public partial class Server : Node
     /// <returns>Node that was spawned</returns>
     public static Node Spawn(uint prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
     {
-
         Node spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)prefabID].Instantiate();
         NetworkedNode netNode;
-
-        // Adds the spawned object to the game world if headless, else wait for client
-        if (NetworkManager.AmIHeadless)
-        {
-            NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-
-            // Set Transform
-            if (spawnedObject is Node3D)
-            {
-                (spawnedObject as Node3D).Position = position;
-                (spawnedObject as Node3D).GlobalBasis = basis;
-            }
-
-        }
+  
 
         // Finds its networked node, it should be a child of this spawned object
         netNode = spawnedObject.FindChild<NetworkedNode>();
@@ -259,17 +245,23 @@ public partial class Server : Node
             return null;
         }
 
+        // Now we can safely add to scene tree
+        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+
         NetworkedNodes.Add(CurrentNodeID, netNode);
+
+        // Set Transform
+        if (spawnedObject is Node3D)
+        {
+            (spawnedObject as Node3D).Position = position;
+            (spawnedObject as Node3D).GlobalBasis = basis;
+        }      
 
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
-
         uint netOwner = owner != null ? owner.GetID() : 0;
-
         netNode.OwnerID = netOwner;
-
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
-
 
         var quat = basis.GetRotationQuaternion().Normalized();
 
@@ -278,14 +270,17 @@ public partial class Server : Node
             NetID = netNode.NetID,
             prefabID = prefabID,
             position = [position.X, position.Y, position.Z],
-            rotation = [quat.X, quat.Y, quat.Z],
+            rotation = [quat.X, quat.Y, quat.Z, quat.W],
             scale = [scale.X, scale.Y, scale.Z]
 
         };
 
+        GD.Print("[Server] Spawned Networked Node: " + packet.NetID);
+
+        netNode.Enabled = true; // Set Process enabled
+
         // Relay to Clients
         SendAll(packet, Channels.Reliable);
-
 
         return spawnedObject;
     }
@@ -331,6 +326,7 @@ public partial class Server : Node
             {
                 // Instantiate the player prefab if not -1
                 connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
+                connection.playerObject.Name = " [Conn ID: " + connection.GetID() + "]";
             }
         }
 
@@ -363,12 +359,20 @@ public partial class Server : Node
             LevelID = levelID,
             UnloadLast = unloadLast,
         };
+        try
+        {
+            GD.Print("[Server] Loading World " + levelID);
+            // Load on server
+            NetworkManager.manager.WorldManager.LoadWorldServer(forConnection, levelID, unloadLast);
 
-        // Load on server
-        NetworkManager.manager.WorldManager.LoadWorldServer(forConnection, levelID, unloadLast);
-
-        // Load for connection
-        Send(packet, forConnection);
+            // Load for connection
+            Send(packet, forConnection);
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr("[Server] Failed to load world " + levelID);
+            GD.PrintErr(e);
+        }
     }
     
 

@@ -65,9 +65,9 @@ public partial class NetworkDebug : Node
         if (Client.serverConnection == null) return;
 
         FPS.Text = "FPS: " + ((int)Engine.GetFramesPerSecond()).ToString();
-        rwBuffers.Text = "Read: " + NetworkPool.GetReaderPoolSize() + "b |" + "Write: " + NetworkPool.GetWriterPoolSize() + "b";
+        rwBuffers.Text = "RdBfr: " + NetworkPool.GetReaderPoolSize() + "b |" + "WrtBfr: " + NetworkPool.GetWriterPoolSize() + "b";
 
-        kbps.Text = "Up: " + Math.Round(KbpsUp, 4) + "kbps | Down: " + Math.Round(KbpsDwn, 4) + " kbps";
+        kbps.Text = "Up: " + Math.Round(KbpsUp, 4) + "kbps | Down: " + Math.Round(KbpsDwn, 4) + "kbps";
         RTTLabel.Text = Client.serverConnection.rtt.ToString() + " MS";
         AmIClientLabel.Text = "Client? " + NetworkManager.AmIClient.ToString();
         AmIServerLabel.Text = "Server? " + NetworkManager.AmIServer.ToString();

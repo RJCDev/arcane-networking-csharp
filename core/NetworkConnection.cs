@@ -64,10 +64,10 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     }
 
     /// Ping connection
-    public void Ping(bool pong = false)
+    public void Ping(byte pingOrPong)
     {
         lastPingTime = Time.GetTicksMsec();
-        Send(new PingPongPacket() { PingPong = (byte)(pong ? 1 : 0), }, Channels.Reliable);
+        Send(new PingPongPacket() { PingPong = pingOrPong, }, Channels.Reliable);
     
     }
 }

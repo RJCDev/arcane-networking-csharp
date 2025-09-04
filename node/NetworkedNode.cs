@@ -33,6 +33,22 @@ public partial class NetworkedNode : Node
         }
     }
 
+    bool _enabled = false;
+    [Export]
+    public bool Enabled
+    {
+        get
+        {
+            return _enabled;
+        }
+
+        set
+        {
+            _enabled = value;
+            ProcessMode = value ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+        }
+    }
+
     [Export]
     public string IDString
     {
@@ -61,37 +77,30 @@ public partial class NetworkedNode : Node
     // Actions
     public Action<ulong, ulong> OnOwnerChanged;
 
-
     // Find all Networked Components
     public override void _EnterTree()
     {
         ChildEnteredTree += OnChildAdded;
-
-        foreach (var child in GetChildren())
-        {
-            if (child is NetworkedComponent)
-            {
-                NetworkedComponents.Add(child as NetworkedComponent);
-                (child as NetworkedComponent).NetworkedNode = this;
-            }
-        }
     }
 
     // Destroy all Networked Components
     public override void _ExitTree()
     {
         ChildEnteredTree -= OnChildAdded;
-
-        foreach (var component in NetworkedComponents)
-        {
-            component.QueueFree();
-        }
     }
 
     void OnChildAdded(Node child)
     {
         // Make SURE we insert it at the correct index
-        if (child is NetworkedComponent) NetworkedComponents.Insert(child.GetIndex(), child as NetworkedComponent);
+        if (child is NetworkedComponent netComponent)
+        {
+            if (NetworkedComponents.Contains(netComponent)) return; // Don't add twice!
+
+            GD.Print("[Networked Node] Networked Node: " + child.Name + " Was Registered In Networked Node: " + NetID);
+            netComponent.NetworkedNode = this;
+            NetworkedComponents.Insert(child.GetIndex(), netComponent);
+        }
         else return;
     }
+
 }
