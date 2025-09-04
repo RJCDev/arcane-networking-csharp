@@ -115,6 +115,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
         else // OnReceive
         {
+            GD.Print("[Client] Reading For: "+ NetworkedNode.NetID);
             // Read the "Current" snapshot we just got
             CurrentState = ReadSnapshot(changed, valuesChanged);
 
@@ -122,7 +123,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (NetworkManager.AmIServer)
             {
                 GD.Print("[Server] Relaying For: "+ NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
-                Set(NetworkManager.AmIHeadless ? [.. Server.Connections.Keys] : Server.GetConnsExcluding(Client.serverConnection.GetID(), NetworkedNode.OwnerID), changed, valuesChanged);
+                //Set(NetworkManager.AmIHeadless ? [.. Server.Connections.Keys] : Server.GetConnsExcluding(Client.serverConnection.GetID(), NetworkedNode.OwnerID), changed, valuesChanged);
             }
         }
               
