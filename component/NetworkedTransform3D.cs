@@ -70,13 +70,18 @@ public partial class NetworkedTransform3D : NetworkedComponent
             {
                 if (ServerScale != TransformNode.Scale) { changes |= Changed.Scale; valuesChanged.Add(TransformNode.Scale.X); valuesChanged.Add(TransformNode.Scale.Y); valuesChanged.Add(TransformNode.Scale.Z); }
             }
-            
+
 
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                // Send to others (server if authority mode is client, all clients if authority mode is server)
-                Set(AuthorityMode == AuthorityMode.Client ? [Client.serverConnection.GetID()] : [.. Server.Connections.Keys], changes, [.. valuesChanged]);
+                uint[] send = null;
+                if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetID()];
+                else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(Client.connectionIDToServer, NetworkedNode.OwnerID);
+
+                // Send
+                Set(send, changes, [.. valuesChanged]);
+
             }
 
         }
@@ -97,7 +102,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // Set our current state
         if (NetworkedNode.AmIOwner) // OnSend
         {
-            GD.Print("[Client] Sending From: " + NetworkedNode.NetID);
+            //GD.Print("[Client] Sending From: " + NetworkedNode.NetID);
 
             // Update Server Pos because are owner
             ServerPos = TransformNode.GlobalPosition;
