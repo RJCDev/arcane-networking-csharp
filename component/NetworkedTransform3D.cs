@@ -106,7 +106,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     }
 
     // Actually apply the changed part of the transform (each value changed is the delta of change, valuesChanged is paddded)
-    [MethodRPC(Channels.Unreliable, true)]
+    [MethodRPC(Channels.Unreliable)]
     public void Set(uint[] connsToSendTo, Changed changed, float[] valuesChanged)
     {
         // Record out local state if we are owner
