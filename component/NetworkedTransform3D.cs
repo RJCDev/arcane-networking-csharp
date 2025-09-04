@@ -23,7 +23,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [Export] public bool LinearInterpolation = true;
     [Export] public float InterpSpeed = 0.5f;
 
-    public TransformSnapshot Previous, Current;
+    public TransformSnapshot Previous = new(), Current = new();
 
     public override void _Ready()
     {
@@ -195,6 +195,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
         public Quaternion Rot;
         public Vector3 Scale;
 
+        public TransformSnapshot()
+        {
+            Pos = Vector3.Zero;
+            Rot = Quaternion.Identity;
+            Scale = Vector3.One;
+        }
         /// <summary>
         /// TO Extrapolate, use a value larger than 1 for amount
         /// </summary>
