@@ -27,6 +27,8 @@ public partial class Server : Node
     public static Action<NetworkConnection> OnClientInitialized;
     public static Action<NetworkConnection> OnClientDisconnect;
 
+    public static uint[] GetConnsExcluding(params uint[] connectionIds) => [.. Connections.Keys.Except(connectionIds)];
+
     public static int GetConnectionCount() => Connections.Count;
 
     public static bool AllConnectionsAuthenticated => Connections.All(x => x.Value.isAuthenticated == true);

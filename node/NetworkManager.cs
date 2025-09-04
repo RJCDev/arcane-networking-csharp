@@ -41,6 +41,10 @@ public partial class NetworkManager : Node
      /// <summary> How NetworkedObjects owned by a connection behave when the connection is disconnected</summary>
     [Export] public DisconectBehavior DisconnectBehavior = DisconectBehavior.Destroy;
 
+    // Am I A client only?
+    public static bool AmIClientOnly => AmIClient && !AmIServer;
+    // Am I A client server combo?
+    public static bool AmICombo => AmIClient && AmIServer;
 
     // Am I a headless server?
     public static bool AmIHeadless => !AmIClient && AmIServer;

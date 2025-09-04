@@ -216,7 +216,7 @@ public partial class Client
         else
         {
             // We are a client only, just spawn it normally
-            if (!NetworkManager.AmIServer && NetworkManager.AmIClient)
+            if (NetworkManager.AmIClientOnly)
             {
                 spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
 

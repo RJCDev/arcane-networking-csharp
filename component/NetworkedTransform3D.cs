@@ -121,8 +121,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // If we recieve and we are the server we need to relay
             if (NetworkManager.AmIServer)
             {
-                GD.Print("[Server] Relaying For: "+ NetworkedNode.NetID);
-                Set([.. Server.Connections.Keys], changed, valuesChanged);
+                GD.Print("[Server] Relaying For: "+ NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
+                Set(NetworkManager.AmIHeadless ? [.. Server.Connections.Keys] : Server.GetConnsExcluding(Client.serverConnection.GetID(), NetworkedNode.OwnerID), changed, valuesChanged);
             }
         }
               
