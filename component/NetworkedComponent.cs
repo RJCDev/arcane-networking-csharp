@@ -20,6 +20,7 @@ public enum SendTime
 /// <summary>
 /// A component that works under a networked node. It can send RPCs over the network.
 /// </summary>
+[GlobalClass, Icon("res://addons/arcane-networking/icon/networked_component.svg")]
 public abstract partial class NetworkedComponent : Node
 {
     public int GetIndex() => NetworkedNode.NetworkedComponents.IndexOf(this);

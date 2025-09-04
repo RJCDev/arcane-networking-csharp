@@ -100,8 +100,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             TransformNode.GlobalPosition = current.Pos;
             TransformNode.GlobalRotation = current.Rot;
             TransformNode.Scale = current.Scale;
-            
-            GD.Print("Setting");
+
         }
        
     }

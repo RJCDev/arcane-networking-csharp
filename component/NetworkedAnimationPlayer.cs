@@ -6,6 +6,8 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
 {
     [Export] AnimationPlayer AnimationPlayer;
 
+    public bool IsPlaying(string anim) => AnimationPlayer.CurrentAnimation == anim;
+
     [MethodRPC]
     public void Play(uint[] connsToSendTo, string animationName, bool backwards = false)
     {

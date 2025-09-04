@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Plug body -->
+  <rect x="7" y="8.5" width="10" height="8" rx="2"></rect>
+  <!-- Prongs -->
+  <path d="M10 8.5V5M14 8.5V5"></path>
+  <!-- Cable (no background) -->
+  <path d="M12 16.5c0 2-1.5 3-3 3H6a3 3 0 1 1 0-6h1.5"></path>
+</svg>
