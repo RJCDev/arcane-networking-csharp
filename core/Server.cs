@@ -244,11 +244,6 @@ public partial class Server : Node
             return null;
         }
 
-        // Now we can safely add to scene tree
-        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-
-        NetworkedNodes.Add(CurrentNodeID, netNode);
-
         // Set Transform
         if (spawnedObject is Node3D)
         {
@@ -275,9 +270,14 @@ public partial class Server : Node
 
         };
 
-        GD.Print("[Server] Spawned Networked Node: " + packet.NetID);
 
+        // Now we can safely add to scene tree after values are set
+        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
         netNode.Enabled = true; // Set Process enabled
+        
+        NetworkedNodes.Add(CurrentNodeID, netNode);
+        
+        GD.Print("[Server] Spawned Networked Node: " + packet.NetID);
 
         // Relay to Clients
         SendAll(packet, Channels.Reliable);
