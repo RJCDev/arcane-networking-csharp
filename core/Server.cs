@@ -234,7 +234,6 @@ public partial class Server : Node
         Node spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)prefabID].Instantiate();
         NetworkedNode netNode;
   
-
         // Finds its networked node, it should be a child of this spawned object
         netNode = spawnedObject.FindChild<NetworkedNode>();
 
@@ -271,7 +270,8 @@ public partial class Server : Node
             prefabID = prefabID,
             position = [position.X, position.Y, position.Z],
             rotation = [quat.X, quat.Y, quat.Z, quat.W],
-            scale = [scale.X, scale.Y, scale.Z]
+            scale = [scale.X, scale.Y, scale.Z],
+            ownerID = owner != null ? owner.GetID() : 0
 
         };
 
