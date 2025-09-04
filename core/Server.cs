@@ -340,7 +340,6 @@ public partial class Server : Node
                 Send(packet, connection, Channels.Reliable);
             }
 
-
             if (NetworkManager.manager.PlayerPrefabID != -1)
             {
                 // Instantiate the player prefab if not -1

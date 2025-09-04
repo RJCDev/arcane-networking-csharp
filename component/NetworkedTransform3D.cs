@@ -82,7 +82,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (changes != Changed.None)
             {
                 // Send to other
-                Set(AuthorityMode == AuthorityMode.Client ? [Client.serverConnection.GetID()] : [.. Server.Connections.Keys], changes, [.. valuesChanged]);
+                Set(NetworkManager.AmIServer ? [.. Server.Connections.Keys] : [Client.serverConnection.GetID()], changes, [.. valuesChanged]);
             }
 
         }
