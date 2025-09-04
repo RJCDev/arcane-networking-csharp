@@ -244,12 +244,6 @@ public partial class Server : Node
             return null;
         }
 
-        // Set Transform
-        if (spawnedObject is Node3D)
-        {
-            (spawnedObject as Node3D).Position = position;
-            (spawnedObject as Node3D).GlobalBasis = basis;
-        }      
 
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
@@ -258,6 +252,19 @@ public partial class Server : Node
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
         var quat = basis.GetRotationQuaternion().Normalized();
+
+        // Now we can safely add to scene tree after values are set
+        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+        netNode.Enabled = true; // Set Process enabled
+        
+        NetworkedNodes.Add(netNode.NetID, netNode);
+        
+        // Set Transform
+        if (spawnedObject is Node3D)
+        {
+            (spawnedObject as Node3D).Position = position;
+            (spawnedObject as Node3D).GlobalBasis = basis;
+        }      
 
         SpawnNodePacket packet = new()
         {
@@ -271,13 +278,7 @@ public partial class Server : Node
         };
 
 
-        // Now we can safely add to scene tree after values are set
-        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-        netNode.Enabled = true; // Set Process enabled
-        
-        NetworkedNodes.Add(CurrentNodeID, netNode);
-        
-        GD.Print("[Server] Spawned Networked Node: " + packet.NetID);
+        GD.Print("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
         SendAll(packet, Channels.Reliable);

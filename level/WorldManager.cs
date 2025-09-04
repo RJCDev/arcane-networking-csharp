@@ -35,7 +35,7 @@ public partial class WorldManager : Node
 
 	public void LoadWorldClient(int levelID, bool unloadLast = true)
 	{
-		if (!NetworkManager.AmIClient || (NetworkManager.AmIClient && NetworkManager.AmIServer)) return;
+		if (!NetworkManager.AmIClient) return;
 
 		NetworkedWorld world = null;
 
