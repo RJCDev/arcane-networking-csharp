@@ -323,6 +323,24 @@ public partial class Server : Node
 
         if (!NetworkedNodes.ContainsKey(connection.GetID()))
         {
+            // Tell them to spawn all net objects that we currenlty have on their client
+            foreach (var node in NetworkedNodes)
+            {
+                SpawnNodePacket packet = new()
+                {
+                    NetID = node.Value.NetID,
+                    prefabID = node.Value.PrefabID,
+                    position = [0, 0, 0],
+                    rotation = [0, 0, 0, 0],
+                    scale = [0, 0, 0],
+                    ownerID = node.Value.OwnerID
+
+                };
+
+                Send(packet, connection, Channels.Reliable);
+            }
+
+
             if (NetworkManager.manager.PlayerPrefabID != -1)
             {
                 // Instantiate the player prefab if not -1

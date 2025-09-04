@@ -65,6 +65,8 @@ public partial class NetworkedNode : Node
 
     public uint NetID;
 
+    public uint PrefabID; // Keep track of this so we can duplicate it easier / send it easier
+
     // Networked Components
     public Array<NetworkedComponent> NetworkedComponents = [];
 
