@@ -331,8 +331,8 @@ public partial class Server : Node
                     NetID = node.Value.NetID,
                     prefabID = node.Value.PrefabID,
                     position = [0, 0, 0],
-                    rotation = [0, 0, 0, 0],
-                    scale = [0, 0, 0],
+                    rotation = [0, 0, 0, 1],
+                    scale = [1, 1, 1],
                     ownerID = node.Value.OwnerID
 
                 };
