@@ -37,6 +37,7 @@ public partial class WorldManager : Node
 	{
 		if (!NetworkManager.AmIClient) return;
 
+
 		NetworkedWorld world = null;
 
 		OnStartLoad?.Invoke(levelID);
@@ -45,8 +46,11 @@ public partial class WorldManager : Node
 		{
 			// Add world to scene tree
 			world = Worlds[levelID].scene.Instantiate<NetworkedWorld>();
+
 			GetTree().Root.AddChild(world);
+
 			LoadedWorlds.Add(world);
+
 		}
 		else world = LoadedWorlds[LoadedWorlds.Count - 1]; // Get latest world loaded on server
 
@@ -65,7 +69,6 @@ public partial class WorldManager : Node
 		if (!NetworkManager.AmIServer) return;
 
 		OnStartLoad?.Invoke(levelID);
-
 
 
 		// Add world to scene tree

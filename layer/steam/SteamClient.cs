@@ -19,7 +19,7 @@ public class SteamClient
 
     public void StartClient(NetworkConnection connection)
     {
-        if (ConnectionToServer == default) // We have no internal connection, we are Remote
+        if (ConnectionToServer == default) // We have no internal connection, we are Searching for remote server
         {
             RemoteIdentity = new() { m_eType = ESteamNetworkingIdentityType.k_ESteamNetworkingIdentityType_SteamID };
             RemoteIdentity.SetSteamID(new CSteamID(connection.GetEndpointAs<ulong>()));
@@ -59,8 +59,6 @@ public class SteamClient
 
                 if (info.m_info.m_identityRemote.GetSteamID() == RemoteIdentity.GetSteamID())
                 {
-                    // We have connected!
-                    SteamNetworkingSockets.AcceptConnection(info.m_hConn);
 
                     GD.PushWarning("[Steam Client] Connected To Remote Host: " + info.m_info.m_identityRemote.GetSteamID());
 

@@ -220,13 +220,14 @@ public partial class Client
             {
                 spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
 
+                // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
+                netNode = spawnedObject.FindChild<NetworkedNode>();
+
                 if (netNode == null)
                 {
                     GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
                     return;
                 }
-                // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
-                netNode = spawnedObject.FindChild<NetworkedNode>();
 
                 // Adds child to the root of the game world
                 NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
@@ -252,11 +253,11 @@ public partial class Client
 
         // Occupy Data
         netNode.NetID = packet.NetID;
+        netNode.OwnerID = packet.ownerID;
 
-
+        GD.Print(netNode.AmIOwner + " " + packet.prefabID + " " + NetworkManager.manager.PlayerPrefabID);
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
             serverConnection.playerObject = spawnedObject; // Set your player object
-
         
 
         netNode.Enabled = true; // Set Process enabled

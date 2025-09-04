@@ -24,7 +24,7 @@ public partial class Server : Node
     public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
 
     public static Action<NetworkConnection> OnClientConnect;
-     public static Action<NetworkConnection> OnClientInitialized;
+    public static Action<NetworkConnection> OnClientInitialized;
     public static Action<NetworkConnection> OnClientDisconnect;
 
     public static int GetConnectionCount() => Connections.Count;
