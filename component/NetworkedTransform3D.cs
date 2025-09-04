@@ -22,6 +22,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [ExportCategory("Interpolation And Corrections")]
     [Export] public bool LinearInterpolation = true;
     [Export] public float InterpSpeed = 0.5f;
+   
+    public float snapShotInterval = 1f / Engine.PhysicsTicksPerSecond;
+    float snapshotTimer = 0;
 
     public TransformSnapshot Previous = new(), Current = new();
 
@@ -41,7 +44,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public override void _PhysicsProcess(double delta)
     {
         // Update Position
-        if (NetworkedNode.AmIOwner)
+        if ((AuthorityMode == AuthorityMode.Client && NetworkedNode.AmIOwner) // Client Authority
+        || AuthorityMode == AuthorityMode.Server && NetworkManager.AmIServer) // Server Authority
         {
             Changed changes = Changed.None;
             List<float> valuesChanged = [];
@@ -90,41 +94,46 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         if (NetworkedNode.AmIOwner) return;
 
-        // Process the interpolation if we aren't owner
-        TransformSnapshot Interp = Previous.InterpWith(Current, InterpSpeed);
+        snapshotTimer += (float)delta;
+
+        float t = (float)(snapshotTimer / snapShotInterval) * InterpSpeed;
+        t = Math.Clamp(t, 0f, 1f);
+
+        // Process the samples if we aren't owner
+        TransformSnapshot Interp = Previous.InterpWith(Current, t);
         TransformNode.GlobalPosition = Interp.Pos;
         TransformNode.Quaternion = Interp.Rot;
         TransformNode.Scale = Interp.Scale;
+
+        if (t == 1)
+        {
+            // Reset interpolation timer
+            snapshotTimer = 0;
+            Previous = Current; // Set previous to current if done interpolating
+            
+        } 
+
     }
 
     [MethodRPC(Channels.Unreliable, true)]
     public void Set(uint[] connsToSendTo, Changed changed, float[] valuesChanged)
     {
-        if (!NetworkedNode.AmIOwner) // OnReceive
+        if (!NetworkedNode.AmIOwner)
         {
-            //GD.Print("[Client] Reading For: " + NetworkedNode.NetID);
-
-            // Set old Current to Previous
-            Previous = Current;
-
-            // Read the "Current" snapshot we just got into our server transform data
-            // We will interpolate back in process loop
+            // Read new current
             ReadSnapshot(changed, valuesChanged);
 
-            // If we recieve and we are the server we need to relay
+            // Relay logic
             if (NetworkManager.AmIServer)
             {
                 uint[] relayConnections = Server.GetConnsExcluding(Client.connectionIDToServer, NetworkedNode.OwnerID);
 
                 if (relayConnections.Length > 0)
-                {
-                    GD.Print("[Server] Relaying For: " + NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
                     Set(relayConnections, changed, valuesChanged);
-                }
             }
         }
-              
     }
+
 
     /// <summary>
     /// Read a snapshot from values changed (delta)

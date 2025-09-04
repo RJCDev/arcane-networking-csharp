@@ -35,7 +35,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));
 
-    public void Send<T>(T packet, Channels channel)
+    public void Send<T>(T packet, Channels channel, bool instant = false)
     {
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
@@ -51,7 +51,15 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
 
             //GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
 
-            MessageHandler.Enqueue(channel, NetworkWriter, this);
+            if (instant)
+            {
+                MessageLayer.Active.SendToConnections(NetworkWriter.ToArraySegment(), Channels.Reliable, connectionID);
+            }
+            else
+            {
+                MessageHandler.Enqueue(channel, NetworkWriter, this);
+            }
+            
 
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
@@ -67,7 +75,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public void Ping(byte pingOrPong)
     {
         lastPingTime = Time.GetTicksMsec();
-        Send(new PingPongPacket() { PingPong = pingOrPong, }, Channels.Reliable);
+        Send(new PingPongPacket() { PingPong = pingOrPong, }, Channels.Reliable, true);
     
     }
 }
