@@ -19,15 +19,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [Export] public bool SyncRotation;
     [Export] public bool SyncScale;
 
-    [ExportCategory("Networking Limits (For Server Authoritive)")]
-    [Export] public float maxYVel = 20f;
-    [Export] public float maxZXVel = 20f;
-
     [ExportCategory("Interpolation And Corrections")]
     [Export] public bool LinearInterpolation = true;
     [Export] public float InterpSpeed = 0.5f;
-    [Export] public float hardPosError = 5f;
-    [Export] public float HardRotError = 2f;
 
 
     // Queue of Snapshots (Used for Cubic Interpolation)
@@ -66,7 +60,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Rot
             if (SyncRotation)
             {
-                 if (CurrentState.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
+                if (CurrentState.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
                 if (CurrentState.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
                 if (CurrentState.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
             }
@@ -81,7 +75,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                // Send to other
+                // Send to others (server if authority mode is client, all clients if authority mode is server)
                 Set(AuthorityMode == AuthorityMode.Client ? [Client.serverConnection.GetID()] : [.. Server.Connections.Keys], changes, [.. valuesChanged]);
             }
 
@@ -105,12 +99,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
        
     }
 
-    // Actually apply the changed part of the transform (each value changed is the delta of change, valuesChanged is paddded)
     [MethodRPC(Channels.Unreliable)]
     public void Set(uint[] connsToSendTo, Changed changed, float[] valuesChanged)
     {
-        // Record out local state if we are owner
-        if (NetworkedNode.AmIOwner && AuthorityMode == AuthorityMode.Client)
+        // Set our current state
+        if (NetworkedNode.AmIOwner) // OnSend
         {
             CurrentState = new()
             {
@@ -119,13 +112,16 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 Scale = TransformNode.Scale
             };
         }
-        else
+        else // OnReceive
         {
             // Read the "Current" snapshot we just got
             CurrentState = ReadSnapshot(changed, valuesChanged);
-        }
-    }
 
+            // If we recieve and are on server authority mode, we need to relay
+            if (AuthorityMode == AuthorityMode.Server) Set([.. Server.Connections.Keys], changed, valuesChanged);
+        }
+              
+    }
 
     /// <summary>
     /// Read a snapshot from values changed
