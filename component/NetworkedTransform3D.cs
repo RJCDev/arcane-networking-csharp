@@ -102,7 +102,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         if (!NetworkedNode.AmIOwner) // OnReceive
         {
-            GD.Print("[Client] Reading For: " + NetworkedNode.NetID);
+            //GD.Print("[Client] Reading For: " + NetworkedNode.NetID);
 
             // Set old Current to Previous
             Previous = Current;

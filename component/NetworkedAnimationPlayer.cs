@@ -11,11 +11,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     [MethodRPC]
     public void Play(uint[] connsToSendTo, string animationName, bool backwards = false)
     {
-        if (AnimationPlayer.CurrentAnimation != animationName)
-        {
-            if (!backwards) AnimationPlayer.Play(animationName);
-            else AnimationPlayer.PlayBackwards(animationName);
-        }
+        PlayLocal(animationName, backwards); // Play local anytime this is called
         if (!NetworkedNode.AmIOwner) // OnReceive
         {
             // Relay
@@ -29,7 +25,15 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
                     Play(relayConnections, animationName, backwards);
                 }
             }
-        } 
+        }
+    }
+    void PlayLocal(string animationName, bool backwards = false)
+    {
+        if (AnimationPlayer.CurrentAnimation != animationName)
+        {
+            if (!backwards) AnimationPlayer.Play(animationName);
+            else AnimationPlayer.PlayBackwards(animationName);
+        }
     }
 
     [MethodRPC]
