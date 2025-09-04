@@ -18,7 +18,7 @@ namespace ArcaneNetworking
 
         /// ON CLIENT ->
         /// <summary>Called by client MessageLayer when the client is connected to the server.</summary>
-        public Action OnClientConnect;
+        public Action<uint> OnClientConnect;
 
         /// <summary>Called by client MessageLayer when the client connected to the server.</summary>
         public Action OnClientDisconnect;

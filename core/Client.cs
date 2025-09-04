@@ -26,6 +26,8 @@ public partial class Client
     // Connection to the server
     public static NetworkConnection serverConnection = null;
 
+    public static uint connectionIDToServer; // Your connection ID on the server
+
     /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
@@ -76,13 +78,14 @@ public partial class Client
 
     }
 
-    static void OnClientConnected()
+    static void OnClientConnected(uint id)
     {
-        
+
         GD.Print("[Client] Client Has Connected!");
 
         NetworkManager.AmIClient = true;
         serverConnection.isAuthenticated = true;
+        connectionIDToServer = id;
     }
     static void OnClientDisconnect()
     {

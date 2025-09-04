@@ -68,7 +68,28 @@ public partial class NetworkedNode : Node
     // Networked Components
     public Array<NetworkedComponent> NetworkedComponents = [];
 
-    public bool AmIOwner => OwnerID == Client.serverConnection.GetID();
+    public bool AmIOwner
+    {
+        get
+        {
+            // If its headless, check if we own it by owner id 0
+            if (NetworkManager.AmIHeadless)
+            {
+                return OwnerID == 0;
+            }
+            else if (NetworkManager.AmIClient)
+            {
+                // We are JUST client
+                if (!NetworkManager.AmIServer)
+                    return OwnerID == Client.connectionIDToServer;
+                else
+                    return OwnerID == 0 || OwnerID == Client.connectionIDToServer;
+            }
+            return false;
+            
+        }
+       
+    }
     public uint OwnerID;
     public object[] OwnerMeta = new object[64];
 

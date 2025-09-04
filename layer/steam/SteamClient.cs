@@ -39,7 +39,7 @@ public class SteamClient
         {
             GD.Print("[Steam Client] Local Client Setup!");
 
-            MessageLayer.Active.OnClientConnect?.Invoke();
+            MessageLayer.Active.OnClientConnect?.Invoke((uint)SteamUser.GetSteamID().m_SteamID);
         }
 
     }
@@ -67,7 +67,7 @@ public class SteamClient
 
                     GD.PushWarning("[Steam Client] Connected To Remote Host: " + info.m_info.m_identityRemote.GetSteamID());
 
-                    MessageLayer.Active.OnClientConnect?.Invoke();
+                    MessageLayer.Active.OnClientConnect?.Invoke((uint)SteamUser.GetSteamID().m_SteamID);
                 }
                 break;
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
