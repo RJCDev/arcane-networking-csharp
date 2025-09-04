@@ -16,6 +16,20 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
             if (!backwards) AnimationPlayer.Play(animationName);
             else AnimationPlayer.PlayBackwards(animationName);
         }
+        if (!NetworkedNode.AmIOwner) // OnReceive
+        {
+            // Relay
+            if (NetworkManager.AmIServer)
+            {
+                uint[] relayConnections = Server.GetConnsExcluding(Client.connectionIDToServer, NetworkedNode.OwnerID);
+
+                if (relayConnections.Length > 0)
+                {
+                    //GD.Print("[Server] Relaying For: " + NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
+                    Play(relayConnections, animationName, backwards);
+                }
+            }
+        } 
     }
 
     [MethodRPC]

@@ -91,7 +91,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         if (NetworkedNode.AmIOwner) return;
 
         // Process the interpolation if we aren't owner
-        TransformSnapshot Interp = Previous.TransformWith(Current, InterpSpeed);
+        TransformSnapshot Interp = Previous.InterpWith(Current, InterpSpeed);
         TransformNode.GlobalPosition = Interp.Pos;
         TransformNode.Quaternion = Interp.Rot;
         TransformNode.Scale = Interp.Scale;
@@ -199,7 +199,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         /// TO Extrapolate, use a value larger than 1 for amount
         /// </summary>
         /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
-        public TransformSnapshot TransformWith(TransformSnapshot other, float amount)
+        public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
         {
             return new()
             {
