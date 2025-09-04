@@ -68,9 +68,7 @@ public partial class NetworkedNode : Node
     // Networked Components
     public Array<NetworkedComponent> NetworkedComponents = [];
 
-    // 0 Means its owned by the server, if its not 0 we own it 
-    // (We cannot see others netId's from the client so that means everything not owned by us is owned by the server, even if owned by other clients)
-    public bool AmIOwner => OwnerID != 0;
+    public bool AmIOwner => OwnerID == Client.serverConnection.GetID();
     public uint OwnerID;
     public object[] OwnerMeta = new object[64];
 
