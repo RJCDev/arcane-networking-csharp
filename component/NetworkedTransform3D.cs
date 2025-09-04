@@ -116,7 +116,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (NetworkManager.AmIServer)
             {
                 GD.Print("[Server] Relaying For: " + NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
-                Set(NetworkManager.AmIHeadless ? [.. Server.Connections.Keys] : Server.GetConnsExcluding(NetworkedNode.OwnerID), changed, valuesChanged);
+
+                foreach (var player in Server.Connections)
+                {
+                    GD.Print(player.Key);
+                }
+                Set(NetworkManager.AmIHeadless ? [.. Server.Connections.Keys] : Server.GetConnsExcluding(Client.connectionIDToServer, NetworkedNode.OwnerID), changed, valuesChanged);
             }
         }
               
