@@ -105,6 +105,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // Set our current state
         if (NetworkedNode.AmIOwner) // OnSend
         {
+            GD.Print("[Client] Sending From: " + NetworkedNode.NetID);
             CurrentState = new()
             {
                 Pos = TransformNode.GlobalPosition,
@@ -117,8 +118,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Read the "Current" snapshot we just got
             CurrentState = ReadSnapshot(changed, valuesChanged);
 
-            // If we recieve and are on server authority mode, we need to relay
-            if (AuthorityMode == AuthorityMode.Server) Set([.. Server.Connections.Keys], changed, valuesChanged);
+            // If we recieve and we are the server we need to relay
+            if (NetworkManager.AmIServer)
+            {
+                GD.Print("[Server] Relaying For: "+ NetworkedNode.NetID);
+                Set([.. Server.Connections.Keys], changed, valuesChanged);
+            }
         }
               
     }
