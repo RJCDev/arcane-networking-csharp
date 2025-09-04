@@ -28,6 +28,7 @@ public partial class Client
 
     public static uint connectionIDToServer; // Your connection ID on the server
 
+     public static Action OnClientConnected;
     public static Action<NetworkedNode> OnClientSpawn;
 
     /// <summary>
@@ -56,7 +57,7 @@ public partial class Client
     internal static void RegisterInternalHandlers()
     {
         // Invokes
-        MessageLayer.Active.OnClientConnect += OnClientConnected; // Client is authenticated
+        MessageLayer.Active.OnClientConnect += OnClientConnect; // Client is authenticated
         MessageLayer.Active.OnClientDisconnect += OnClientDisconnect; // Client has disconnected
         MessageLayer.Active.OnClientReceive += OnClientReceive; // Client received bytes
 
@@ -79,7 +80,7 @@ public partial class Client
 
     }
 
-    static void OnClientConnected(uint id)
+    static void OnClientConnect(uint id)
     {
 
         GD.Print("[Client] Client Has Connected!");
@@ -87,6 +88,8 @@ public partial class Client
         NetworkManager.AmIClient = true;
         serverConnection.isAuthenticated = true;
         connectionIDToServer = id;
+
+        OnClientConnected?.Invoke();
     }
     static void OnClientDisconnect()
     {
