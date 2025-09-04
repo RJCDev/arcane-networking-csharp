@@ -21,10 +21,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     [ExportCategory("Interpolation And Corrections")]
     [Export] public bool LinearInterpolation = true;
-    [Export] public float InterpSpeed = 0.5f;
    
     public float snapShotInterval = 1f / Engine.PhysicsTicksPerSecond;
     float snapshotTimer = 0;
+    float oneWaySec => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
 
     public TransformSnapshot Previous = new(), Current = new();
 
@@ -96,7 +96,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         snapshotTimer += (float)delta;
 
-        float t = (float)(snapshotTimer / snapShotInterval) * InterpSpeed;
+        float t = (float)(snapshotTimer / snapShotInterval) * oneWaySec;
         t = Math.Clamp(t, 0f, 1f);
 
         // Process the samples if we aren't owner
@@ -105,13 +105,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         TransformNode.Quaternion = Interp.Rot;
         TransformNode.Scale = Interp.Scale;
 
-        if (t == 1)
-        {
-            // Reset interpolation timer
-            snapshotTimer = 0;
-            Previous = Current; // Set previous to current if done interpolating
-            
-        } 
+        if (t == 1) Previous = Current; // Set previous to current // Done Interpolating
 
     }
 
@@ -122,7 +116,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
         {
             // Read new current
             ReadSnapshot(changed, valuesChanged);
+            Current.SnaphotTime = Time.GetTicksMsec();
 
+            snapshotTimer = 0;
             // Relay logic
             if (NetworkManager.AmIServer)
             {
@@ -204,6 +200,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         public Quaternion Rot;
         public Vector3 Scale;
 
+        public ulong SnaphotTime;
         public TransformSnapshot()
         {
             Pos = Vector3.Zero;

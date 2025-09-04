@@ -52,13 +52,10 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
             //GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
 
             if (instant)
-            {
                 MessageLayer.Active.SendToConnections(NetworkWriter.ToArraySegment(), Channels.Reliable, connectionID);
-            }
             else
-            {
                 MessageHandler.Enqueue(channel, NetworkWriter, this);
-            }
+            
             
 
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
