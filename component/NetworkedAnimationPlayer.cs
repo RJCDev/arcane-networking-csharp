@@ -18,7 +18,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
             if (NetworkManager.AmIServer)
             {
                 //GD.Print("[Server] Relaying For: " + NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
-                Play(validSends, animationName, backwards);
+                if (validSends.Length > 0) Play(validSends, animationName, backwards);
                 
             }
         }

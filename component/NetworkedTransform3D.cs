@@ -123,7 +123,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             snapshotTimer = 0;
 
             // Relay logic
-            if (NetworkManager.AmIServer)
+            if (NetworkManager.AmIServer && validSends.Length > 0)
                 Set(validSends, changed, valuesChanged);
             
         }
