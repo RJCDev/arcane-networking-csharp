@@ -63,9 +63,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
             {
                 Vector3 compressed = CompQuat(TransformNode.Quaternion); // Compress to fit into Vector3
 
-                if (Current.Rot.X != compressed.X) { changes |= Changed.RotX; valuesChanged.Add(compressed.X); }
-                if (Current.Rot.Y != compressed.Y) { changes |= Changed.RotY; valuesChanged.Add(compressed.Y); }
-                if (Current.Rot.Z != compressed.Z) { changes |= Changed.RotZ; valuesChanged.Add(compressed.Z); }
+                if (Current.Rot.X != TransformNode.Quaternion.X) { changes |= Changed.RotX; valuesChanged.Add(compressed.X); }
+                if (Current.Rot.Y != TransformNode.Quaternion.Y) { changes |= Changed.RotY; valuesChanged.Add(compressed.Y); }
+                if (Current.Rot.Z != TransformNode.Quaternion.Z) { changes |= Changed.RotZ; valuesChanged.Add(compressed.Z); }
             }
 
             // Scale
@@ -81,8 +81,13 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 uint[] send = null;
                 if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetRemoteID()];
                 else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
-                
+
                 Set(send, changes, [.. valuesChanged]); // Send
+
+                // Set our current to be this so we can backtest it again above
+                Current.Pos = TransformNode.GlobalPosition;
+                Current.Rot = TransformNode.Quaternion;
+                Current.Scale = TransformNode.Scale;
 
             }
 
@@ -118,7 +123,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             Current.SnaphotTime = Time.GetTicksMsec();
 
             snapshotTimer = 0;
-           
+
             // Relay logic
             if (NetworkManager.AmIServer)
             {
@@ -128,6 +133,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                     Set(relayConnections, changed, valuesChanged);
             }
         }
+        
     }
 
 

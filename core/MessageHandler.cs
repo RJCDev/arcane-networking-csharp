@@ -49,14 +49,14 @@ public static class MessageHandler
         double msElapsedPing = Time.GetTicksMsec() - lastPingPongTime;
 
         // Queue Ping Pong Packets
-        if (msElapsedPing > NetworkManager.manager.PingPongFrequency * 1000.0f)
+        if (msElapsedPing > NetworkManager.manager.PingPongFrequency)
         {
            
             lastPingPongTime = Time.GetTicksMsec();
 
             if (NetworkManager.AmIClient)
             {
-                //GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
+                GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
 
                 Client.serverConnection.Ping(0);
                 
