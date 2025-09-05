@@ -59,7 +59,6 @@ public class SteamClient
 
                 if (info.m_info.m_identityRemote.GetSteamID() == RemoteIdentity.GetSteamID())
                 {
-
                     GD.PushWarning("[Steam Client] Connected To Remote Host: " + info.m_info.m_identityRemote.GetSteamID());
 
                     MessageLayer.Active.OnClientConnect?.Invoke();

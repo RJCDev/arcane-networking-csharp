@@ -95,7 +95,7 @@ public partial class Server : Node
     {
         GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
 
-        InitClient(connection);
+        Connections.Add(connection.GetRemoteID(), connection);
 
         OnServerConnect?.Invoke(connection);
 
@@ -338,16 +338,6 @@ public partial class Server : Node
 
     }
 
-    /// <summary>
-    /// Initializes the client in our connections list
-    /// </summary>
-    public static void InitClient(NetworkConnection connection)
-    {
-        Connections.Add(connection.GetRemoteID(), connection);
-
-        OnServerConnect?.Invoke(connection);
-
-    }
     /// <summary>
     /// Physically adds a client to the server based on a valid NetworkConnection based on the player prefab,
     /// Sends them all active nodes that need to be spawned

@@ -80,8 +80,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             {
                 uint[] send = null;
                 if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetRemoteID()];
-                else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(NetworkedNode.OwnerID);
-
+                else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
                 // Send
                 if (send.Length > 0) Set(send, changes, [.. valuesChanged]);
 
@@ -123,7 +122,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Relay logic
             if (NetworkManager.AmIServer)
             {
-                uint[] relayConnections = Server.GetConnsExcluding(NetworkedNode.OwnerID);
+                uint[] relayConnections = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
 
                 if (relayConnections.Length > 0)
                     Set(relayConnections, changed, valuesChanged);

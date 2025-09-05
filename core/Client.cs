@@ -92,7 +92,6 @@ public partial class Client
         OnClientConnected?.Invoke();
     }
 
-
     static void OnClientDisconnect()
     {
         GD.Print("[Client] Client Has Disconnected..");
@@ -288,7 +287,6 @@ public partial class Client
         GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
 
     }
-
 
     /// <summary>
     /// Used for modifying a net object (disabling, destroying, etc.)

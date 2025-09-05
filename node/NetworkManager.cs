@@ -32,7 +32,7 @@ public partial class NetworkManager : Node
     [Export] public ulong NetworkRate = 60;
 
     /// <summary> The rate at which the server and clients will Ping Pong eachother, 0 would be same as NetworkRate</summary>
-    [Export] public ulong PingPongRate = 600;
+    [Export] public ulong PingPongFrequency = 600;
 
     /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
     [Export] public int MaxConnections = 4;
