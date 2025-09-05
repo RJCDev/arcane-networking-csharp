@@ -84,6 +84,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 // Send
                 if (send.Length > 0) Set(send, changes, [.. valuesChanged]);
 
+                 foreach (var Conn in send) GD.Print("[Owner] Sending To: " + Conn);
+
             }
 
         }
@@ -123,6 +125,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (NetworkManager.AmIServer)
             {
                 uint[] relayConnections = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
+
+                foreach (var Conn in relayConnections) GD.Print("[Relay] Sending To: " + Conn);
 
                 if (relayConnections.Length > 0)
                     Set(relayConnections, changed, valuesChanged);
