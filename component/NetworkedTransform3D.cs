@@ -78,11 +78,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                uint[] send = null;
-                if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetRemoteID()];
-                else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(NetworkedNode.OwnerID);
+                
 
-                Set(send, changes, [.. valuesChanged]); // Send
+                Set(validSends, changes, [.. valuesChanged]); // Send
 
                 // Set our current to be this so we can backtest it again above
                 Current.Pos = TransformNode.GlobalPosition;
@@ -126,12 +124,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
             // Relay logic
             if (NetworkManager.AmIServer)
-            {
-                uint[] relayConnections = Server.GetConnsExcluding(NetworkedNode.OwnerID);
-
-                if (relayConnections.Length > 0)
-                    Set(relayConnections, changed, valuesChanged);
-            }
+                Set(validSends, changed, valuesChanged);
+            
         }
         
     }
