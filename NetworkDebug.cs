@@ -13,7 +13,9 @@ public partial class NetworkDebug : Control
     [Export] public Label IsAuthenticatedLabel;
 
 
-    static Queue bytesDownCounter, bytesUpCounter;
+    static readonly Queue bytesDownCounter = new();
+    static readonly Queue bytesUpCounter = new();
+
     public static double KbpsDwn = 0, KbpsUp = 0;
 
 
@@ -23,13 +25,17 @@ public partial class NetworkDebug : Control
 
     public static void OnClientPacketOut(ArraySegment<byte> data) => bytesUpCounter.Enqueue(data.Count);
 
+    public static void OnServerPacketIn(ArraySegment<byte> data, uint conn) => bytesDownCounter.Enqueue(data.Count);
+
+    public static void OnServerPacketOut(ArraySegment<byte> data, uint conn) => bytesUpCounter.Enqueue(data.Count);
+
     public override void _Ready()
     {
         MessageLayer.Active.OnClientSend += OnClientPacketOut;
         MessageLayer.Active.OnClientReceive += OnClientPacketIn;
+        MessageLayer.Active.OnServerSend += OnServerPacketOut;
+        MessageLayer.Active.OnServerReceive += OnServerPacketIn;
 
-        bytesDownCounter = new Queue();
-        bytesUpCounter = new Queue();
     }
 
     public void ClcltPckSz()
