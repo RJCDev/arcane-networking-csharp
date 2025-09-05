@@ -286,7 +286,6 @@ public partial class Server : Node
         
         NetworkedNodes.Add(netNode.NetID, netNode);
 
-
         SpawnNodePacket packet = new()
         {
             NetID = netNode.NetID,

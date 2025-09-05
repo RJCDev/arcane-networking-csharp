@@ -17,7 +17,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
             // Relay
             if (NetworkManager.AmIServer)
             {
-                uint[] relayConnections = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
+                uint[] relayConnections = Server.GetConnsExcluding(NetworkedNode.OwnerID);
 
                 if (relayConnections.Length > 0)
                 {
