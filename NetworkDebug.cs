@@ -70,16 +70,21 @@ public partial class NetworkDebug : Control
 
     public override void _PhysicsProcess(double delta)
     {
-        if (Client.serverConnection == null) return;
+
 
         FPS.Text = "FPS: " + ((int)Engine.GetFramesPerSecond()).ToString();
         rwBuffers.Text = "RdBfr: " + NetworkPool.GetReaderPoolSize() + "b |" + "WrtBfr: " + NetworkPool.GetWriterPoolSize() + "b";
 
         kbps.Text = "Up: " + Math.Round(KbpsUp, 4) + "kbps | Down: " + Math.Round(KbpsDwn, 4) + "kbps";
-        RTTLabel.Text = Client.serverConnection.rtt.ToString() + " MS";
+        
         AmIClientLabel.Text = "Client? " + NetworkManager.AmIClient.ToString();
         AmIServerLabel.Text = "Server? " + NetworkManager.AmIServer.ToString();
-        IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
+
+        if (Client.serverConnection != null)
+        {
+            RTTLabel.Text = Client.serverConnection.rtt.ToString() + " MS";
+            IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
+        } 
 
         timeCounter += delta;
         ClcltPckSz();
