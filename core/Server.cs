@@ -24,7 +24,7 @@ public partial class Server : Node
     public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
 
     public static Action<NetworkConnection> OnServerConnect;
-    public static Action<NetworkConnection> OnServerInitialized;
+    public static Action<NetworkConnection> OnServerAuthenticate;
     public static Action<NetworkConnection> OnServerDisconnect;
 
     public static Action<NetworkedNode> OnServerSpawn;
@@ -64,6 +64,7 @@ public partial class Server : Node
         MessageLayer.Active.OnServerReceive += OnServerReceive;
 
         // Packet Handlers
+        RegisterPacketHandler<HandshakePacket>(OnHandshake);
         RegisterPacketHandler<SpawnNodePacket>((_, _) => { }); // Server Authorative. No need to receive OnSpawn because we won't process them anyways
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
@@ -77,7 +78,7 @@ public partial class Server : Node
     /// </summary>
     public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable)
     {
-        GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetID());
+        GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetRemoteID());
 
         conn.Send(packet, channel);
     }
@@ -94,9 +95,10 @@ public partial class Server : Node
     {
         GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
 
-        AddClient(connection);
+        InitClient(connection);
 
         OnServerConnect?.Invoke(connection);
+
     }
     static void OnServerClientDisconnect(uint connID)
     {
@@ -203,6 +205,27 @@ public partial class Server : Node
 
     ////////////////////////// Internal Packet Callbacks
 
+    static void OnHandshake(HandshakePacket packet, uint fromConnection)
+    {
+        NetworkConnection conn = Connections[fromConnection];
+
+        if (conn.Encryption != null)
+        {
+            // TODO // ENCRYPTED AUTHENTICATION // TODO //   
+        }
+
+        conn.isAuthenticated = true;
+
+        OnServerAuthenticate?.Invoke(conn);
+
+        Send(new HandshakePacket() { ID = fromConnection }, conn, Channels.Reliable);
+
+        GD.Print("[Server] Client Authenticated!");
+
+        AddClient(conn); // We are authenticated, add them to the game
+        
+    }
+
     static void OnPingPong(PingPongPacket packet, uint fromConnection)
     {
         // Send back if it was a ping
@@ -212,7 +235,7 @@ public partial class Server : Node
             Connections[fromConnection].Ping(1); // Send Pong if it was a Ping, if it was a Pong
         }
         else // This was a pong, we need to record the RTT
-            Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime; 
+            Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime;
     } 
 
     static void OnModify(ModifyNodePacket packet, uint fromConnection)
@@ -239,27 +262,31 @@ public partial class Server : Node
             return null;
         }
 
-
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
-        uint netOwner = owner != null ? owner.GetID() : 0;
+        uint netOwner = owner != null ? owner.GetRemoteID() : 0;
         netNode.OwnerID = netOwner;
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
         var quat = basis.GetRotationQuaternion().Normalized();
 
-        // Now we can safely add to scene tree after values are set
-        NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-        netNode.Enabled = true; // Set Process enabled
+        if (NetworkManager.AmIHeadless) // Check if we are headless, if we are a server + local client don't spawn yet, client will to keep the flow
+        {
+            // Now we can safely add to scene tree after values are set
+            NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+            netNode.Enabled = true; // Set Process enabled
+
+            // Set Transform
+            if (spawnedObject is Node3D)
+            {
+                (spawnedObject as Node3D).Position = position;
+                (spawnedObject as Node3D).GlobalBasis = basis;
+            }      
+        }
         
         NetworkedNodes.Add(netNode.NetID, netNode);
         
-        // Set Transform
-        if (spawnedObject is Node3D)
-        {
-            (spawnedObject as Node3D).Position = position;
-            (spawnedObject as Node3D).GlobalBasis = basis;
-        }      
+
 
         SpawnNodePacket packet = new()
         {
@@ -268,7 +295,7 @@ public partial class Server : Node
             position = [position.X, position.Y, position.Z],
             rotation = [quat.X, quat.Y, quat.Z, quat.W],
             scale = [scale.X, scale.Y, scale.Z],
-            ownerID = owner != null ? owner.GetID() : 0
+            ownerID = owner != null ? owner.GetRemoteID() : 0
 
         };
 
@@ -311,14 +338,23 @@ public partial class Server : Node
 
     }
 
-    // <summary>
-    /// Physically adds a client to the server based on a valid NetworkConnection based on the player prefab
+    /// <summary>
+    /// Initializes the client in our connections list
+    /// </summary>
+    public static void InitClient(NetworkConnection connection)
+    {
+        Connections.Add(connection.GetRemoteID(), connection);
+
+        OnServerConnect?.Invoke(connection);
+
+    }
+    /// <summary>
+    /// Physically adds a client to the server based on a valid NetworkConnection based on the player prefab,
+    /// Sends them all active nodes that need to be spawned
     /// </summary>
     public static void AddClient(NetworkConnection connection)
     {
-        Connections.Add(connection.GetID(), connection);
-
-        if (!NetworkedNodes.ContainsKey(connection.GetID()))
+        if (!NetworkedNodes.ContainsKey(connection.GetRemoteID()))
         {
             // Tell them to spawn all net objects that we currenlty have on their client
             foreach (var node in NetworkedNodes)
@@ -342,28 +378,23 @@ public partial class Server : Node
             {
                 // Instantiate the player prefab if not -1
                 connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
-                connection.playerObject.Name = " [Conn ID: " + connection.GetID() + "]";
+                connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
             }
         }
-
-        connection.isAuthenticated = true;
-        
-        OnServerInitialized?.Invoke(connection);
-
     }
 
     public static void RemoveClient(NetworkConnection connection, bool destroyObjects)
     {
-        Connections.Remove(connection.GetID());
+        Connections.Remove(connection.GetRemoteID());
 
         foreach (var netObject in NetworkedNodes)
         {
-            if (netObject.Value.OwnerID == connection.GetID()) // They own this object
+            if (netObject.Value.OwnerID == connection.GetRemoteID()) // They own this object
                 Modify(netObject.Value, !destroyObjects, destroyObjects);
         }
 
         // If these objects wont just become unspawns, then completely remove the memory from the list
-        if (destroyObjects) NetworkedNodes.Remove(connection.GetID());
+        if (destroyObjects) NetworkedNodes.Remove(connection.GetRemoteID());
 
     }
 

@@ -3,13 +3,15 @@ using Godot;
 using System;
 using System.Collections;
 
-public partial class NetworkDebug : Node
+[GlobalClass]
+[Icon("res://addons/arcane-networking/icon/network_debug.svg")]
+public partial class NetworkDebug : Control
 {
     [Export] public Label FPS, RTTLabel, kbps, rwBuffers;
     [Export] public Label AmIClientLabel;
     [Export] public Label AmIServerLabel;
     [Export] public Label IsAuthenticatedLabel;
-    
+
 
     static Queue bytesDownCounter, bytesUpCounter;
     public static double KbpsDwn = 0, KbpsUp = 0;
@@ -46,7 +48,7 @@ public partial class NetworkDebug : Node
 
         int bytesUpAverage = 0;
         int bytesUpSamples = bytesUpCounter.Count;
-            
+
         if (bytesUpSamples > 0)
         {
             while (bytesUpCounter.Count > 0) bytesUpAverage += (int)bytesUpCounter.Dequeue();
@@ -73,7 +75,7 @@ public partial class NetworkDebug : Node
         AmIServerLabel.Text = "Server? " + NetworkManager.AmIServer.ToString();
         IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
 
-        timeCounter+=delta;
+        timeCounter += delta;
         ClcltPckSz();
     }
 }

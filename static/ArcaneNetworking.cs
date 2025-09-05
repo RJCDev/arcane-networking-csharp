@@ -35,8 +35,10 @@ public static class ArcaneNetworking
         RPCMethods.Add(hash, del);
         //GD.Print("[Arcane Networking] Registered RPC: " + hash + " | Invoker: " + del.Method.Name);
     }
+    
     internal static void Init()
     {
+
         //GD.Print("[Arcane Networking] Arcane Networking Initialized!");
         Client.RegisterInternalHandlers();
         Server.RegisterInternalHandlers();

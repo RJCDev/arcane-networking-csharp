@@ -1,8 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Plug body -->
-  <rect x="7" y="8.5" width="10" height="8" rx="2"></rect>
-  <!-- Prongs -->
-  <path d="M10 8.5V5M14 8.5V5"></path>
-  <!-- Cable (no background) -->
-  <path d="M12 16.5c0 2-1.5 3-3 3H6a3 3 0 1 1 0-6h1.5"></path>
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<!-- Created using Krita: https://krita.org -->
+<svg xmlns="http://www.w3.org/2000/svg" 
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:krita="http://krita.org/namespaces/svg/krita"
+    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+    width="61.92pt"
+    height="61.92pt"
+    viewBox="0 0 61.92 61.92">
+<defs/>
+<rect id="shape0" transform="translate(8.98200084540064, 18.8460008786344)" fill="none" stroke="#e0e0e0" stroke-width="5.76" stroke-linecap="square" stroke-linejoin="bevel" width="43.9559983091987" height="21.6000006480713"/><rect id="shape01" transform="translate(18.6839992813061, 40.8780000311566)" fill="none" stroke="#e0e0e0" stroke-width="5.76" stroke-linecap="square" stroke-linejoin="bevel" width="24.4079990611282" height="12.7079984421378"/><rect id="shape1" transform="translate(13.536, 8.33400152670563)" fill="#e0e0e0" fill-rule="evenodd" stroke="#e0e0e0" stroke-width="5.76" stroke-linecap="square" stroke-linejoin="bevel" width="9.68399910682487" height="9.53999938931747"/><rect id="shape02" transform="translate(38.3579987816477, 8.3520013977164)" fill="#e0e0e0" stroke="#e0e0e0" stroke-width="5.76" stroke-linecap="square" stroke-linejoin="bevel" width="9.68399910682487" height="9.53999938931747"/>
 </svg>

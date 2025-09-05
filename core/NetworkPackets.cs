@@ -22,6 +22,17 @@ namespace ArcaneNetworking
     /// Arcane Networking can understand.
     /// </summary>
     public interface Packet;
+    
+    [MessagePackObject]
+    public struct HandshakePacket : Packet
+    {
+        [Key(0)] // Your Local ID
+        public uint ID;
+
+        [Key(1)] // Authentication Payload
+        public ArraySegment<byte> AuthPayload;
+    }
+    
     public enum ConnectionState : byte
     {
         Handshake,

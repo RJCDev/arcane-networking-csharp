@@ -9,6 +9,8 @@ namespace ArcaneNetworking;
 /// It can have child components that send RPC calls over the network, and is referenced internaly by its guid.
 /// By itself, this node does nothing, it requires child components to send data.
 /// </summary>
+[GlobalClass]
+[Icon("res://addons/arcane-networking/icon/networked_node.svg")]
 public partial class NetworkedNode : Node
 {
     [ExportGroup("Network Identity")]
@@ -83,9 +85,11 @@ public partial class NetworkedNode : Node
             {
                 // We are JUST client
                 if (!NetworkManager.AmIServer)
-                    return OwnerID == Client.connectionIDToServer;
+                    return OwnerID == Client.serverConnection.localID;
+                    
+                // We are BOTH, check if the server OR local client own this node
                 else
-                    return OwnerID == 0 || OwnerID == Client.connectionIDToServer;
+                    return OwnerID == 0 || OwnerID == Client.serverConnection.localID;
             }
             return false;
             

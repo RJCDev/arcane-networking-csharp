@@ -26,9 +26,8 @@ public partial class Client
     // Connection to the server
     public static NetworkConnection serverConnection = null;
 
-    public static uint connectionIDToServer; // Your connection ID on the server
-
-     public static Action OnClientConnected;
+    public static Action OnClientConnected;
+    public static Action OnClientAuthenticated;
     public static Action<NetworkedNode> OnClientSpawn;
 
     /// <summary>
@@ -62,6 +61,7 @@ public partial class Client
         MessageLayer.Active.OnClientReceive += OnClientReceive; // Client received bytes
 
         // Packet Handlers
+        RegisterPacketHandler<HandshakePacket>(OnHandshake);
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
         RegisterPacketHandler<PingPongPacket>(OnPingPong);
@@ -80,21 +80,23 @@ public partial class Client
 
     }
 
-    static void OnClientConnect(uint id)
+    static void OnClientConnect()
     {
 
         GD.Print("[Client] Client Has Connected!");
 
         NetworkManager.AmIClient = true;
-        serverConnection.isAuthenticated = true;
-        connectionIDToServer = id;
+
+        Send(new HandshakePacket(), Channels.Reliable);
 
         OnClientConnected?.Invoke();
     }
+
+
     static void OnClientDisconnect()
     {
         GD.Print("[Client] Client Has Disconnected..");
-        serverConnection = null;        
+        serverConnection = null;
     }
     
     /// <summary>
@@ -197,9 +199,23 @@ public partial class Client
         MessageLayer.Active.StopClient();
         serverConnection = null;
     }
-  
+
     ////////////////////////// Internal Packet Callbacks
 
+    static void OnHandshake(HandshakePacket packet)
+    {
+        if (serverConnection.Encryption != null)
+        {
+            // TODO // ENCRYPTED AUTHENTICATION // TODO //   
+        }
+
+        GD.Print("[Client] Client Authenticated!");
+
+        serverConnection.isAuthenticated = true;
+        serverConnection.localID = packet.ID;
+
+        OnClientAuthenticated?.Invoke();
+    }
     static void OnPingPong(PingPongPacket packet)
     {
         // Send back if it was a ping
@@ -209,7 +225,7 @@ public partial class Client
             serverConnection.Ping(1); // Send Pong if it was a Ping, if it was a Pong
         }
         else // This was a pong, we need to record the RTT
-            serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime; 
+            serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime;
     }
     static void OnSpawn(SpawnNodePacket packet)
     {
@@ -236,17 +252,6 @@ public partial class Client
                     GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
                     return;
                 }
-
-                // Adds to the current loaded world
-                NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
-
-                // Set Transform
-                if (spawnedObject is Node3D)
-                {
-                    (spawnedObject as Node3D).Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
-                    (spawnedObject as Node3D).Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
-                    (spawnedObject as Node3D).Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
-                }      
             }
             // We are the server as well as a client, don't instantiate twice, we can just get the info locally from the server
             else if (!NetworkManager.AmIHeadless)
@@ -255,19 +260,35 @@ public partial class Client
                 netNode = Server.NetworkedNodes[packet.NetID];
                 spawnedObject = netNode.Node;
             }
+            
+            // Adds to the current loaded world
+            NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+
+            // Set Transform
+            if (spawnedObject is Node3D)
+            {
+                (spawnedObject as Node3D).Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
+                (spawnedObject as Node3D).Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
+                (spawnedObject as Node3D).Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
+            }
 
             NetworkedNodes.Add(packet.NetID, netNode);
         }
         netNode.Enabled = true; // Set Process enabled
-        
+
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
+        {
             serverConnection.playerObject = spawnedObject; // Set your player object if its yours
+            serverConnection.playerObject.Name = " [Conn ID: " + serverConnection.localID + "]";
+        }
+           
             
         OnClientSpawn?.Invoke(netNode);
 
         GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
 
     }
+
 
     /// <summary>
     /// Used for modifying a net object (disabling, destroying, etc.)

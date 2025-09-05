@@ -24,7 +24,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
    
     public float snapShotInterval = 1f / Engine.PhysicsTicksPerSecond;
     float snapshotTimer = 0;
-    float oneWaySec => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
+    float Latency => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
 
     public TransformSnapshot Previous = new(), Current = new();
 
@@ -79,7 +79,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (changes != Changed.None)
             {
                 uint[] send = null;
-                if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetID()];
+                if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetRemoteID()];
                 else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(NetworkedNode.OwnerID);
 
                 // Send
@@ -96,7 +96,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         snapshotTimer += (float)delta;
 
-        float t = (float)(snapshotTimer / snapShotInterval) * oneWaySec;
+        float t = (float)(snapshotTimer / snapShotInterval) * Latency;
         t = Math.Clamp(t, 0f, 1f);
 
         // Process the samples if we aren't owner
@@ -119,10 +119,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
             Current.SnaphotTime = Time.GetTicksMsec();
 
             snapshotTimer = 0;
+            
             // Relay logic
             if (NetworkManager.AmIServer)
             {
-                uint[] relayConnections = Server.GetConnsExcluding(Client.connectionIDToServer, NetworkedNode.OwnerID);
+                uint[] relayConnections = Server.GetConnsExcluding(NetworkedNode.OwnerID);
 
                 if (relayConnections.Length > 0)
                     Set(relayConnections, changed, valuesChanged);

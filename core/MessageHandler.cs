@@ -26,14 +26,14 @@ public static class MessageHandler
         double msElapsed = Time.GetTicksMsec() - lastProcessTime;
 
         // Regular packets
-        if (msElapsed > NetworkManager.manager.NetworkRate)
+        if (msElapsed > 1.0d / NetworkManager.manager.NetworkRate * 1000.0f)
         {
             while (MessageQueue.Count > 0)
             {
                 var message = MessageQueue.Dequeue();
 
                 foreach (var connection in message.connections)
-                    MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, connection.GetID());
+                    MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, connection.GetRemoteID());
 
                 NetworkPool.Recycle(message.writer);
             }
@@ -47,7 +47,7 @@ public static class MessageHandler
         double msElapsedPing = Time.GetTicksMsec() - lastPingPongTime;
 
         // Queue Ping Pong Packets
-        if (msElapsedPing > NetworkManager.manager.PingPongRate)
+        if (msElapsedPing > 1.0d / NetworkManager.manager.PingPongRate * 1000.0f)
         {
             lastPingPongTime = Time.GetTicksMsec();
 

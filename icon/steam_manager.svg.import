@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cp1i22fhyhlnb"
-path="res://.godot/imported/networked_component.svg-9bac4e7835a904bbeeea8098ed8833fb.ctex"
+uid="uid://dbqlfpugvwkqw"
+path="res://.godot/imported/steam_manager.svg-a20e639ca0d7a77b6059ff955b15ae84.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/arcane-networking/icon/networked_component.svg"
-dest_files=["res://.godot/imported/networked_component.svg-9bac4e7835a904bbeeea8098ed8833fb.ctex"]
+source_file="res://addons/arcane-networking/icon/steam_manager.svg"
+dest_files=["res://.godot/imported/steam_manager.svg-a20e639ca0d7a77b6059ff955b15ae84.ctex"]
 
 [params]
 

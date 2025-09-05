@@ -51,6 +51,7 @@ public class SteamServer
         uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
         NetworkConnection incoming = new(SteamUser.GetSteamID().m_SteamID.ToString(), steam32, null);
+
         GD.Print("[Steam Server] Setup Local Connection To Server!");
 
         MessageLayer.Active.OnServerConnect?.Invoke(incoming); // Invoke to the High-Level API that this Connection in the MessageLayer is connected
@@ -66,12 +67,18 @@ public class SteamServer
         uint steam32 = (uint)info.m_info.m_identityRemote.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
         // Accept the client
-        SteamNetworkingSockets.AcceptConnection(info.m_hConn);
+       
         
         switch (info.m_info.m_eState)
         {
-            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
+            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting:
 
+                SteamNetworkingSockets.AcceptConnection(info.m_hConn);
+
+                break;
+
+            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
+   
                 if (info.m_info.m_hListenSocket == ServerListenSocket)
                 {
                     SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, ClientPollGroup);
@@ -79,7 +86,7 @@ public class SteamServer
                     NetworkConnection incoming = new(info.m_info.m_identityRemote.GetSteamID().ToString(), steam32, null);
                     ClientsConnected.Add(steam32, info.m_hConn);
 
-                    GD.Print("[Steam Server] Accepting a Networking Session with a remote Client: " + info.m_info.m_identityRemote.GetSteamID());
+                    GD.Print("[Steam Server] Accepted a Networking Session with a remote Client: " + info.m_info.m_identityRemote.GetSteamID());
 
                     MessageLayer.Active.OnServerConnect?.Invoke(incoming); // Invoke to the High-Level API that this Connection in the MessageLayer is connected
 

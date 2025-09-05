@@ -10,12 +10,14 @@ public enum DisconectBehavior
     Unspawn
 }
 
+[GlobalClass]
+[Icon("res://addons/arcane-networking/icon/network_manager.svg")]
 public partial class NetworkManager : Node
 {
     public static NetworkManager manager;
 
     /// <summary> Layer that is used for network messages </summary>
-    [Export] PackedScene MsgLayer;
+    [Export] MessageLayer MsgLayer;
 
     /// <summary> Objects that you wish to be networked MUST be present in this dictionary</summary>
     [Export] public Array<PackedScene> NetworkObjectPrefabs = new Array<PackedScene>();
@@ -26,16 +28,16 @@ public partial class NetworkManager : Node
     /// <summary> Should we enable the debug callbacks?</summary>
     [Export] public bool EnableDebug = false;
 
-    /// <summary> The rate at which the server and clients will send data in ms</summary>
-    [Export] public ulong NetworkRate = 1000;
+    /// <summary> The rate per second at which the server and clients will send data in ms</summary>
+    [Export] public ulong NetworkRate = 60;
 
-     /// <summary> The rate at which the server and clients will Ping Pong eachother, 0 would be same as NetworkRate</summary>
-    [Export] public ulong PingPongRate = 10000;
+    /// <summary> The rate at which the server and clients will Ping Pong eachother, 0 would be same as NetworkRate</summary>
+    [Export] public ulong PingPongRate = 600;
 
-     /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
+    /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
     [Export] public int MaxConnections = 4;
 
-     /// <summary> How NetworkedObjects owned by a connection behave when the connection is disconnected</summary>
+    /// <summary> How NetworkedObjects owned by a connection behave when the connection is disconnected</summary>
     [Export] public DisconectBehavior DisconnectBehavior = DisconectBehavior.Destroy;
 
     // Am I A client only?
@@ -68,14 +70,12 @@ public partial class NetworkManager : Node
 
     public override void _EnterTree()
     {
-      
+
         if (MsgLayer != null)
         {
-            // Instantiate Message Layer
-            AddChild(MessageLayer.Active = MsgLayer.Instantiate<MessageLayer>());
+            MessageLayer.Active = MsgLayer; // Set Active Message Layer
 
             ArcaneNetworking.Init(); // Initialize our networking protocol
-
         }
         else
         {
@@ -85,6 +85,6 @@ public partial class NetworkManager : Node
 
     }
 
-   
+
 
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<!-- Created using Krita: https://krita.org -->
+<svg xmlns="http://www.w3.org/2000/svg" 
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:krita="http://krita.org/namespaces/svg/krita"
+    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+    width="61.92pt"
+    height="61.92pt"
+    viewBox="0 0 61.92 61.92">
+<defs/>
+<path id="shape0" transform="matrix(-4.16517257406335 -4.43129420526965 4.14130538061009 -3.89259904513347 50.1118777277335 53.9725449101649)" sodipodi:type="arc" sodipodi:rx="5.09805400347907" sodipodi:ry="4.72577514980555" sodipodi:cx="4.78591350661012" sodipodi:cy="-1.35853637197127" sodipodi:start="0.291588218418383" sodipodi:end="2.78984676059191" sodipodi:open="true" d="M0 0.26967C0.756092 2.17938 2.74571 3.42628 4.93923 3.3651C7.13276 3.30392 9.03791 1.94839 9.66877 0" fill="none" stroke="#e0e0e0" stroke-width="1.44" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2"/><path id="shape01" transform="matrix(-4.05190216508138 -4.31078671175643 4.31078671175643 -4.05190216508138 33.2726676739571 51.062453718819)" sodipodi:type="arc" sodipodi:rx="2.88049592916681" sodipodi:ry="2.59000636608402" sodipodi:cx="2.70413070629048" sodipodi:cy="-0.744558879850022" sodipodi:start="0.291588218418383" sodipodi:end="2.78984676059191" sodipodi:open="true" d="M0 0.147795C0.427206 1.19443 1.55138 1.87781 2.79076 1.84428C4.03014 1.81075 5.10659 1.06784 5.46304 0" fill="none" stroke="#e0e0e0" stroke-width="1.152" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2"/><ellipse id="shape1" transform="matrix(42.4499962952433 0 0 47.1751200773879 8.4545482139367 39.8544842718853)" rx="0.161618988581439" ry="0.149746196482522" cx="0.161618988581439" cy="0.149746196482522" fill="#7dff7d" fill-rule="evenodd" stroke="#7dff7d" stroke-width="0.03672" stroke-linecap="square" stroke-linejoin="bevel"/>
+</svg>

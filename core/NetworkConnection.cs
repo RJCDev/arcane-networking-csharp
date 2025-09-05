@@ -1,4 +1,5 @@
 using Godot;
+using MessagePack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,8 +16,10 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public NetworkEncryption Encryption = encryption;
 
     // The ID of this 2 way connection
-    readonly uint connectionID = id;
+    readonly uint remoteID = id;
     string connectionEndPoint = endpoint;
+
+    public uint localID;
 
     // The player object that is owned by this connection
     public Node playerObject = null;
@@ -30,7 +33,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     // The round trip time in ms of the network connection (populates by calling Ping())
     public ulong lastPingTime, rtt;
 
-    public uint GetID() => connectionID;
+    public uint GetRemoteID() => remoteID;
     internal void SetEndPoint(string endpoint) => connectionEndPoint = endpoint;
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));
@@ -52,17 +55,19 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
             //GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
 
             if (instant)
-                MessageLayer.Active.SendToConnections(NetworkWriter.ToArraySegment(), Channels.Reliable, connectionID);
+                MessageLayer.Active.SendToConnections(NetworkWriter.ToArraySegment(), Channels.Reliable, remoteID);
             else
                 MessageHandler.Enqueue(channel, NetworkWriter, this);
-            
-            
+
+
 
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
         catch (Exception e)
         {
-            GD.PrintErr("Error sending packet to connection: " + connectionID + " " + e.Message);
+            GD.PrintErr("Error sending packet to connection: " + remoteID);
+            if (e is MessagePackSerializationException) GD.PrintErr("Did you forget to assign [MessagePackObject] to your packet?");
+            GD.PrintErr(e.Message);
         }
 
 
