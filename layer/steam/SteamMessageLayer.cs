@@ -78,8 +78,11 @@ public partial class SteamMessageLayer : MessageLayer
 
     public override void Poll()
     {
-        SteamServer.PollMessages(this);
-        SteamClient.PollMessages(this);
+        if (NetworkManager.AmIClient)
+            SteamClient.PollMessages(this);
+        if (NetworkManager.AmIServer)
+            SteamServer.PollMessages(this);
+        
     }
 
     public override void SendToConnections(ArraySegment<byte> bytes, Channels sendType, params uint[] connnectionsToSendTo)

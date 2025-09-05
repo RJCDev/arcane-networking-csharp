@@ -47,7 +47,8 @@ public partial class NetworkedNode : Node
         set
         {
             _enabled = value;
-            ProcessMode = value ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+            SetProcess(_enabled);
+            SetPhysicsProcess(_enabled);
         }
     }
 

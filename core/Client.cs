@@ -82,7 +82,6 @@ public partial class Client
 
     static void OnClientConnect()
     {
-
         GD.Print("[Client] Client Has Connected!");
 
         NetworkManager.AmIClient = true;
