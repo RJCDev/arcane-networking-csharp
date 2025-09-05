@@ -81,10 +81,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 uint[] send = null;
                 if (NetworkManager.AmIClientOnly) send = [Client.serverConnection.GetRemoteID()];
                 else if (NetworkManager.AmIServer) send = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
-                // Send
-                if (send.Length > 0) Set(send, changes, [.. valuesChanged]);
-
-                 foreach (var Conn in send) GD.Print("[Owner] Sending To: " + Conn);
+                
+                Set(send, changes, [.. valuesChanged]); // Send
 
             }
 
@@ -106,8 +104,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         TransformNode.Quaternion = Interp.Rot;
         TransformNode.Scale = Interp.Scale;
 
-        if (t == 1) Previous = Current; // Set previous to current // Done Interpolating
-
     }
 
     [MethodRPC(Channels.Unreliable, true)]
@@ -115,18 +111,18 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         if (!NetworkedNode.AmIOwner)
         {
+            Previous = Current; // Set previous to current
+
             // Read new current
             ReadSnapshot(changed, valuesChanged);
             Current.SnaphotTime = Time.GetTicksMsec();
 
             snapshotTimer = 0;
-            
+           
             // Relay logic
             if (NetworkManager.AmIServer)
             {
                 uint[] relayConnections = Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
-
-                foreach (var Conn in relayConnections) GD.Print("[Relay] Sending To: " + Conn);
 
                 if (relayConnections.Length > 0)
                     Set(relayConnections, changed, valuesChanged);
