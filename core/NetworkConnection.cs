@@ -48,18 +48,12 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
 
         try
         {
-            //GD.Print("[NetworkConnection] Pack.. " + packet.GetType());
-
             NetworkPacker.Pack(packet, NetworkWriter);
 
-            //GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
-
-            if (instant)
+            if (instant) // Send Instantly
                 MessageLayer.Active.SendTo(NetworkWriter.ToArraySegment(), Channels.Reliable, this);
-            else
+            else // Queue
                 MessageHandler.Enqueue(channel, NetworkWriter, this);
-
-
 
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
@@ -69,7 +63,6 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
             if (e is MessagePackSerializationException) GD.PrintErr("Did you forget to assign [MessagePackObject] to your packet?");
             GD.PrintErr(e.Message);
         }
-
 
     }
 

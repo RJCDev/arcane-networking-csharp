@@ -68,7 +68,6 @@ namespace ArcaneNetworking
 
         /// <summary>
         /// Sends raw data to the MessageLayer and routes it to the connections specified
-        /// Channel Ids: 0 = RPCs, 1 = VOIP, 2 = Pings
         /// </summary>
         public abstract void SendTo(ArraySegment<byte> bytes, Channels channel, NetworkConnection conn);
         

@@ -12,7 +12,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     // Play
     [Command(Channels.Reliable)]
     public void Play(string animationName, bool backwards = false) => PlayRelay(animationName, backwards);
-    [Relay]
+    [Relay(Channels.Reliable)]
     void PlayRelay(string animationName, bool backwards = false)
     {
         if (AnimationPlayer.CurrentAnimation != animationName)
@@ -35,14 +35,14 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     [Command(Channels.Reliable)]
     public void SetSpeed(float timeScale) => SetSpeedRelay(timeScale);
 
-    [Relay]
+    [Relay(Channels.Reliable)]
     void SetSpeedRelay(float timeScale) => AnimationPlayer.SpeedScale = timeScale;
 
     // Stop
     [Command(Channels.Reliable)]
     public void Stop() => StopRelay();
 
-    [Relay]
+    [Relay(Channels.Reliable)]
     public void StopRelay() => AnimationPlayer.Stop();
 
 }

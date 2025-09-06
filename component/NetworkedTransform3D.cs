@@ -78,8 +78,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                SendChanged(changes, [.. valuesChanged]); // Send
-
+                //SendChanged(changes, [.. valuesChanged]); // Send
+                SendChanged(changes, [..valuesChanged]);
                 // Set our current to be this so we can backtest it again above
                 Current.Pos = TransformNode.GlobalPosition;
                 Current.Rot = TransformNode.Quaternion;
@@ -111,9 +111,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         // Tell the clients their new info
         ClientChanged(changed, valuesChanged);
+
     }
 
-    [Relay(Channels.Unreliable, false)]
+    [Relay(Channels.Unreliable)]
     public void ClientChanged(Changed changed, float[] valuesChanged)
     {
         Previous = Current; // Set previous to current

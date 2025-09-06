@@ -11,11 +11,9 @@ public class RelayAttribute : Attribute
 {
     // Debug inspection
     public Channels Channel { get; }
-    public bool RunLocal { get; }
 
-    public RelayAttribute(Channels channel = Channels.Reliable, bool runLocal = true)
+    public RelayAttribute(Channels channel = Channels.Reliable)
     {
         Channel = channel;
-        RunLocal = runLocal;
     }
 }

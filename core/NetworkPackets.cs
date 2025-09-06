@@ -60,16 +60,6 @@ namespace ArcaneNetworking
         [Key(0)]
         public byte PingPong; 
     }
-
-    public enum TypeByte : byte
-    {
-        Byte,
-        UnsignedInt,
-        Int,
-        Long,
-        Object
-    }
-
     // Instantiates an object over the network
     [MessagePackObject]
     public struct SpawnNodePacket : Packet
