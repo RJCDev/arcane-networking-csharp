@@ -70,26 +70,6 @@ namespace ArcaneNetworking
         Object
     }
 
-    // Packet that calls a method with the specified arguents
-    [MessagePackObject]
-    public struct RPCPacket : Packet
-    {
-        // Caller NetworkObject guid
-        [Key(0)]
-        public uint CallerNetID;
-
-        // Compoenent Index
-        [Key(1)]
-        public int CallerCompIndex;
-
-        [Key(2)]
-        public uint ArgCount;
-
-        // Arguments are written into a buffer AFTER this packet has been serialized
-        //public ArraySegment<byte> Args;
-
-    }
-
     // Instantiates an object over the network
     [MessagePackObject]
     public struct SpawnNodePacket : Packet

@@ -55,7 +55,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
             //GD.Print("[NetworkConnection] Enqueue.. " + packet.GetType());
 
             if (instant)
-                MessageLayer.Active.SendToConnections(NetworkWriter.ToArraySegment(), Channels.Reliable, remoteID);
+                MessageLayer.Active.SendTo(NetworkWriter.ToArraySegment(), Channels.Reliable, this);
             else
                 MessageHandler.Enqueue(channel, NetworkWriter, this);
 
@@ -78,6 +78,6 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     {
         lastPingTime = Time.GetTicksMsec();
         Send(new PingPongPacket() { PingPong = pingOrPong, }, Channels.Reliable, true);
-    
+
     }
 }

@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+namespace ArcaneNetworking;
+
 public struct QueuedMessage()
 {
     public Channels channel;
@@ -18,6 +20,11 @@ public static class MessageHandler
     // Message processing timing
     static ulong lastProcessTime, lastPingPongTime;
 
+    // Enqueue single target
+    public static void Enqueue(Channels channel, NetworkWriter writer, NetworkConnection connection)
+    => MessageQueue.Enqueue(new QueuedMessage() { writer = writer, channel = channel, connections = [connection] });
+
+    // Enqueue multi target
     public static void Enqueue(Channels channel, NetworkWriter writer, params NetworkConnection[] connections)
     => MessageQueue.Enqueue(new QueuedMessage() { writer = writer, channel = channel, connections = connections });
 
@@ -35,7 +42,7 @@ public static class MessageHandler
                 var message = MessageQueue.Dequeue();
 
                 foreach (var connection in message.connections)
-                    MessageLayer.Active.SendToConnections(message.writer.ToArraySegment(), message.channel, connection.GetRemoteID());
+                    MessageLayer.Active.SendTo(message.writer.ToArraySegment(), message.channel, connection);
 
                 NetworkPool.Recycle(message.writer);
             }

@@ -8,7 +8,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
 
     public bool IsPlaying(string anim) => AnimationPlayer.CurrentAnimation == anim;
 
-    [MethodRPC]
+    [Command]
     public void Play(uint[] connsToSendTo, string animationName, bool backwards = false)
     {
         PlayLocal(animationName, backwards); // Play local anytime this is called
@@ -18,7 +18,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
             if (NetworkManager.AmIServer)
             {
                 //GD.Print("[Server] Relaying For: " + NetworkedNode.NetID); // If im headless, send to all, if not, then send to all but our local connection, and the owner of this object
-                if (validSends.Length > 0) Play(validSends, animationName, backwards);
+                
                 
             }
         }
@@ -32,20 +32,20 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
         }
     }
 
-    [MethodRPC]
+    [Command]
     public void Seek(uint[] connsToSendTo, double seconds, bool freezeSeek = false)
     {
         AnimationPlayer.SpeedScale = freezeSeek ? 0 : 1;
         AnimationPlayer.Seek(seconds);
     }
 
-    [MethodRPC]
+    [Command]
     public void SetSpeed(uint[] connsToSendTo, float timeScale) => AnimationPlayer.SpeedScale = timeScale;
 
-    [MethodRPC]
+    [Command]
     public void PlayBackwards(uint[] connsToSendTo, string animationName) => AnimationPlayer.PlayBackwards(animationName);
 
-    [MethodRPC]
+    [Command]
     public void Stop(uint[] connsToSendTo) => AnimationPlayer.Stop();
 
 }

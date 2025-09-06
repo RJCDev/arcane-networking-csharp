@@ -85,50 +85,48 @@ public partial class SteamMessageLayer : MessageLayer
         
     }
 
-    public override void SendToConnections(ArraySegment<byte> bytes, Channels sendType, params uint[] connnectionsToSendTo)
+    public override void SendTo(ArraySegment<byte> bytes, Channels sendType, params NetworkConnection connTarget)
     {
-        var connectionsSending = connnectionsToSendTo;
-        if (connectionsSending == null) GD.PrintErr($"[Steam] User Didn't Specify connections to send to!");
-        if (connectionsSending.Length == 0) GD.PrintErr($"[Steam] User Didn't Specify connections to send to!");
+        if (connTarget == null) GD.PrintErr($"[Steam] User Didn't Specify connection to send to!");
+        
+        var remoteID = connTarget.GetRemoteID();
+        
+        // Run invokes (send is for debug)
+        if (remoteID != 0) OnServerSend?.Invoke(bytes, remoteID);
+        else OnClientSend?.Invoke(bytes);
 
-        foreach (uint connID in connectionsSending)
+        // Get SteamNetConnection handle to send to
+        HSteamNetConnection steamConnectionToSend = remoteID == 0 ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[remoteID];
+
+        GCHandle handle = default;
+        try
         {
-            // Run invokes (send is for debug)
-            if (connID != 0) OnServerSend?.Invoke(bytes, connID);
-            else OnClientSend?.Invoke(bytes);
+            // pin the backing array so GC won't move it
+            handle = GCHandle.Alloc(bytes.Array, GCHandleType.Pinned);
 
-            // Get SteamNetConnection handle to send to
-            HSteamNetConnection steamConnectionToSend = connID == 0 ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[connID];
+            // get pointer to the offset inside the pinned array
+            IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(bytes.Array, bytes.Offset);
 
-            GCHandle handle = default;
-            try
-            {
-                // pin the backing array so GC won't move it
-                handle = GCHandle.Alloc(bytes.Array, GCHandleType.Pinned);
+            EResult result = SteamNetworkingSockets.SendMessageToConnection(steamConnectionToSend, // Send Message Over SteamNetworkingSockets
+                ptr,
+                (uint)bytes.Count,
+                sendType == Channels.Reliable ? 0 : 8,
+                out long msgNum
+            );
 
-                // get pointer to the offset inside the pinned array
-                IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(bytes.Array, bytes.Offset);
-
-                EResult result = SteamNetworkingSockets.SendMessageToConnection(steamConnectionToSend, // Send Message Over SteamNetworkingSockets
-                    ptr,
-                    (uint)bytes.Count,
-                    sendType == Channels.Reliable ? 0 : 8,
-                    out long msgNum
-                );
-
-                //GD.Print("[Steam] Sending: " + (uint)bytes.Count + "b To: " + connection.GetID());
-                if (result != EResult.k_EResultOK) GD.PushWarning($"[Steam] Failed to send because: {result}");
-            }
-            catch (Exception e)
-            {
-                GD.Print(e.Message);
-            }
-            finally
-            {
-                if (handle.IsAllocated)
-                    handle.Free();
-            }
+            //GD.Print("[Steam] Sending: " + (uint)bytes.Count + "b To: " + connection.GetID());
+            if (result != EResult.k_EResultOK) GD.PushWarning($"[Steam] Failed to send because: {result}");
         }
+        catch (Exception e)
+        {
+            GD.Print(e.Message);
+        }
+        finally
+        {
+            if (handle.IsAllocated)
+                handle.Free();
+        }
+        
 
     }
 

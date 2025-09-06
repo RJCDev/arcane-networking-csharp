@@ -23,15 +23,6 @@ public enum SendTime
 [GlobalClass, Icon("res://addons/arcane-networking/icon/networked_component.svg")]
 public abstract partial class NetworkedComponent : Node
 {
-    protected uint[] validSends
-    {
-        get
-        {
-            if (NetworkManager.AmIClientOnly) return [Client.serverConnection.GetRemoteID()];
-            else if (NetworkManager.AmIHeadless) return Server.GetConnsExcluding(NetworkedNode.OwnerID);
-            else return Server.GetConnsExcluding(Client.serverConnection.localID, NetworkedNode.OwnerID);
-        }
-    }
     public int GetIndex() => NetworkedNode.NetworkedComponents.IndexOf(this);
 
     public NetworkedNode NetworkedNode;

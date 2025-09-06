@@ -78,15 +78,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                
-
-                Set(validSends, changes, [.. valuesChanged]); // Send
+                SendChanged(changes, [.. valuesChanged]); // Send
 
                 // Set our current to be this so we can backtest it again above
                 Current.Pos = TransformNode.GlobalPosition;
                 Current.Rot = TransformNode.Quaternion;
                 Current.Scale = TransformNode.Scale;
-
             }
 
         }
@@ -109,30 +106,32 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     }
 
-    [MethodRPC(Channels.Unreliable, true)]
-    public void Set(uint[] connsToSendTo, Changed changed, float[] valuesChanged)
+    [Command(Channels.Unreliable, false)]
+    public void SendChanged(Changed changed, float[] valuesChanged)
     {
-        if (!NetworkedNode.AmIOwner)
-        {
-            Previous = Current; // Set previous to current
-
-            // Read new current
-            ReadSnapshot(changed, valuesChanged);
-            Current.SnaphotTime = Time.GetTicksMsec();
-
-            snapshotTimer = 0;
-
-            // Relay logic
-            if (NetworkManager.AmIServer && validSends.Length > 0)
-                Set(validSends, changed, valuesChanged);
-            
-        }
-        
+        // Tell the clients their new info
+        ClientChanged(changed, valuesChanged, [.. Server.Connections.Values]);
     }
 
+    [Relay(Channels.Unreliable, false)]
+    public void ClientChanged(Changed changed, float[] valuesChanged, params NetworkConnection[] targets)
+    {
+        // Set locally
+        Set(changed, valuesChanged);
+    }
+
+    void Set(Changed changed, float[] valuesChanged)
+    {
+        Previous = Current; // Set previous to current
+
+        // Read new current
+        ReadSnapshot(changed, valuesChanged);
+        Current.SnaphotTime = Time.GetTicksMsec();
+        snapshotTimer = 0;
+    }
 
     /// <summary>
-    /// Read a snapshot from values changed (delta)
+    /// Read a snapshot from values changed
     /// </summary>
     void ReadSnapshot(Changed changed, float[] valuesChanged)
     {
@@ -183,7 +182,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         return new Vector3(q.X, q.Y, q.Z);
     }
-
 
     public static Quaternion DecompQuat(Vector3 v)
     {

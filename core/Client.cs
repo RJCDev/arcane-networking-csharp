@@ -109,58 +109,52 @@ public partial class Client
 
         var reader = NetworkPool.GetReader(bytes.Array);
 
-        if (reader.Read(out byte packetHeader)) // Do we have a valid header?
+        if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid header?
         {
-            //GD.Print("[Client] Header Valid! " + packetHeader);
+            //GD.Print("[Client] Header Valid! " + hash);
 
-            if (reader.Read(out int hash))
+            switch (type)
             {
-                //GD.Print("[Client] Hash Valid! " + hash);
-                switch (packetHeader)
-                {
-                    case 0: // Regular Packet
+                case 0: // Regular Packet
 
-                        //GD.Print("[Client] Regular Packet ");
+                    //GD.Print("[Client] Regular Packet ");
 
-                        if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
+                    if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
+                    {
+                        //GD.Print("[Client] Packet Valid! " + hash);
+                        PacketInvoke(hash, packet);
+                    }
+
+                    break;
+
+
+                case 1: // RPC Packet
+
+                    //GD.Print("[Client] RPC Packet");
+
+                    if (reader.Read(out uint callerNetID) && reader.Read(out int callerCompIndex))
+                    {
+                        if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
                         {
-                            //GD.Print("[Client] Packet Valid! " + hash);
-                            PacketInvoke(hash, packet);
-                        }
+                            // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
 
-                        break;
+                            //GD.PrintErr("[Client] Unpacking RPC..");
 
-
-                    case 1: // RPC Packet
-
-                        //GD.Print("[Client] RPC Packet");
-
-                        if (reader.Read(out RPCPacket rpcPacket))
-                        {
-                            if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
-                            {
-                                // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
-                                
-                                //GD.PrintErr("[Client] Unpacking RPC..");
-
-                                unpack(reader, NetworkedNodes[rpcPacket.CallerNetID].NetworkedComponents[rpcPacket.CallerCompIndex]);
-                            }
-                            else
-                            {
-                                GD.PrintErr("[Client] RPC Method Hash not found! " + hash);
-                            }
-
+                            unpack(reader, NetworkedNodes[callerNetID].NetworkedComponents[callerCompIndex]);
                         }
                         else
                         {
-                            GD.PrintErr("[Client] Could not read RPC Packet! " + hash);
+                            GD.PrintErr("[Client] RPC Method Hash not found! " + hash);
                         }
 
-                        break;
-                }
-            }
+                    }
+                    else
+                    {
+                        GD.PrintErr("[Client] Could not read RPC Packet! " + hash);
+                    }
 
-            else GD.PrintErr("[Client] Packet was invalid on receive!");
+                    break;
+            }
         }
         else GD.PrintErr("[Client] Packet header was invalid on receive!");
 
