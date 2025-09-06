@@ -4,7 +4,7 @@ namespace ArcaneNetworking;
 
 /// <summary>
 /// When Called: Relays to the clients specified at the end of your method.
-/// <para> For example: RelayExplosion(Vector3 position, params uint[] sendTo)</para>
+/// <para> For example: RelayExplosion(Vector3 position, params NetworkConnection[] sendTo)</para>
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public class RelayAttribute : Attribute

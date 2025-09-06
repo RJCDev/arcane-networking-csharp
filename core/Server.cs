@@ -29,6 +29,7 @@ public partial class Server : Node
 
     public static Action<NetworkedNode> OnServerSpawn;
 
+    public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
     public static uint[] GetConnsExcluding(params uint[] connectionIds) => [.. Connections.Keys.Except(connectionIds)];
 
     public static int GetConnectionCount() => Connections.Count;
@@ -123,8 +124,8 @@ public partial class Server : Node
             switch (type)
             {
                 case 0: // Regular Packet
-                    
-                    if (reader.Read(out Packet packet)) // Invoke our packet handler
+
+                    if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                     {
                         PacketInvoke(hash, packet, connID);
                     }

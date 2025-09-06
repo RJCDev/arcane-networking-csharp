@@ -106,21 +106,15 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     }
 
-    [Command(Channels.Unreliable, false)]
+    [Command(Channels.Unreliable)]
     public void SendChanged(Changed changed, float[] valuesChanged)
     {
         // Tell the clients their new info
-        ClientChanged(changed, valuesChanged, [.. Server.Connections.Values]);
+        ClientChanged(changed, valuesChanged);
     }
 
     [Relay(Channels.Unreliable, false)]
-    public void ClientChanged(Changed changed, float[] valuesChanged, params NetworkConnection[] targets)
-    {
-        // Set locally
-        Set(changed, valuesChanged);
-    }
-
-    void Set(Changed changed, float[] valuesChanged)
+    public void ClientChanged(Changed changed, float[] valuesChanged)
     {
         Previous = Current; // Set previous to current
 

@@ -118,7 +118,7 @@ public partial class Client
                 case 0: // Regular Packet
 
                     //GD.Print("[Client] Regular Packet ");
-
+                    
                     if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                     {
                         //GD.Print("[Client] Packet Valid! " + hash);

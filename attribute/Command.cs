@@ -11,13 +11,11 @@ public class CommandAttribute : Attribute
 {
     // Debug inspection
     public Channels Channel { get; }
-    public bool RunLocal { get; }
     public bool RequireAuthority { get; }
     
-    public CommandAttribute(Channels channel = Channels.Reliable, bool runLocal = false, bool requireAuthority = false)
+    public CommandAttribute(Channels channel = Channels.Reliable, bool requireAuthority = false)
     {
         Channel = channel;
-        RunLocal = runLocal;
         RequireAuthority = requireAuthority;
     }
 }
