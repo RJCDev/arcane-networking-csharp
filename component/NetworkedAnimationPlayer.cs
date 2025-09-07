@@ -7,7 +7,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
 {
     [Export] AnimationPlayer AnimationPlayer;
 
-    public bool IsPlaying(string anim) => AnimationPlayer.CurrentAnimation == anim;
+    public bool IsPlaying(string anim = "") => anim == "" ? AnimationPlayer.IsPlaying() : AnimationPlayer.IsPlaying() && AnimationPlayer.CurrentAnimation == anim;
 
     // Play
     [Command(Channels.Reliable)]
@@ -40,7 +40,11 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
 
     // Stop
     [Command(Channels.Reliable)]
-    public void Stop() => StopRelay();
+    public void Stop(bool reset = false)
+    {
+        if (reset) AnimationPlayer.Play("RESET");
+        StopRelay();
+    }
 
     [Relay(Channels.Reliable)]
     public void StopRelay() => AnimationPlayer.Stop();
