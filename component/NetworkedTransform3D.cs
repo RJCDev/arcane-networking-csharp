@@ -10,9 +10,6 @@ namespace ArcaneNetworking;
 public partial class NetworkedTransform3D : NetworkedComponent
 {
     Node3D TransformNode;
-    [Export] public SendTime SendTime = SendTime.Physics;
-
-    [Export] public Channels SendChannel = Channels.Reliable;
 
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition;

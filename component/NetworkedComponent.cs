@@ -11,10 +11,8 @@ public enum AuthorityMode
 
 public enum SendTime
 {
-    Disabled,
     Process,
     Physics,
-    Manual,
 }
 
 /// <summary>
@@ -29,6 +27,7 @@ public abstract partial class NetworkedComponent : Node
 
     [ExportGroup("Send Config")]
     [Export] public AuthorityMode AuthorityMode = AuthorityMode.Server;
+    [Export] public SendTime SendTime = SendTime.Physics;
 
         
 }

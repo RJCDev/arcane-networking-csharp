@@ -38,7 +38,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));
 
-    public void Send<T>(T packet, Channels channel, bool instant = false)
+    public void Send<T>(T packet, Channels channel, bool instant = false, SendTime sendTime = SendTime.Process)
     {
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
@@ -53,7 +53,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
             if (instant) // Send Instantly
                 MessageLayer.Active.SendTo(NetworkWriter.ToArraySegment(), Channels.Reliable, this);
             else // Queue
-                MessageHandler.Enqueue(channel, NetworkWriter, this);
+                MessageHandler.Enqueue(channel, sendTime, NetworkWriter, this);
 
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
