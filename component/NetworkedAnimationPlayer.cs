@@ -19,6 +19,7 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
         {
             if (!backwards) AnimationPlayer.Play(animationName);
             else AnimationPlayer.PlayBackwards(animationName);
+            GD.Print("Crouch! " + NetworkedNode.OwnerID);
         }
     }
 
