@@ -258,6 +258,7 @@ public partial class Client
                 // Occupy Data (it will be occupied already if we are a client and server)
                 netNode.PrefabID = packet.prefabID;
                 netNode.NetID = packet.NetID;
+                netNode.OwnerID = packet.ownerID;
          
                 if (netNode == null)
                 {

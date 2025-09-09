@@ -317,6 +317,7 @@ public partial class Server : Node
             position = [position.X, position.Y, position.Z],
             rotation = [quat.X, quat.Y, quat.Z, quat.W],
             scale = [scale.X, scale.Y, scale.Z],
+            ownerID = owner != null ? owner.GetRemoteID() : 0
 
         };
 
@@ -377,6 +378,7 @@ public partial class Server : Node
                     position = [0, 0, 0],
                     rotation = [0, 0, 0, 1],
                     scale = [1, 1, 1],
+                    ownerID = node.Value.OwnerID
 
                 };
 
