@@ -19,6 +19,7 @@ public class Batcher
     public void Flush(out ArraySegment<byte> batchBytes)
     {
         byte count = (byte)Mathf.Min(byte.MaxValue, QueuedMessages.Count);
+        
         CurrBatch.WriteByte(count); // Write batch Header (Message Count)
 
         for (int i = 0; i < count; i++)
@@ -31,7 +32,8 @@ public class Batcher
         }
 
         batchBytes = CurrBatch.ToArraySegment(); // Flush out
-        if (!HasData()) CurrBatch.Reset(); // Reset
+
+        CurrBatch.Reset(); // Reset
 
     }
 

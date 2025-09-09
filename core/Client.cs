@@ -115,7 +115,6 @@ public partial class Client
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
             {
-
                 //GD.Print("[Client] Header Valid! " + hash);
 
                 switch (type)

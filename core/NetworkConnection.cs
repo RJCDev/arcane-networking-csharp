@@ -50,15 +50,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     {
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
-        try
-        {
-            Batchers[channel].Push(writer);
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("Error writing raw bytes to connection: " + remoteID);
-            GD.PrintErr(e.Message);
-        }
+        Batchers[channel].Push(writer);
     }
 
     public void Send<T>(T packet, Channels channel)

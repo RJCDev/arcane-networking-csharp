@@ -125,7 +125,6 @@ public partial class Server : Node
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
             {
-
                 //GD.Print("[Server] Header Valid! " + hash);
 
                 switch (type)
