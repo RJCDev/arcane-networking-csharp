@@ -119,7 +119,7 @@ public partial class Server : Node
 
         var reader = NetworkPool.GetReader(bytes);
 
-        reader.Read(out byte batchMsgCount); // Get batched message count
+        reader.ReadByte(out byte batchMsgCount); // Get batched message count
         
         for (int i = 0; i < batchMsgCount; i++)
         {

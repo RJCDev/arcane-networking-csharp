@@ -35,7 +35,7 @@ namespace ArcaneNetworking
         {
             Position = 0;
         }
-
+        public bool ReadByte(out byte read) => Read(out read);
         /// <summary>
         /// Reads a message object from the current position.
         /// Advances Position based on how much was consumed.

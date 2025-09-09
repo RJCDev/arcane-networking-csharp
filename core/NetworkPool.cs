@@ -17,7 +17,7 @@ public static class NetworkPool
     public static int GetWriterPoolSize()
     {
         int allBytes = 0;
-        writerPool.ToList().ForEach(x => allBytes += x.Buffer.Length);
+        writerPool.ToList().ForEach(x => allBytes += x.buffer.Length);
         return allBytes;
     } 
 
@@ -79,13 +79,15 @@ public static class NetworkPool
 
     public static void Recycle(NetworkWriter writer)
     {
-        writerPool.Add(writer);
         writer.Reset();
+        writerPool.Add(writer);
+
     }
     public static void Recycle(NetworkReader reader)
     {
-        readerPool.Add(reader);
         reader.Reset();
+        readerPool.Add(reader);
+
     }
 
 

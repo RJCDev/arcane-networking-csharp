@@ -105,12 +105,12 @@ public partial class Client
     /// </summary>
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
-        //GD.Print("[Client] Recieve Length: " + bytes.Count);
 
         var reader = NetworkPool.GetReader(bytes);
 
-        reader.Read(out byte batchMsgCount); // Get batched message count
-        
+        reader.ReadByte(out byte batchMsgCount); // Get batched message count
+       // GD.Print("[Client] Recieve Length: " + batchMsgCount);
+
         for (int i = 0; i < batchMsgCount; i++)
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?

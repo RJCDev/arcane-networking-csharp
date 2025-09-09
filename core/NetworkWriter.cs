@@ -7,25 +7,27 @@ namespace ArcaneNetworking
 {
     public class NetworkWriter
     {
-        internal byte[] Buffer;
+        internal byte[] buffer;
         public int Position { get; private set; }
 
         public static int MaxAllocationBytes = 65535;
 
-        public int RemainingBytes => Buffer.Length - Position;
+        public int RemainingBytes => buffer.Length - Position;
 
         public NetworkWriter(int initialCapacity = 1500)
         {
-            Buffer = new byte[initialCapacity];
+            buffer = new byte[initialCapacity];
             Position = 0;
         }
 
         internal void EnsureCapacity(int sizeBytes)
         {
-            if (Buffer.Length >= sizeBytes)
+            if (buffer.Length >= sizeBytes)
                 return;
             
-            Array.Resize(ref Buffer, sizeBytes);
+            int newSize = Math.Max(sizeBytes, buffer.Length * 2);
+            Array.Resize(ref buffer, newSize);
+
         }
 
         public void Reset() => Position = 0;
@@ -36,15 +38,8 @@ namespace ArcaneNetworking
             // Ensure your buffer is large enough
             EnsureCapacity(Position + bytes.Count);
 
-            Array.ConstrainedCopy(bytes.Array, bytes.Offset, Buffer, Position, bytes.Count);
+            Buffer.BlockCopy(bytes.Array, bytes.Offset, buffer, Position, bytes.Count);
             Position += bytes.Count;
-        }
-        public void WriteByte(byte _byte)
-        {
-            // Ensure your buffer is large enough
-            EnsureCapacity(Position + _byte);
-
-            Buffer[Position++] = _byte;
         }
         /// <summary>
         /// Writes an object into the buffer using MessagePack.
@@ -69,11 +64,11 @@ namespace ArcaneNetworking
             // Ensure your buffer is large enough
             EnsureCapacity(Position + written.Length);
 
-            written.CopyTo(Buffer.AsSpan(Position));
+            written.CopyTo(buffer.AsSpan(Position));
             Position += written.Length;
         }
 
         public ArraySegment<byte> ToArraySegment() =>
-            new ArraySegment<byte>(Buffer, 0, Position);
+            new ArraySegment<byte>(buffer, 0, Position);
     }
 }
