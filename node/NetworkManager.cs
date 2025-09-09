@@ -37,6 +37,8 @@ public partial class NetworkManager : Node
     /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
     [Export] public int MaxConnections = 4;
 
+    [Export] public int Port = 27156;
+
     /// <summary> How NetworkedObjects owned by a connection behave when the connection is disconnected</summary>
     [Export] public DisconectBehavior DisconnectBehavior = DisconectBehavior.Destroy;
 
