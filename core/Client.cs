@@ -250,6 +250,7 @@ public partial class Client
             // We are a client only, just spawn it normally
             if (NetworkManager.AmIClientOnly)
             {
+                GD.Print(packet.prefabID);
                 spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
 
                 // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
