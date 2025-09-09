@@ -10,7 +10,7 @@ public class Batcher
     public Queue<NetworkWriter> QueuedMessages = new();
 
     public void Push(NetworkWriter writer) => QueuedMessages.Enqueue(writer);
-
+    public void Reset() => CurrBatch.Reset();
     public bool HasData() => QueuedMessages.Count > 0;
 
     /// <summary>
@@ -18,8 +18,6 @@ public class Batcher
     /// </summary>
     public void Flush(out ArraySegment<byte> batchBytes)
     {
-        CurrBatch.Reset(); // Reset
-
         byte count = (byte)Mathf.Min(byte.MaxValue, QueuedMessages.Count);
         CurrBatch.WriteBytes(new ArraySegment<byte>([count])); // Write batch Header (Message Count)
 
@@ -33,9 +31,6 @@ public class Batcher
         }
 
         batchBytes = CurrBatch.ToArraySegment(); // Flush out
-
-   
-
     }
 
 }

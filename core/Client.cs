@@ -105,7 +105,7 @@ public partial class Client
     /// </summary>
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
-        //GD.Print("[Client] Recieve Length: " + bytes.Array.Length);
+        //GD.Print("[Client] Recieve Length: " + bytes.Count);
 
         var reader = NetworkPool.GetReader(bytes);
 
@@ -208,6 +208,7 @@ public partial class Client
                 batcher.Value.Flush(out ArraySegment<byte> batch);
                 MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
             }
+            batcher.Value.Reset();
                 
         }
     }

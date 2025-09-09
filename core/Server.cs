@@ -220,6 +220,7 @@ public partial class Server : Node
                     batcher.Value.Flush(out ArraySegment<byte> batch);
                     MessageLayer.Active.SendTo(batch, batcher.Key, conn.Value);
                 }
+                batcher.Value.Reset();
             }
         }
     }
