@@ -28,16 +28,16 @@ public static class NetworkPool
         return allBytes;
     } 
 
-    public static NetworkWriter GetWriter()
+    public static NetworkWriter GetWriter() // Should we reset the position and overwrite? or should we keep writing to this writer
     {
         if (!writerPool.TryTake(out NetworkWriter writer))
         {
             writer = new NetworkWriter();
-
             //GD.Print("[NetworkWriter] Obtaining NEW Network Writer");
         }
         else
         {
+
             writer.Reset();
             //GD.Print("[NetworkWriter] Obtaining Network Writer From Pool and RESETING POSITION.");
         }

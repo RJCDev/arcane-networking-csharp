@@ -3,6 +3,7 @@ using MessagePack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Channels;
 using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace ArcaneNetworking;
@@ -14,6 +15,13 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
 {
     // If this connection is encrypted, hold the data here
     public NetworkEncryption Encryption = encryption;
+
+    // Batcher for batching tiny packets together for efficiency (1 for each channel)
+    public readonly Dictionary<Channels, Batcher> Batchers = new()
+    {
+        { Channels.Reliable, new() },
+        { Channels.Unreliable, new() }
+    };
 
     // The ID of this 2 way connection
     readonly uint remoteID = id;
@@ -38,29 +46,39 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));
 
-    public void Send<T>(T packet, Channels channel, bool instant = false, SendTime sendTime = SendTime.Process)
+    public void SendRaw(NetworkWriter writer, Channels channel)
+    {
+        bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
+
+        try
+        {
+            Batchers[channel].Push(writer);
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr("Error writing raw bytes to connection: " + remoteID);
+            GD.PrintErr(e.Message);
+        }
+    }
+
+    public void Send<T>(T packet, Channels channel)
     {
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
         //GD.Print("[NetworkConnection] GetWriter(): " + packet.GetType());
 
-        var NetworkWriter = NetworkPool.GetWriter();
+        var writer = NetworkPool.GetWriter();
 
         try
         {
-            NetworkPacker.Pack(packet, NetworkWriter);
-
-            if (instant) // Send Instantly
-                MessageLayer.Active.SendTo(NetworkWriter.ToArraySegment(), Channels.Reliable, this);
-            else // Queue
-                MessageHandler.Enqueue(channel, sendTime, NetworkWriter, this);
-
+            NetworkPacker.Pack(packet, writer);
+            Batchers[channel].Push(writer);
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
         catch (Exception e)
         {
-            GD.PrintErr("Error sending packet to connection: " + remoteID);
-            if (e is MessagePackSerializationException) GD.PrintErr("Did you forget to assign [MessagePackObject] to your packet?");
+            GD.PrintErr("Error packing packet for connection: " + remoteID);
+            if (e is MessagePackSerializationException) GD.PrintErr("Did you forget to assign [MessagePackObject] to your packet struct?");
             GD.PrintErr(e.Message);
         }
 
@@ -69,8 +87,13 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     /// Ping connection
     public void Ping(byte pingOrPong)
     {
+        var writer = NetworkPool.GetWriter();
+        NetworkPacker.Pack(new PingPongPacket() { PingPong = pingOrPong }, writer); // Pack pingpong
+
         lastPingTime = Time.GetTicksMsec();
-        Send(new PingPongPacket() { PingPong = pingOrPong, }, Channels.Reliable, true);
+        MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send instantly
+
+        NetworkPool.Recycle(writer);
 
     }
 }

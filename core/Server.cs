@@ -199,6 +199,19 @@ public partial class Server : Node
         GD.Print("[Server] Server Has Stopped..");
     }
 
+    public static void Process()
+    {
+        foreach (var conn in Connections)
+        {
+            foreach (var batcher in conn.Value.Batchers)
+            {
+                // Send all batched messages
+                MessageLayer.Active.SendTo(batcher.Value.Flush(), batcher.Key, conn.Value);
+            }
+        }
+    }
+
+
     ////////////////////////// Internal Packet Callbacks
 
     static void OnHandshake(HandshakePacket packet, uint fromConnection)
@@ -219,7 +232,7 @@ public partial class Server : Node
         GD.Print("[Server] Client Authenticated!");
 
         AddClient(conn); // We are authenticated, add them to the game
-        
+
     }
 
     static void OnPingPong(PingPongPacket packet, uint fromConnection)

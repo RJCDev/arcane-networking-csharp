@@ -192,6 +192,16 @@ public partial class Client
         serverConnection = null;
     }
 
+    public static void Process()
+    {
+        foreach (var batcher in serverConnection.Batchers)
+        {
+            // Send all batched messages
+            MessageLayer.Active.SendTo(batcher.Value.Flush(), batcher.Key, serverConnection);
+        }
+    }
+
+
     ////////////////////////// Internal Packet Callbacks
 
     static void OnHandshake(HandshakePacket packet)

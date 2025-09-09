@@ -24,7 +24,7 @@ public partial class SteamMessageLayer : MessageLayer
     public SteamClient SteamClient = new();
     public SteamServer SteamServer = new();
 
-    internal IntPtr[] ReceiveBuffer = new nint[64];
+    internal IntPtr[] ReceivePointers = new nint[64]; // Pointers to steamworks unmanaged messages on receive
 
     public override void StartServer(bool isHeadless)
     {
@@ -76,15 +76,9 @@ public partial class SteamMessageLayer : MessageLayer
         SteamClient.StopClient();
     }
 
-    public override void Poll()
-    {
-        if (NetworkManager.AmIClient)
-            SteamClient.PollMessages(this);
-        if (NetworkManager.AmIServer)
-            SteamServer.PollMessages(this);
+    public override void PollClient() => SteamClient.PollMessages(this);
+    public override void PollServer() => SteamServer.PollMessages(this);
         
-    }
-
     public override void SendTo(ArraySegment<byte> bytes, Channels sendType, params NetworkConnection connTarget)
     {
         if (connTarget == null) GD.PrintErr($"[Steam] User Didn't Specify connection to send to!");
@@ -99,6 +93,7 @@ public partial class SteamMessageLayer : MessageLayer
         HSteamNetConnection steamConnectionToSend = remoteID == 0 ? SteamClient.ConnectionToServer : SteamServer.ClientsConnected[remoteID];
 
         GCHandle handle = default;
+
         try
         {
             // pin the backing array so GC won't move it

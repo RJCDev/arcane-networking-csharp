@@ -27,7 +27,5 @@ public abstract partial class NetworkedComponent : Node
 
     [ExportGroup("Send Config")]
     [Export] public AuthorityMode AuthorityMode = AuthorityMode.Server;
-    [Export] public SendTime SendTime = SendTime.Physics;
-
         
 }

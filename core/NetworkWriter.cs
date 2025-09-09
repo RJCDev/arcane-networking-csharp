@@ -10,7 +10,7 @@ namespace ArcaneNetworking
         internal byte[] Buffer;
         public int Position { get; private set; }
 
-        public int MaxAllocationBytes = 65535;
+        public static int MaxAllocationBytes = 65535;
 
         public int RemainingBytes => Buffer.Length - Position;
 
@@ -24,11 +24,22 @@ namespace ArcaneNetworking
         {
             if (Buffer.Length >= sizeBytes)
                 return;
+            
+            
             Array.Resize(ref Buffer, sizeBytes);
         }
 
         public void Reset() => Position = 0;
 
+        // Write bytes to the end of this writer
+        public void WriteBytes(ArraySegment<byte> bytes)
+        {
+            // Ensure your buffer is large enough
+            EnsureCapacity(Position + bytes.Count);
+
+            Array.ConstrainedCopy(bytes.Array, bytes.Offset, Buffer, Position, bytes.Count);
+            Position += bytes.Count;
+        }
         /// <summary>
         /// Writes an object into the buffer using MessagePack.
         /// </summary>
@@ -42,6 +53,12 @@ namespace ArcaneNetworking
             mpWriter.Flush();
 
             ReadOnlySpan<byte> written = bufferWriter.WrittenSpan;
+
+            if (Position + written.Length > MaxAllocationBytes)
+            {
+                GD.PrintErr("[Network Writer] Write Failed! Buffer Too Large: " + (Position + written.Length) + "b! Write Failed!");
+                return;
+            }
 
             // Ensure your buffer is large enough
             EnsureCapacity(Position + written.Length);

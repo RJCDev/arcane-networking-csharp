@@ -113,12 +113,12 @@ public class SteamServer
 
     public void PollMessages(SteamMessageLayer layer)
     {
-        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(ClientPollGroup, layer.ReceiveBuffer, layer.ReceiveBuffer.Length);
+        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(ClientPollGroup, layer.ReceivePointers, layer.ReceivePointers.Length);
 
         for (int i = 0; i < msgCount; i++)
         {
             SteamNetworkingMessage_t netMessage =
-                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceiveBuffer[i]);
+                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceivePointers[i]);
 
             try
             {
@@ -139,7 +139,7 @@ public class SteamServer
             }
             finally
             {
-                SteamNetworkingMessage_t.Release(layer.ReceiveBuffer[i]); // Tell Steam to free the buffer
+                SteamNetworkingMessage_t.Release(layer.ReceivePointers[i]); // Tell Steam to free the buffer
             }
         }
     

@@ -44,14 +44,14 @@ namespace ArcaneNetworking
         /// <summary>Called by MessageLayer when the server receieves from a client.</summary>
         public Action<ArraySegment<byte>, uint> OnServerReceive;
 
-        public override void _Process(double delta) => MessageHandler.Process();
-
+        public override void _Process(double delta) => NetworkTime.Process();
 
         public abstract void StartServer(bool isHeadless);
 
         public abstract void StopServer();
 
-        public abstract void Poll();
+        public abstract void PollClient();
+        public abstract void PollServer();
         /// <summary>
         /// Attempts a connection with an endpoint
         /// Here is where we pass in an empty NetworkConnection to our MessageLayer to attemp to connect

@@ -74,18 +74,19 @@ public class SteamClient
 
     public void PollMessages(SteamMessageLayer layer)
     {
-        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(ConnectionToServer, layer.ReceiveBuffer, layer.ReceiveBuffer.Length);
+        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(ConnectionToServer, layer.ReceivePointers, layer.ReceivePointers.Length);
 
         for (int i = 0; i < msgCount; i++)
         {
             SteamNetworkingMessage_t netMessage =
-                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceiveBuffer[i]);
+                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceivePointers[i]);
                 
             try
             {
+               
                 byte[] buffer = ArrayPool<byte>.Shared.Rent(netMessage.m_cbSize);
                 Marshal.Copy(netMessage.m_pData, buffer, 0, netMessage.m_cbSize);
-                var segment = new ArraySegment<byte>(buffer, 0, netMessage.m_cbSize);
+                var segment = new ArraySegment<byte>(buffer, 0, netMessage.m_cbSize); // Create segment from message pointer
 
                 MessageLayer.Active.OnClientReceive?.Invoke(segment);
 
@@ -98,7 +99,7 @@ public class SteamClient
             }
             finally
             {
-                SteamNetworkingMessage_t.Release(layer.ReceiveBuffer[i]); // Tell Steam to free the buffer
+                SteamNetworkingMessage_t.Release(layer.ReceivePointers[i]); // Tell Steam to free the buffer
             }
         }
     }

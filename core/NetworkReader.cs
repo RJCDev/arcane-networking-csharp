@@ -21,7 +21,7 @@ namespace ArcaneNetworking
             Reset();
         }
 
-        public void Reset(ArraySegment<byte> bytes)
+        public void Reset(ArraySegment<byte> bytes) // Resets to this arraysegment, sets the buffer and the offset
         {
             if (bytes.Array.Length > MaxAllocationBytes)
                 throw new InvalidOperationException(
