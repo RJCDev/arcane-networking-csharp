@@ -19,6 +19,7 @@ public partial class Server : Node
 
     // Connections to clients that are connected to this server
     public static Dictionary<uint, NetworkConnection> Connections = new Dictionary<uint, NetworkConnection>();
+    public static NetworkConnection LocalConnection = null;
 
     /// Dictionary of lists of Networked nodes. Keys are NetworkConnection IDs of clients
     public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
@@ -30,7 +31,6 @@ public partial class Server : Node
     public static Action<NetworkedNode> OnServerSpawn;
 
     public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
-    public static uint[] GetConnsExcluding(params uint[] connectionIds) => [.. Connections.Keys.Except(connectionIds)];
 
     public static int GetConnectionCount() => Connections.Count;
 
@@ -73,7 +73,6 @@ public partial class Server : Node
         GD.Print("[Server] Internal Handlers Registered");
     }
 
-
     /// <summary>
     /// Send Logic for simple packets
     /// </summary>
@@ -96,6 +95,9 @@ public partial class Server : Node
     {
         GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
 
+        // Filter local connection
+        if (connection.isLocalConnection) LocalConnection = connection;
+        
         Connections.Add(connection.GetRemoteID(), connection);
 
         OnServerConnect?.Invoke(connection);
@@ -220,7 +222,6 @@ public partial class Server : Node
                     batcher.Value.Flush(out ArraySegment<byte> batch);
                     MessageLayer.Active.SendTo(batch, batcher.Key, conn.Value);
                 }
-                batcher.Value.Reset();
             }
         }
     }

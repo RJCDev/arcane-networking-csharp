@@ -39,6 +39,13 @@ namespace ArcaneNetworking
             Array.ConstrainedCopy(bytes.Array, bytes.Offset, Buffer, Position, bytes.Count);
             Position += bytes.Count;
         }
+        public void WriteByte(byte _byte)
+        {
+            // Ensure your buffer is large enough
+            Resize(Position + _byte);
+
+            Buffer[Position++] = _byte;
+        }
         /// <summary>
         /// Writes an object into the buffer using MessagePack.
         /// </summary>

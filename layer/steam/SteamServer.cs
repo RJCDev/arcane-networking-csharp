@@ -51,6 +51,7 @@ public class SteamServer
         uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
         NetworkConnection incoming = new(SteamUser.GetSteamID().m_SteamID.ToString(), steam32, null);
+        incoming.isLocalConnection = true;
 
         GD.Print("[Steam Server] Setup Local Connection To Server!");
 

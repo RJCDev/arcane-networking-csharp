@@ -208,7 +208,6 @@ public partial class Client
                 batcher.Value.Flush(out ArraySegment<byte> batch);
                 MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
             }
-            batcher.Value.Reset();
                 
         }
     }
