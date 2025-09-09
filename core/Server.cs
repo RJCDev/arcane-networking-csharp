@@ -270,9 +270,9 @@ public partial class Server : Node
     /// Spawns a Node on the server and relays to all connections
     /// </summary>
     /// <returns>Node that was spawned</returns>
-    public static Node Spawn(int prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
+    public static Node Spawn(uint prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
     {
-        Node spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[prefabID].Instantiate();
+        Node spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)prefabID].Instantiate();
         NetworkedNode netNode;
   
         // Finds its networked node, it should be a child of this spawned object
@@ -287,6 +287,7 @@ public partial class Server : Node
 
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
+        netNode.PrefabID = prefabID;
         uint netOwner = owner != null ? owner.GetRemoteID() : 0;
         netNode.OwnerID = netOwner;
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
@@ -312,11 +313,10 @@ public partial class Server : Node
         SpawnNodePacket packet = new()
         {
             NetID = netNode.NetID,
-            prefabID = (uint)prefabID,
+            prefabID = prefabID,
             position = [position.X, position.Y, position.Z],
             rotation = [quat.X, quat.Y, quat.Z, quat.W],
             scale = [scale.X, scale.Y, scale.Z],
-            ownerID = owner != null ? owner.GetRemoteID() : 0
 
         };
 
@@ -377,7 +377,6 @@ public partial class Server : Node
                     position = [0, 0, 0],
                     rotation = [0, 0, 0, 1],
                     scale = [1, 1, 1],
-                    ownerID = node.Value.OwnerID
 
                 };
 
@@ -388,7 +387,7 @@ public partial class Server : Node
             if (NetworkManager.manager.PlayerPrefabID != -1)
             {
                 // Instantiate the player prefab if not -1
-                connection.playerObject = Spawn(NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
+                connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
                 connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
             }
         }

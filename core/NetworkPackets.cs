@@ -71,15 +71,12 @@ namespace ArcaneNetworking
         public uint prefabID;
 
         [Key(2)]
-        public uint ownerID;
-
-        [Key(3)]
         public float[] position;
 
-        [Key(4)]
+        [Key(3)]
         public float[] rotation;
 
-        [Key(5)]
+        [Key(4)]
         public float[] scale;
 
     }

@@ -250,15 +250,14 @@ public partial class Client
             // We are a client only, just spawn it normally
             if (NetworkManager.AmIClientOnly)
             {
-                GD.Print(packet.prefabID);
                 spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
 
                 // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
                 netNode = spawnedObject.FindChild<NetworkedNode>();
 
                 // Occupy Data (it will be occupied already if we are a client and server)
+                netNode.PrefabID = packet.prefabID;
                 netNode.NetID = packet.NetID;
-                netNode.OwnerID = packet.ownerID;
          
                 if (netNode == null)
                 {
@@ -294,8 +293,7 @@ public partial class Client
             serverConnection.playerObject = spawnedObject; // Set your player object if its yours
             serverConnection.playerObject.Name = " [Conn ID: " + serverConnection.localID + "]";
         }
-           
-            
+        
         OnClientSpawn?.Invoke(netNode);
 
         GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
