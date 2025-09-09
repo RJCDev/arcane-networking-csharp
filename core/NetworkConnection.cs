@@ -88,6 +88,7 @@ public partial class NetworkConnection(string endpoint, uint id, NetworkEncrypti
     public void Ping(byte pingOrPong)
     {
         var writer = NetworkPool.GetWriter();
+        writer.WriteBytes(new ArraySegment<byte>([1])); // Include msg count header
         NetworkPacker.Pack(new PingPongPacket() { PingPong = pingOrPong }, writer); // Pack pingpong
 
         lastPingTime = Time.GetTicksMsec();

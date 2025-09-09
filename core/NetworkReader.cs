@@ -66,7 +66,7 @@ namespace ArcaneNetworking
             }
             catch (MessagePackSerializationException e)
             {
-                GD.PrintErr("Couldn't deserialize type from writer: " + typeof(T).ToString());
+                GD.PrintErr("Couldn't deserialize type from reader: " + typeof(T).ToString());
                 GD.PrintErr(e.Message);
                 read = default;
                 return false;

@@ -40,9 +40,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
     }
     public override void _PhysicsProcess(double delta)
     {
+        
+        bool clientAuth = AuthorityMode == AuthorityMode.Client && NetworkedNode.AmIOwner && NetworkedNode.AmIOwner;
+        bool serverAuth = AuthorityMode == AuthorityMode.Server && NetworkManager.AmIServer;
+        
         // Update Position
-        if ((AuthorityMode == AuthorityMode.Client && NetworkedNode.AmIOwner) // Client Authority
-        || AuthorityMode == AuthorityMode.Server && NetworkManager.AmIServer) // Server Authority
+        if (clientAuth || serverAuth)
         {
             Changed changes = Changed.None;
             List<float> valuesChanged = [];
@@ -75,7 +78,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                SendChanged(changes, [..valuesChanged]);
+                if (serverAuth)
+                    RelayChanged(changes, [.. valuesChanged]);
+                else if (clientAuth)
+                    SendChanged(changes, [.. valuesChanged]);
+                
 
                 // Set our current to be this so we can backtest it again above
                 Current.Pos = TransformNode.GlobalPosition;
@@ -107,12 +114,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public void SendChanged(Changed changed, float[] valuesChanged)
     {
         // Tell the clients their new info
-        ClientChanged(changed, valuesChanged);
+        RelayChanged(changed, valuesChanged);
 
     }
 
     [Relay(Channels.Unreliable)]
-    public void ClientChanged(Changed changed, float[] valuesChanged)
+    public void RelayChanged(Changed changed, float[] valuesChanged)
     {
         if (NetworkedNode.AmIOwner) return;
         

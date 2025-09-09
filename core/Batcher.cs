@@ -5,30 +5,37 @@ using System.Collections.Generic;
 
 public class Batcher
 {
-    int MaxSize = 1500;
     NetworkWriter CurrBatch = new();
 
     public Queue<NetworkWriter> QueuedMessages = new();
 
     public void Push(NetworkWriter writer) => QueuedMessages.Enqueue(writer);
 
+    public bool HasData() => QueuedMessages.Count > 0;
+
     /// <summary>
     /// Resets the Batcher and flushes all data up to the max size
     /// </summary>
-    public ArraySegment<byte> Flush()
+    public void Flush(out ArraySegment<byte> batchBytes)
     {
-        CurrBatch.Reset(); // Reset the currBatch processing
+        CurrBatch.Reset(); // Reset
 
-        while (QueuedMessages.Count > 0)
+        byte count = (byte)Mathf.Min(byte.MaxValue, QueuedMessages.Count);
+        CurrBatch.WriteBytes(new ArraySegment<byte>([count])); // Write batch Header (Message Count)
+
+        for (int i = 0; i < count; i++)
         {
-            if (CurrBatch.Buffer.Length + QueuedMessages.Peek().Buffer.Length > MaxSize) // Flush now!
-            {
-                return CurrBatch.ToArraySegment();
-            }
+            NetworkWriter msg = QueuedMessages.Dequeue();
 
-            CurrBatch.WriteBytes(QueuedMessages.Dequeue().ToArraySegment()); // Write the last message
+            CurrBatch.WriteBytes(msg.ToArraySegment()); // Write the message
+
+            NetworkPool.Recycle(msg); // We can now get rid of this NetworkWriter that originally wrote the packet
         }
 
-        return CurrBatch.ToArraySegment(); // Flush, we didn't make the max size but thats fine
+        batchBytes = CurrBatch.ToArraySegment(); // Flush out
+
+   
+
     }
+
 }

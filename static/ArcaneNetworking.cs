@@ -16,6 +16,7 @@ public delegate void RPCUnpackDelegate(NetworkReader reader, NetworkedComponent 
 /// </summary>
 public static class ArcaneNetworking
 {
+    public static readonly Dictionary<string, int> PrefabIDs = new Dictionary<string, int>();
     public static readonly Dictionary<int, Type> PacketTypes = new Dictionary<int, Type>();
     
     public static readonly Dictionary<int, RPCUnpackDelegate> RPCMethods = new Dictionary<int, RPCUnpackDelegate>();

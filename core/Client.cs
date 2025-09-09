@@ -107,57 +107,63 @@ public partial class Client
     {
         //GD.Print("[Client] Recieve Length: " + bytes.Array.Length);
 
-        var reader = NetworkPool.GetReader(bytes.Array);
+        var reader = NetworkPool.GetReader(bytes);
 
-        if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid header?
+        reader.Read(out byte batchMsgCount); // Get batched message count
+        
+        for (int i = 0; i < batchMsgCount; i++)
         {
-            //GD.Print("[Client] Header Valid! " + hash);
-
-            switch (type)
+            if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
             {
-                case 0: // Regular Packet
 
-                    //GD.Print("[Client] Regular Packet ");
-                    
-                    if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
-                    {
-                        //GD.Print("[Client] Packet Valid! " + hash);
-                        PacketInvoke(hash, packet);
-                    }
+                //GD.Print("[Client] Header Valid! " + hash);
 
-                    break;
+                switch (type)
+                {
+                    case 0: // Regular Packet
 
+                        //GD.Print("[Client] Regular Packet ");
 
-                case 1: // RPC Packet
-
-                    //GD.Print("[Client] RPC Packet");
-
-                    if (reader.Read(out uint callerNetID) && reader.Read(out int callerCompIndex))
-                    {
-                        if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
+                        if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                         {
-                            // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
+                            //GD.Print("[Client] Packet Valid! " + hash);
+                            PacketInvoke(hash, packet);
+                        }
 
-                            //GD.PrintErr("[Client] Unpacking RPC..");
+                        break;
 
-                            unpack(reader, NetworkedNodes[callerNetID].NetworkedComponents[callerCompIndex]);
+
+                    case 1: // RPC Packet
+
+                        //GD.Print("[Client] RPC Packet");
+
+                        if (reader.Read(out uint callerNetID) && reader.Read(out int callerCompIndex))
+                        {
+                            if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
+                            {
+                                // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
+
+                                //GD.PrintErr("[Client] Unpacking RPC..");
+
+                                unpack(reader, NetworkedNodes[callerNetID].NetworkedComponents[callerCompIndex]);
+                            }
+                            else
+                            {
+                                GD.PrintErr("[Client] RPC Method Hash not found! " + hash);
+                            }
+
                         }
                         else
                         {
-                            GD.PrintErr("[Client] RPC Method Hash not found! " + hash);
+                            GD.PrintErr("[Client] Could not read RPC Packet! " + hash);
                         }
 
-                    }
-                    else
-                    {
-                        GD.PrintErr("[Client] Could not read RPC Packet! " + hash);
-                    }
-
-                    break;
+                        break;
+                }
             }
+            else GD.PrintErr("[Client] Packet header was invalid on receive!");
         }
-        else GD.PrintErr("[Client] Packet header was invalid on receive!");
-
+        
         NetworkPool.Recycle(reader);
     }
 
@@ -197,7 +203,12 @@ public partial class Client
         foreach (var batcher in serverConnection.Batchers)
         {
             // Send all batched messages
-            MessageLayer.Active.SendTo(batcher.Value.Flush(), batcher.Key, serverConnection);
+            while (batcher.Value.HasData())
+            {
+                batcher.Value.Flush(out ArraySegment<byte> batch);
+                MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
+            }
+                
         }
     }
 

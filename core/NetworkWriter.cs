@@ -20,11 +20,10 @@ namespace ArcaneNetworking
             Position = 0;
         }
 
-        internal void EnsureCapacity(int sizeBytes)
+        internal void Resize(int sizeBytes)
         {
             if (Buffer.Length >= sizeBytes)
                 return;
-            
             
             Array.Resize(ref Buffer, sizeBytes);
         }
@@ -35,7 +34,7 @@ namespace ArcaneNetworking
         public void WriteBytes(ArraySegment<byte> bytes)
         {
             // Ensure your buffer is large enough
-            EnsureCapacity(Position + bytes.Count);
+            Resize(Position + bytes.Count);
 
             Array.ConstrainedCopy(bytes.Array, bytes.Offset, Buffer, Position, bytes.Count);
             Position += bytes.Count;
@@ -61,7 +60,7 @@ namespace ArcaneNetworking
             }
 
             // Ensure your buffer is large enough
-            EnsureCapacity(Position + written.Length);
+            Resize(Position + written.Length);
 
             written.CopyTo(Buffer.AsSpan(Position));
             Position += written.Length;
