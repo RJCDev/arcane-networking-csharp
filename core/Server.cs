@@ -12,13 +12,13 @@ namespace ArcaneNetworking;
 public partial class Server : Node
 {
     // Packet Handling
-    static readonly Dictionary<int, Action<Packet, uint>> PacketInvokes = [];
+    static readonly Dictionary<int, Action<Packet, int>> PacketInvokes = [];
 
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
     static uint CurrentNodeID = 0;
 
     // Connections to clients that are connected to this server
-    public static Dictionary<uint, NetworkConnection> Connections = new Dictionary<uint, NetworkConnection>();
+    public static Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
 
     /// Dictionary of lists of Networked nodes. Keys are NetworkConnection IDs of clients
@@ -39,14 +39,14 @@ public partial class Server : Node
     /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
-    public static void RegisterPacketHandler<T>(Action<T, uint> handler) where T : Packet
+    public static void RegisterPacketHandler<T>(Action<T, int> handler) where T : Packet
     {
         // Wrap the handler so it can fit into Action<Packet>
         Type packetType = typeof(T);
         int packetHash = ExtensionMethods.StableHash(packetType.FullName);
         PacketInvokes[packetHash] = (packet, connID) => handler((T)packet, connID);
     }
-    internal static void PacketInvoke(int packetHash, Packet packet, uint fromConnection)
+    internal static void PacketInvoke(int packetHash, Packet packet, int fromConnection)
     {
         if (PacketInvokes.TryGetValue(packetHash, out var handler))
         {
@@ -103,7 +103,7 @@ public partial class Server : Node
         OnServerConnect?.Invoke(connection);
 
     }
-    static void OnServerClientDisconnect(uint connID)
+    static void OnServerClientDisconnect(int connID)
     {
         OnServerDisconnect?.Invoke(Connections[connID]);
                 
@@ -113,7 +113,7 @@ public partial class Server : Node
 
 
     }
-    static void OnServerReceive(ArraySegment<byte> bytes, uint connID)
+    static void OnServerReceive(ArraySegment<byte> bytes, int connID)
     {
        //GD.Print("[Server] Recieve Length: " + bytes.Array.Length);
 
@@ -197,9 +197,9 @@ public partial class Server : Node
     }
     public static void Stop()
     {
-        foreach (var client in NetworkedNodes)
+        foreach (var client in Connections)
         {
-            RemoveClient(Connections[client.Key], true);
+            RemoveClient(client.Value, true);
         }
 
         Connections.Clear();
@@ -228,7 +228,7 @@ public partial class Server : Node
 
     ////////////////////////// Internal Packet Callbacks
 
-    static void OnHandshake(HandshakePacket packet, uint fromConnection)
+    static void OnHandshake(HandshakePacket packet, int fromConnection)
     {
         NetworkConnection conn = Connections[fromConnection];
 
@@ -241,7 +241,7 @@ public partial class Server : Node
 
         OnServerAuthenticate?.Invoke(conn);
 
-        Send(new HandshakePacket() { ID = fromConnection }, conn, Channels.Reliable);
+        Send(new HandshakePacket() { netID = fromConnection }, conn, Channels.Reliable);
 
         GD.Print("[Server] Client Authenticated!");
 
@@ -249,7 +249,7 @@ public partial class Server : Node
 
     }
 
-    static void OnPingPong(PingPongPacket packet, uint fromConnection)
+    static void OnPingPong(PingPongPacket packet, int fromConnection)
     {
         // Send back if it was a ping
         if (packet.PingPong == 0)
@@ -261,7 +261,7 @@ public partial class Server : Node
             Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime;
     } 
 
-    static void OnModify(ModifyNodePacket packet, uint fromConnection)
+    static void OnModify(ModifyNodePacket packet, int fromConnection)
     {
 
     }
@@ -288,7 +288,7 @@ public partial class Server : Node
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
         netNode.PrefabID = prefabID;
-        uint netOwner = owner != null ? owner.GetRemoteID() : 0;
+        int netOwner = owner != null ? owner.GetRemoteID() : 0;
         netNode.OwnerID = netOwner;
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
@@ -312,7 +312,7 @@ public partial class Server : Node
 
         SpawnNodePacket packet = new()
         {
-            NetID = netNode.NetID,
+            netID = netNode.NetID,
             prefabID = prefabID,
             position = [position.X, position.Y, position.Z],
             rotation = [quat.X, quat.Y, quat.Z, quat.W],
@@ -351,7 +351,7 @@ public partial class Server : Node
 
         ModifyNodePacket packet = new()
         {
-            NetID = netNode.NetID,
+            netID = netNode.NetID,
             enabled = enabled,
             destroy = destroy,
         };
@@ -366,33 +366,31 @@ public partial class Server : Node
     /// </summary>
     public static void AddClient(NetworkConnection connection)
     {
-        if (!NetworkedNodes.ContainsKey(connection.GetRemoteID()))
+        // Tell them to spawn all net objects that we currenlty have on their client
+        foreach (var node in NetworkedNodes)
         {
-            // Tell them to spawn all net objects that we currenlty have on their client
-            foreach (var node in NetworkedNodes)
+            SpawnNodePacket packet = new()
             {
-                SpawnNodePacket packet = new()
-                {
-                    NetID = node.Value.NetID,
-                    prefabID = node.Value.PrefabID,
-                    position = [0, 0, 0],
-                    rotation = [0, 0, 0, 1],
-                    scale = [1, 1, 1],
-                    ownerID = node.Value.OwnerID
+                netID = node.Value.NetID,
+                prefabID = node.Value.PrefabID,
+                position = [0, 0, 0],
+                rotation = [0, 0, 0, 1],
+                scale = [1, 1, 1],
+                ownerID = node.Value.OwnerID
 
-                };
+            };
 
-                Send(packet, connection, Channels.Reliable);
-            }
-
-
-            if (NetworkManager.manager.PlayerPrefabID != -1)
-            {
-                // Instantiate the player prefab if not -1
-                connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
-                connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
-            }
+            Send(packet, connection, Channels.Reliable);
         }
+
+
+        if (NetworkManager.manager.PlayerPrefabID != -1)
+        {
+            // Instantiate the player prefab if not -1
+            connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
+            connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
+        }
+        
     }
 
     public static void RemoveClient(NetworkConnection connection, bool destroyObjects)
@@ -404,9 +402,6 @@ public partial class Server : Node
             if (netObject.Value.OwnerID == connection.GetRemoteID()) // They own this object
                 Modify(netObject.Value, !destroyObjects, destroyObjects);
         }
-
-        // If these objects wont just become unspawns, then completely remove the memory from the list
-        if (destroyObjects) NetworkedNodes.Remove(connection.GetRemoteID());
 
     }
 

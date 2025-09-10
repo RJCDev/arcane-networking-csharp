@@ -6,133 +6,102 @@ using System.Net.Sockets;
 using System.Text;
 using ArcaneNetworkingSteam;
 using Godot;
-using Kcp;
+using kcp2k;
 
 namespace ArcaneNetworking
 {
     public partial class KCPMessageLayer : MessageLayer
     {
-        KCPClient KCPClient = new();
-        KCPServer KCPServer = new();
-        private UInt32 mNextUpdateTime = 0;
+        [Export] KcpConfig KCPConfig = new();
 
-        public bool WriteDelay { get; set; }
-        public bool AckNoDelay { get; set; }
+        KcpClient KCPClient;
+        KcpServer KCPServer;
 
-        private DateTime startDt = DateTime.Now;
-        const int logmask = KCP.IKCP_LOG_IN_ACK | KCP.IKCP_LOG_OUT_ACK | KCP.IKCP_LOG_IN_DATA | KCP.IKCP_LOG_OUT_DATA;
-
-        
-        public int Recv(byte[] data, int index, int length)
+        // Server Functions
+        public override void StartServer(bool isHeadless)
         {
-            if (mRecvBuffer.ReadableBytes > 0) {
-                var recvBytes = Math.Min(mRecvBuffer.ReadableBytes, length);
-                Buffer.BlockCopy(mRecvBuffer.RawBuffer, mRecvBuffer.ReaderIndex, data, index, recvBytes);
-                mRecvBuffer.ReaderIndex += recvBytes;
+            KCPServer = new KcpServer(
+                (id) =>
+                {
+                    // Create NetworkConnection
+                    var endpoint = KCPServer.GetClientEndPoint(id);
 
-                if (mRecvBuffer.ReaderIndex == mRecvBuffer.WriterIndex) {
-                    mRecvBuffer.Clear();
-                }
-                return recvBytes;
-            }
+                    NetworkConnection incoming = new(endpoint.Address.ToString(), (ushort)endpoint.Port, id);
+                    OnServerConnect?.Invoke(incoming);
+                },
+                (id, bytes, channel) => OnServerReceive?.Invoke(bytes, id), // Discard channel, doesn't really matter when incoming
+                (id) => OnServerDisconnect?.Invoke(id),
+                (id, error, message) =>
+                {
+                    GD.PrintErr("[KCP] Server Error: " + message);
+                    OnServerError?.Invoke(id, (byte)error, message);
+                },
+                KCPConfig);
 
-            if (mSocket == null)
-                return -1;
+            KCPServer.Start(Port);
 
-            if (!mSocket.Poll(0, SelectMode.SelectRead)) {
-                return 0;
-            }
+            GD.Print("[KCP] Server Started On Port: " + Port);
 
-            var rn = 0;
-            try {
-                rn = mSocket.Receive(mRecvBuffer.RawBuffer, mRecvBuffer.WriterIndex, mRecvBuffer.WritableBytes, SocketFlags.None);
-            } catch(Exception ex) {
-                Console.WriteLine(ex);
-                rn = -1;
-            }
-
-            if (rn <= 0) {
-                return rn;
-            }
-            mRecvBuffer.WriterIndex += rn;
-
-            var inputN = mKCP.Input(mRecvBuffer.RawBuffer, mRecvBuffer.ReaderIndex, mRecvBuffer.ReadableBytes, true, AckNoDelay);
-            if (inputN < 0) {
-                mRecvBuffer.Clear();
-                return inputN;
-            }
-            mRecvBuffer.Clear();
-
-            for (;;) {
-                var size = mKCP.PeekSize();
-                if (size < 0) break;
-
-                mRecvBuffer.EnsureWritableBytes(size);
-
-                var n = mKCP.Recv(mRecvBuffer.RawBuffer, mRecvBuffer.WriterIndex, size);
-                if (n > 0) mRecvBuffer.WriterIndex += n;
-            }
-
-
-            if (mRecvBuffer.ReadableBytes > 0) {
-                return Recv(data, index, length);
-            }
-
-            return 0;
         }
+        public override void PollServer() => KCPServer.Tick();
+        public override void StopServer() => KCPServer.Stop();
 
-
-        public override void StartServer(bool isHeadless) => KCPServer.StartServer();
-        public override void StopServer()
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void PollClient()
-        {
-            if (KCPClient.mSocket == null)
-                return;
-
-            KCPClient.SocketReceive();
-            KCPClient.PollMessages();
-        }
-
-        public override void PollServer()
-        {
-            throw new NotImplementedException();
-        }
-
+        // Client Functions
         public override bool StartClient(NetworkConnection host)
         {
-            throw new NotImplementedException();
-        }
+            KCPClient = new KcpClient(
+                () =>
+                {
+                    GD.Print("[KCP] Connected To Server!: " + host.GetEndPoint());
+                    OnClientConnect?.Invoke();
+                },
+                (message, channel) => OnClientReceive?.Invoke(message),
+                () => OnClientDisconnect?.Invoke(),
+                (error, message) =>
+                {
+                    GD.PrintErr("[KCP] Client Error: " + message);
+                    OnClientError?.Invoke((byte)error, message);
+                },
+                 KCPConfig);
 
-        public override void StopClient()
-        {
-            throw new NotImplementedException();
+            KCPClient.Connect(host.GetEndPoint(), host.GetPort());
+
+            return true;
+
         }
+        public override void PollClient() => KCPClient.Tick();
+        public override void StopClient() => KCPClient.Disconnect();
 
         public override void SendTo(ArraySegment<byte> bytes, Channels channel, NetworkConnection target)
         {
-            if (target == null) GD.PrintErr($"[KCP] User Didn't Specify connection to send to!");
+            if (target == null) GD.PrintErr("[KCP] User Didn't Specify connection to send to!");
 
-            var convID = target.GetRemoteID();
-
-            // Run invokes (send is for debug)
-            if (convID != 0)
+            var remoteID = target.GetRemoteID();
+            
+            // Run invokes
+            if (remoteID != 0) // Send as server
             {
-                OnServerSend?.Invoke(bytes, convID);
+                KCPServer.Send(remoteID, bytes, ToKCPChannel(channel));
+
+                OnServerSend?.Invoke(bytes, remoteID);
             }
-            else
+            else // Send as client (use authentication to see if we should send the first packet through the raw socket)
             {
+                KCPClient.Send(bytes, ToKCPChannel(channel));
 
                 OnClientSend?.Invoke(bytes);
             }
-            
-            if (mSocket != null)
-                {
-                    mSocket.Send(bytes.Array, bytes.Count, SocketFlags.None);
-                }
+
+        }
+
+        KcpChannel ToKCPChannel(Channels channel)
+        {
+            return channel switch
+            {
+                Channels.Reliable => KcpChannel.Reliable,
+                Channels.Unreliable => KcpChannel.Unreliable,
+                _ => default,
+            };
         }
     }
 }

@@ -12,9 +12,9 @@ public class SteamServer
 {
     internal HSteamListenSocket ServerListenSocket;
     internal HSteamNetPollGroup ClientPollGroup;
-    internal Dictionary<uint, HSteamNetConnection> ClientsConnected = [];
+    internal Dictionary<int, HSteamNetConnection> ClientsConnected = [];
     protected Callback<SteamNetConnectionStatusChangedCallback_t> ConnectionCallback;
-
+    IntPtr[] ReceivePointers = new nint[64]; // Pointers to steamworks unmanaged messages on receive
 
     public void StartServer(HSteamNetConnection localConnection = default)
     {
@@ -28,7 +28,7 @@ public class SteamServer
         {
             uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
-            ClientsConnected.Add(steam32, localConnection);
+            ClientsConnected.Add((int)steam32, localConnection);
 
             SteamNetworkingSockets.SetConnectionPollGroup(localConnection, ClientPollGroup);
 
@@ -50,8 +50,7 @@ public class SteamServer
     {
         uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
 
-        NetworkConnection incoming = new(SteamUser.GetSteamID().m_SteamID.ToString(), steam32, null);
-        incoming.isLocalConnection = true;
+        NetworkConnection incoming = new("127.0.0.1", 0, (int)steam32);
 
         GD.Print("[Steam Server] Setup Local Connection To Server!");
 
@@ -84,8 +83,8 @@ public class SteamServer
                 {
                     SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, ClientPollGroup);
 
-                    NetworkConnection incoming = new(info.m_info.m_identityRemote.GetSteamID().ToString(), steam32, null);
-                    ClientsConnected.Add(steam32, info.m_hConn);
+                    NetworkConnection incoming = new(info.m_info.m_identityRemote.GetSteamID().ToString(), 0, (int)steam32, null);
+                    ClientsConnected.Add((int)steam32, info.m_hConn);
 
                     GD.Print("[Steam Server] Accepted a Networking Session with a remote Client: " + info.m_info.m_identityRemote.GetSteamID());
 
@@ -103,9 +102,9 @@ public class SteamServer
                 SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, HSteamNetPollGroup.Invalid);
                 SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
 
-                MessageLayer.Active.OnServerDisconnect?.Invoke(steam32);
+                MessageLayer.Active.OnServerDisconnect?.Invoke((int)steam32);
 
-                ClientsConnected.Remove(steam32);
+                ClientsConnected.Remove((int)steam32);
 
                 break;
         }
@@ -114,12 +113,12 @@ public class SteamServer
 
     public void PollMessages(SteamMessageLayer layer)
     {
-        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(ClientPollGroup, layer.ReceivePointers, layer.ReceivePointers.Length);
+        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnPollGroup(ClientPollGroup, ReceivePointers, ReceivePointers.Length);
 
         for (int i = 0; i < msgCount; i++)
         {
             SteamNetworkingMessage_t netMessage =
-                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceivePointers[i]);
+                Marshal.PtrToStructure<SteamNetworkingMessage_t>(ReceivePointers[i]);
 
             try
             {
@@ -129,7 +128,7 @@ public class SteamServer
 
                 MessageLayer.Active.OnServerReceive?.Invoke(
                     segment,
-                    (uint)netMessage.m_identityPeer.GetSteamID().m_SteamID);
+                    (int)(uint)netMessage.m_identityPeer.GetSteamID().m_SteamID);
 
                 //GD.Print("[SteamServer] Message Received! Count: " + msgCount);
             }
@@ -140,7 +139,7 @@ public class SteamServer
             }
             finally
             {
-                SteamNetworkingMessage_t.Release(layer.ReceivePointers[i]); // Tell Steam to free the buffer
+                SteamNetworkingMessage_t.Release(ReceivePointers[i]); // Tell Steam to free the buffer
             }
         }
     

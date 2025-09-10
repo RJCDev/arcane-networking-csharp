@@ -97,11 +97,11 @@ public partial class NetworkedNode : Node
         }
        
     }
-    public uint OwnerID;
+    public int OwnerID;
     public object[] OwnerMeta = new object[64];
 
     // Actions
-    public Action<ulong, ulong> OnOwnerChanged;
+    public Action<int, int> OnOwnerChanged;
 
     // Find all Networked Components
     public override void _EnterTree()

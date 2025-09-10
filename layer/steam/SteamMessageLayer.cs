@@ -16,16 +16,9 @@ namespace ArcaneNetworkingSteam;
 /// </summary>
 public partial class SteamMessageLayer : MessageLayer
 {
-    public override void _Ready()
-    {
-        SteamNetworkingUtils.InitRelayNetworkAccess();
-    }
-
     public SteamClient SteamClient = new();
     public SteamServer SteamServer = new();
-
-    internal IntPtr[] ReceivePointers = new nint[64]; // Pointers to steamworks unmanaged messages on receive
-
+ 
     public override void StartServer(bool isHeadless)
     {
         // Local Server Connection
@@ -41,18 +34,13 @@ public partial class SteamMessageLayer : MessageLayer
         else SteamServer.StartServer();
     }
 
-    public override void StopServer()
-    {
-        SteamServer.StopServer();
-    }
-
+    public override void StopServer() => SteamServer.StopServer();
+    
     public override bool StartClient(NetworkConnection other)
     {
-        if (other.GetEndpointAs<string>() == "localhost") // Local Connection
+        // Steam is odd, and we need to do some special stuff for Local Connections
+        if (other.isLocalConnection) // Local Connection
         {
-            other.SetEndPoint(SteamUser.GetSteamID().m_SteamID.ToString());
-            other.isLocalConnection = true;
-            
             SteamClient.StartClient(other);
             SteamServer.InitLocal(); // Invoke client connection callback
         }
@@ -71,20 +59,18 @@ public partial class SteamMessageLayer : MessageLayer
         return true;
     }
 
-    public override void StopClient()
-    {
-        SteamClient.StopClient();
-    }
+    public override void StopClient() => SteamClient.StopClient();
+
 
     public override void PollClient() => SteamClient.PollMessages(this);
     public override void PollServer() => SteamServer.PollMessages(this);
-        
+
     public override void SendTo(ArraySegment<byte> bytes, Channels sendType, params NetworkConnection connTarget)
     {
         if (connTarget == null) GD.PrintErr($"[Steam] User Didn't Specify connection to send to!");
-        
+
         var remoteID = connTarget.GetRemoteID();
-        
+
         // Run invokes (send is for debug)
         if (remoteID != 0) OnServerSend?.Invoke(bytes, remoteID);
         else OnClientSend?.Invoke(bytes);
@@ -121,7 +107,6 @@ public partial class SteamMessageLayer : MessageLayer
             if (handle.IsAllocated)
                 handle.Free();
         }
-        
 
     }
 

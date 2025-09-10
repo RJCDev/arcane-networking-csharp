@@ -16,6 +16,8 @@ public class SteamClient
 
     public void SetLocal(HSteamNetConnection conn) => ConnectionToServer = conn;
 
+    IntPtr[] ReceivePointers = new nint[64]; // Pointers to steamworks unmanaged messages on receive
+
 
     public void StartClient(NetworkConnection connection)
     {
@@ -74,12 +76,12 @@ public class SteamClient
 
     public void PollMessages(SteamMessageLayer layer)
     {
-        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(ConnectionToServer, layer.ReceivePointers, layer.ReceivePointers.Length);
+        int msgCount = SteamNetworkingSockets.ReceiveMessagesOnConnection(ConnectionToServer, ReceivePointers, ReceivePointers.Length);
 
         for (int i = 0; i < msgCount; i++)
         {
             SteamNetworkingMessage_t netMessage =
-                Marshal.PtrToStructure<SteamNetworkingMessage_t>(layer.ReceivePointers[i]);
+                Marshal.PtrToStructure<SteamNetworkingMessage_t>(ReceivePointers[i]);
                 
             try
             {
@@ -99,7 +101,7 @@ public class SteamClient
             }
             finally
             {
-                SteamNetworkingMessage_t.Release(layer.ReceivePointers[i]); // Tell Steam to free the buffer
+                SteamNetworkingMessage_t.Release(ReceivePointers[i]); // Tell Steam to free the buffer
             }
         }
     }

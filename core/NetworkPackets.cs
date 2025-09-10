@@ -27,7 +27,7 @@ namespace ArcaneNetworking
     public struct HandshakePacket : Packet
     {
         [Key(0)] // Your Local ID
-        public uint ID;
+        public int netID;
 
         [Key(1)] // Authentication Payload
         public ArraySegment<byte> AuthPayload;
@@ -65,13 +65,13 @@ namespace ArcaneNetworking
     public struct SpawnNodePacket : Packet
     {
         [Key(0)]
-        public uint NetID;
+        public uint netID;
 
         [Key(1)]
         public uint prefabID;
 
         [Key(2)]
-        public uint ownerID;
+        public int ownerID;
 
         [Key(3)]
         public float[] position;
@@ -88,7 +88,7 @@ namespace ArcaneNetworking
     public struct ModifyNodePacket : Packet
     {
         [Key(0)]
-        public uint NetID;
+        public uint netID;
 
         [Key(1)]
         public bool enabled;

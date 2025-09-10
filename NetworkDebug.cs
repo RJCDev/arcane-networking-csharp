@@ -25,9 +25,9 @@ public partial class NetworkDebug : Control
 
     public static void OnClientPacketOut(ArraySegment<byte> data) => bytesUpCounter.Enqueue(data.Count);
 
-    public static void OnServerPacketIn(ArraySegment<byte> data, uint conn) => bytesDownCounter.Enqueue(data.Count);
+    public static void OnServerPacketIn(ArraySegment<byte> data, int conn) => bytesDownCounter.Enqueue(data.Count);
 
-    public static void OnServerPacketOut(ArraySegment<byte> data, uint conn) => bytesUpCounter.Enqueue(data.Count);
+    public static void OnServerPacketOut(ArraySegment<byte> data, int conn) => bytesUpCounter.Enqueue(data.Count);
 
     public override void _Ready()
     {

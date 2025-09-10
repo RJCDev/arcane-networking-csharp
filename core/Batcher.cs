@@ -18,7 +18,7 @@ public class Batcher
     /// </summary>
     public void Flush(out ArraySegment<byte> batchBytes)
     {
-        byte count = (byte)Mathf.Min(byte.MaxValue - 1, QueuedMessages.Count);
+        byte count = (byte)Mathf.Min(16, QueuedMessages.Count); // 16 Max Messages
 
         CurrBatch.Write(count); // Write batch Header (Message Count)
         

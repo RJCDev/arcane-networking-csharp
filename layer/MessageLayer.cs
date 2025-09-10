@@ -16,11 +16,19 @@ namespace ArcaneNetworking
     [Icon("res://addons/arcane-networking/icon/network_layer.svg")]
     public abstract partial class MessageLayer : Node
     {
+        [Export] public ushort Port;
+
         public static MessageLayer Active;
 
+        /// <summary>Called when this client connection has throws an error, provided with a message.</summary>
+        public Action<byte, string> OnClientError;
+        
+        /// <summary>Called when a connection has throws an error, provided with a message.</summary>
+        public Action<int, byte, string> OnServerError;
         /// ON CLIENT ->
         /// <summary>Called by client MessageLayer when the client is connected to the server.</summary>
         public Action OnClientConnect;
+
 
         /// <summary>Called by client MessageLayer when the client connected to the server.</summary>
         public Action OnClientDisconnect;
@@ -36,13 +44,13 @@ namespace ArcaneNetworking
         public Action<NetworkConnection> OnServerConnect;
 
         /// <summary>Called by server MessageLayer when a client disconnects to the server.</summary>
-        public Action<uint> OnServerDisconnect;
+        public Action<int> OnServerDisconnect;
 
         /// <summary>Called by server MessageLayer when the server sends data to a client.</summary>
-        public Action<ArraySegment<byte>, uint> OnServerSend;
+        public Action<ArraySegment<byte>, int> OnServerSend;
 
         /// <summary>Called by MessageLayer when the server receieves from a client.</summary>
-        public Action<ArraySegment<byte>, uint> OnServerReceive;
+        public Action<ArraySegment<byte>, int> OnServerReceive;
 
         public override void _Process(double delta) => NetworkTime.Process();
 
@@ -52,6 +60,7 @@ namespace ArcaneNetworking
 
         public abstract void PollClient();
         public abstract void PollServer();
+
         /// <summary>
         /// Attempts a connection with an endpoint
         /// Here is where we pass in an empty NetworkConnection to our MessageLayer to attemp to connect

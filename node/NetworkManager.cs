@@ -37,8 +37,6 @@ public partial class NetworkManager : Node
     /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
     [Export] public int MaxConnections = 4;
 
-    [Export] public int Port = 27156;
-
     /// <summary> How NetworkedObjects owned by a connection behave when the connection is disconnected</summary>
     [Export] public DisconectBehavior DisconnectBehavior = DisconectBehavior.Destroy;
 
@@ -65,10 +63,9 @@ public partial class NetworkManager : Node
     public void StartServer(bool headless = false)
     {
         Server.Start(headless);
-        if (!headless) Client.Connect("localhost");
+        if (!headless) Client.Connect("127.0.0.1");
     }
-    public void Connect(string host, int port = -1) => Client.Connect(host, port);
-    public void Connect(string host) => Client.Connect(host, -1);
+    public void Connect(string host) => Client.Connect(host);
 
     public override void _EnterTree()
     {

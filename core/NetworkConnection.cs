@@ -11,7 +11,7 @@ namespace ArcaneNetworking;
 /// <summary>
 /// A connection to a remote host that is identified by its connectionID, and its URI
 /// </summary>
-public partial class NetworkConnection(string endpoint, int port, uint id, NetworkEncryption encryption = null)
+public partial class NetworkConnection(string endpoint, ushort port, int id, NetworkEncryption encryption = null)
 {
     // If this connection is encrypted, hold the data here
     public NetworkEncryption Encryption = encryption;
@@ -24,11 +24,11 @@ public partial class NetworkConnection(string endpoint, int port, uint id, Netwo
     };
 
     // The ID of this 2 way connection
-    readonly uint remoteID = id;
-    int connectionPort = port;
+    readonly int remoteID = id;
+    ushort connectionPort = port;
     string connectionEndPoint = endpoint;
 
-    public uint localID;
+    public int localID;
 
     // The player object that is owned by this connection
     public Node playerObject = null;
@@ -36,14 +36,14 @@ public partial class NetworkConnection(string endpoint, int port, uint id, Netwo
     // This will be true if a client is accepted by the server
     public bool isAuthenticated = false;
 
-    public bool isLocalConnection = false;
+    public bool isLocalConnection => connectionEndPoint == "127.0.0.1" || connectionEndPoint == "localhost";
 
     // pingTime is the last time we sent a ping since the game was started
     // The round trip time in ms of the network connection (populates by calling Ping())
     public ulong lastPingTime, rtt;
 
-    public int GetPort() => connectionPort;
-    public uint GetRemoteID() => remoteID;
+    public ushort GetPort() => connectionPort;
+    public int GetRemoteID() => remoteID;
     internal void SetEndPoint(string endpoint) => connectionEndPoint = endpoint;
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));

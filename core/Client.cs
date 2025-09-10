@@ -84,8 +84,6 @@ public partial class Client
     {
         GD.Print("[Client] Client Has Connected!");
 
-        NetworkManager.AmIClient = true;
-
         Send(new HandshakePacket(), Channels.Reliable);
 
         OnClientConnected?.Invoke();
@@ -171,7 +169,7 @@ public partial class Client
     /// If port is left as -1, we will not attempt to connect via a port, assumed to be DNS address
     /// The auth string can be used for the server to "Remember" the player if disconnected. On first connect this won't be needed as the server will generate it for you.
     /// </summary>
-    public static void Connect(string host, int port = -1)
+    public static void Connect(string host)
     {
         if (serverConnection != null)
         {
@@ -180,17 +178,19 @@ public partial class Client
         }
 
         // Create Connection and store it (even if it isn't valid yet, we will store data about its authentication state)
-        serverConnection = new(port == -1 ? host : host + ":" + port, 0);
-        
+        serverConnection = new(host, MessageLayer.Active.Port, 0);
+
         // Setup our MessageLayer to the server
         MessageLayer.Active.StartClient(serverConnection);    
+        
+        NetworkManager.AmIClient = true;
     }
 
     public static void Disconnect()
     {
         foreach (var netObject in NetworkedNodes)
         {
-            OnModify(new ModifyNodePacket() { NetID = netObject.Key, enabled = true, destroy = true });
+            OnModify(new ModifyNodePacket() { netID = netObject.Key, enabled = true, destroy = true });
         }
 
         MessageLayer.Active.StopClient();
@@ -211,7 +211,6 @@ public partial class Client
         }
     }
 
-
     ////////////////////////// Internal Packet Callbacks
 
     static void OnHandshake(HandshakePacket packet)
@@ -224,7 +223,7 @@ public partial class Client
         GD.Print("[Client] Client Authenticated!");
 
         serverConnection.isAuthenticated = true;
-        serverConnection.localID = packet.ID;
+        serverConnection.localID = packet.netID;
 
         OnClientAuthenticated?.Invoke();
     }
@@ -244,7 +243,7 @@ public partial class Client
         Node spawnedObject = null;
         NetworkedNode netNode = null;
 
-        if (NetworkedNodes.ContainsKey(packet.NetID)) return; // Check if we already got this packet
+        if (NetworkedNodes.ContainsKey(packet.netID)) return; // Check if we already got this packet
         else
         {
             // We are a client only, just spawn it normally
@@ -257,12 +256,12 @@ public partial class Client
 
                 // Occupy Data (it will be occupied already if we are a client and server)
                 netNode.PrefabID = packet.prefabID;
-                netNode.NetID = packet.NetID;
+                netNode.NetID = packet.netID;
                 netNode.OwnerID = packet.ownerID;
          
                 if (netNode == null)
                 {
-                    GD.PrintErr("Networked Node: " + packet.NetID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
+                    GD.PrintErr("Networked Node: " + packet.netID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
                     return;
                 }
             }
@@ -270,7 +269,7 @@ public partial class Client
             else if (!NetworkManager.AmIHeadless)
             {
                 // Grab net node from server class
-                netNode = Server.NetworkedNodes[packet.NetID];
+                netNode = Server.NetworkedNodes[packet.netID];
                 spawnedObject = netNode.Node;
             }
             
@@ -285,7 +284,7 @@ public partial class Client
                 (spawnedObject as Node3D).Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
             }
 
-            NetworkedNodes.Add(packet.NetID, netNode);
+            NetworkedNodes.Add(packet.netID, netNode);
         }
         netNode.Enabled = true; // Set Process enabled
 
@@ -307,7 +306,7 @@ public partial class Client
     public static void OnModify(ModifyNodePacket packet)
     {
 
-        if (FindNetworkedNode(packet.NetID, out NetworkedNode netObject))
+        if (FindNetworkedNode(packet.netID, out NetworkedNode netObject))
         {
             // This means its visibility can be changed
             if (netObject.Node.HasMethod("show"))
