@@ -50,13 +50,30 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
     public void SendRaw(NetworkWriter writer, Channels channel)
     {
+        if (!isAuthenticated) return;
+
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
         Batchers[channel].Push(writer);
     }
 
+    public void SendHandshake(int netID = 0)
+    {
+        // if (!isAuthenticated) return; // Bypass
+
+        NetworkWriter writer = NetworkPool.GetWriter();
+
+        writer.Write<byte>(1); // 1 Message for the header
+        NetworkPacker.Pack(new HandshakePacket() { netID = netID }, writer);
+
+        MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send
+
+        NetworkPool.Recycle(writer);
+    }
     public void Send<T>(T packet, Channels channel)
     {
+        if (!isAuthenticated) return;
+        
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
         //GD.Print("[NetworkConnection] GetWriter(): " + packet.GetType());

@@ -17,21 +17,18 @@ public static class NetworkPacker
     
     public static bool ReadHeader(NetworkReader reader, out byte type, out int hash)
     {
-        try
+        bool success = true;
+        // Attempt to read packet message
+        if (!reader.Read(out type)) success = false;
+        if (!reader.Read(out hash)) success = false;
+        
+        if (!success)
         {
-            // Attempt to read packet message
-            reader.Read(out type);
-            reader.Read(out hash);
-            return true;
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr("Error unpacking Packet! Header was Corrupted!");
-            GD.PrintErr(e.Message);
-            type = byte.MaxValue;
-            hash = int.MinValue;
+            type = default;
+            hash = default;
             return false;
         }
+        else return true;
 
     }
 

@@ -78,7 +78,7 @@ public partial class Server : Node
     /// </summary>
     public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable)
     {
-        GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetRemoteID());
+        //GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetRemoteID());
 
         conn.Send(packet, channel);
     }
@@ -115,12 +115,14 @@ public partial class Server : Node
     }
     static void OnServerReceive(ArraySegment<byte> bytes, int connID)
     {
-       //GD.Print("[Server] Recieve Length: " + bytes.Array.Length);
+       
 
         var reader = NetworkPool.GetReader(bytes);
 
         reader.ReadByte(out byte batchMsgCount); // Get batched message count
-        
+
+        //GD.Print("[Server] Recieve Length: bytes " + + bytes.Count + " " + batchMsgCount);
+
         for (int i = 0; i < batchMsgCount; i++)
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
@@ -218,6 +220,8 @@ public partial class Server : Node
                 // Send all batched messages
                 while (batcher.Value.HasData())
                 {
+                    if (!conn.Value.isAuthenticated) break;
+
                     batcher.Value.Flush(out ArraySegment<byte> batch);
                     MessageLayer.Active.SendTo(batch, batcher.Key, conn.Value);
                 }
@@ -238,14 +242,14 @@ public partial class Server : Node
         }
 
         conn.isAuthenticated = true;
+        AddClient(conn); // We are authenticated, add them to the game
 
         OnServerAuthenticate?.Invoke(conn);
 
-        Send(new HandshakePacket() { netID = fromConnection }, conn, Channels.Reliable);
+        conn.SendHandshake(fromConnection);
 
         GD.Print("[Server] Client Authenticated!");
 
-        AddClient(conn); // We are authenticated, add them to the game
 
     }
 

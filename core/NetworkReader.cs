@@ -42,13 +42,14 @@ namespace ArcaneNetworking
         /// </summary>
         public bool Read<T>(out T read, Type concreteType = default)
         {
+
+            var segment = new ReadOnlyMemory<byte>(Buffer, Position, Buffer.Length - Position);
+            var reader = new MessagePackReader(segment);
+
+            object msg;
+
             try
             {
-                var segment = new ReadOnlyMemory<byte>(Buffer, Position, Buffer.Length - Position);
-                var reader = new MessagePackReader(segment);
-
-                object msg;
-
                 // Read in the type
                 if (concreteType != default)
                 {
@@ -64,13 +65,13 @@ namespace ArcaneNetworking
 
                 return true;
             }
-            catch (MessagePackSerializationException e)
+            catch
             {
                 GD.PrintErr("Couldn't deserialize type from reader: " + typeof(T).ToString());
-                GD.PrintErr(e.Message);
                 read = default;
                 return false;
             }
+           
 
         }
 

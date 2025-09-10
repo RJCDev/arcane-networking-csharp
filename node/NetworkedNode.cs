@@ -122,7 +122,7 @@ public partial class NetworkedNode : Node
         {
             if (NetworkedComponents.Contains(netComponent)) return; // Don't add twice!
 
-            GD.Print("[Networked Node] Networked Node: " + child.Name + " Was Registered In Networked Node: " + NetID);
+            //GD.Print("[Networked Node] Networked Node: " + child.Name + " Was Registered In Networked Node: " + NetID);
             netComponent.NetworkedNode = this;
             NetworkedComponents.Insert(child.GetIndex(), netComponent);
         }

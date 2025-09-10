@@ -21,7 +21,7 @@ public class Batcher
         byte count = (byte)Mathf.Min(16, QueuedMessages.Count); // 16 Max Messages
 
         CurrBatch.Write(count); // Write batch Header (Message Count)
-        
+
         for (int i = 0; i < count; i++)
         {
             NetworkWriter msg = QueuedMessages.Dequeue();
@@ -30,9 +30,10 @@ public class Batcher
             CurrBatch.WriteBytes(seg); // Write the message
 
             NetworkPool.Recycle(msg); // We can now get rid of this NetworkWriter that originally wrote the packet
+            
         }
         
-        //GD.Print("[Network Batcher] Flushed " + count + " Messages!");
+        
         batchBytes = CurrBatch.ToArraySegment(); // Flush out
 
         CurrBatch.Reset(); // Reset

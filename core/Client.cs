@@ -84,7 +84,7 @@ public partial class Client
     {
         GD.Print("[Client] Client Has Connected!");
 
-        Send(new HandshakePacket(), Channels.Reliable);
+        serverConnection.SendHandshake();
 
         OnClientConnected?.Invoke();
     }
@@ -103,12 +103,10 @@ public partial class Client
     /// </summary>
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
-
         var reader = NetworkPool.GetReader(bytes);
 
         reader.ReadByte(out byte batchMsgCount); // Get batched message count
-       // GD.Print("[Client] Recieve Length: " + batchMsgCount);
-
+        
         for (int i = 0; i < batchMsgCount; i++)
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
@@ -119,11 +117,10 @@ public partial class Client
                 {
                     case 0: // Regular Packet
 
-                        //GD.Print("[Client] Regular Packet ");
+                        
 
                         if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                         {
-                            //GD.Print("[Client] Packet Valid! " + hash);
                             PacketInvoke(hash, packet);
                         }
 
@@ -140,7 +137,7 @@ public partial class Client
                             {
                                 // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
 
-                                //GD.PrintErr("[Client] Unpacking RPC..");
+                                //GD.Print("[Client] Unpacking RPC From .." + NetworkedNodes[callerNetID].OwnerID);
 
                                 unpack(reader, NetworkedNodes[callerNetID].NetworkedComponents[callerCompIndex]);
                             }
@@ -204,6 +201,8 @@ public partial class Client
             // Send all batched messages
             while (batcher.Value.HasData())
             {
+                if (!serverConnection.isAuthenticated) break;
+
                 batcher.Value.Flush(out ArraySegment<byte> batch);
                 MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
             }
@@ -243,13 +242,20 @@ public partial class Client
         Node spawnedObject = null;
         NetworkedNode netNode = null;
 
-        if (NetworkedNodes.ContainsKey(packet.netID)) return; // Check if we already got this packet
+        if (NetworkedNodes.ContainsKey(packet.netID))
+        {
+            GD.Print("[Client] We Already Have Networked Node: " + packet.netID);
+            return; // Check if we already got this packet
+        }
         else
         {
             // We are a client only, just spawn it normally
             if (NetworkManager.AmIClientOnly)
             {
+
                 spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
+
+                GD.Print("[Client] Spawning Networked Node: " + packet.netID + " | Prefab ID: " + (int)packet.prefabID);
 
                 // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
                 netNode = spawnedObject.FindChild<NetworkedNode>();

@@ -19,8 +19,8 @@ namespace kcp2k
         //     recv buffer default: 786896 (771 KB)
         //     send buffer default:  9216 (9 KB)
         //     max configurable: ~7 MB
-        [Export] public int RecvBufferSize = 1024 * 1024 * 7;
-        [Export] public int SendBufferSize = 1024 * 9;
+        [Export] public int RecvBufferSize = 786896;
+        [Export] public int SendBufferSize = 9216;
 
         // kcp configuration ///////////////////////////////////////////////////
         // configurable MTU in case kcp sits on top of other abstractions like
@@ -34,7 +34,7 @@ namespace kcp2k
         // KCP internal update interval. 100ms is KCP default, but a lower
         // interval is recommended to minimize latency and to scale to more
         // networked entities.
-        [Export] public uint Interval = 10;
+        [Export] public uint Interval = 50;
 
         // KCP fastresend parameter. Faster resend for the cost of higher
         // bandwidth.
@@ -67,8 +67,8 @@ namespace kcp2k
         // makes it easy to define "new KcpConfig(DualMode=false)" etc.
         public KcpConfig(
             bool DualMode = true,
-            int RecvBufferSize = 1024 * 1024 * 7,
-            int SendBufferSize = 1024 * 9,
+            int RecvBufferSize = 786896,
+            int SendBufferSize = 9216,
             int Mtu = Kcp.MTU_DEF,
             bool NoDelay = true,
             uint Interval = 10,

@@ -25,7 +25,7 @@ namespace ArcaneNetworking
                 {
                     // Create NetworkConnection
                     var endpoint = KCPServer.GetClientEndPoint(id);
-
+                    GD.Print("[KCP] Client Connected! " + endpoint.Address.ToString() + " ID: " + id);
                     NetworkConnection incoming = new(endpoint.Address.ToString(), (ushort)endpoint.Port, id);
                     OnServerConnect?.Invoke(incoming);
                 },

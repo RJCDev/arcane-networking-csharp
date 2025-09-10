@@ -5,7 +5,7 @@ using System.Buffers;
 
 namespace ArcaneNetworking
 {
-    public class NetworkWriter
+    public class NetworkWriter : IBufferWriter<byte>
     {
         internal byte[] buffer;
         public int Position { get; private set; }
@@ -20,13 +20,22 @@ namespace ArcaneNetworking
             Position = 0;
         }
 
-        internal void EnsureCapacity(int sizeBytes)
+        internal void EnsureCapacity(int size)
         {
-            if (buffer.Length >= sizeBytes)
-                return;
-            
-            int newSize = Math.Max(sizeBytes, buffer.Length * 2);
-            Array.Resize(ref buffer, newSize);
+            if (size > MaxAllocationBytes)
+            {
+                GD.PrintErr("[Network Writer] Write Failed! Buffer Too Large: " + size + "b! Write Failed!");
+                throw new InvalidOperationException("NetworkWriter exceeded MaxAllocationBytes");
+            }
+
+            if (size > buffer.Length)
+            {
+                int newSize = buffer.Length;
+                while (newSize < size)
+                    newSize *= 2;
+
+                Array.Resize(ref buffer, newSize);
+            }
 
         }
 
@@ -46,26 +55,26 @@ namespace ArcaneNetworking
         /// </summary>
         public void Write<T>(T obj)
         {
-            var bufferWriter = new ArrayBufferWriter<byte>();
-            var mpWriter = new MessagePackWriter(bufferWriter);
-
+            var mpWriter = new MessagePackWriter(this); // this implements IBufferWriter
             MessagePackSerializer.Serialize(ref mpWriter, obj, MessagePackSerializer.DefaultOptions);
-
             mpWriter.Flush();
 
-            ReadOnlySpan<byte> written = bufferWriter.WrittenSpan;
+        }
+        public void Advance(int count)
+        {
+            Position += count;
+        }
 
-            if (Position + written.Length > MaxAllocationBytes)
-            {
-                GD.PrintErr("[Network Writer] Write Failed! Buffer Too Large: " + (Position + written.Length) + "b! Write Failed!");
-                return;
-            }
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            EnsureCapacity(Position + sizeHint);
+            return buffer.AsMemory(Position);
+        }
 
-            // Ensure your buffer is large enough
-            EnsureCapacity(Position + written.Length);
-
-            written.CopyTo(buffer.AsSpan(Position));
-            Position += written.Length;
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            EnsureCapacity(Position + sizeHint);
+            return buffer.AsSpan(Position);
         }
 
         public ArraySegment<byte> ToArraySegment() =>
