@@ -76,19 +76,27 @@ public partial class Server : Node
     /// <summary>
     /// Send Logic for simple packets
     /// </summary>
-    public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable)
+    public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable, bool instant = false)
     {
         //GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetRemoteID());
 
-        conn.Send(packet, channel);
+        conn.Send(packet, channel, instant);
     }
 
     /// <summary>
     /// Sends to all clients connected
     /// </summary>
-    public static void SendAll<T>(T packet, Channels channel = Channels.Reliable)
+    public static void SendAll<T>(T packet, Channels channel = Channels.Reliable, bool instant = false)
     {
-        foreach (var client in Connections.Values) Send(packet, client, channel);
+        foreach (var client in Connections)
+            Send(packet, client.Value, channel, instant);
+    }
+    
+    public static void SendAllExcept<T>(T packet, Channels channel = Channels.Reliable, bool instant = false, params int[] ignore)
+    {
+        foreach (var client in Connections)
+            if (!ignore.Contains(client.Key))
+                Send(packet, client.Value, channel, instant);
     }
 
     static void OnServerClientConnect(NetworkConnection connection)
@@ -97,7 +105,7 @@ public partial class Server : Node
 
         // Filter local connection
         if (connection.isLocalConnection) LocalConnection = connection;
-        
+
         Connections.Add(connection.GetRemoteID(), connection);
 
         OnServerConnect?.Invoke(connection);

@@ -74,7 +74,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
         NetworkPool.Recycle(writer);
     }
-    public void Send<T>(T packet, Channels channel)
+    public void Send<T>(T packet, Channels channel, bool instant = false)
     {
         if (!isAuthenticated) return;
         
@@ -87,7 +87,10 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
         try
         {
             NetworkPacker.Pack(packet, writer);
-            Batchers[channel].Push(writer);
+
+            if (!instant) Batchers[channel].Push(writer);
+            else MessageLayer.Active.SendTo(writer.ToArraySegment(), channel, this);
+            
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
         catch (Exception e)

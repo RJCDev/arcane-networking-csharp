@@ -79,5 +79,6 @@ namespace ArcaneNetworking
 
         public ArraySegment<byte> ToArraySegment() =>
             new ArraySegment<byte>(buffer, 0, Position);
+
     }
 }

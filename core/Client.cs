@@ -72,11 +72,11 @@ public partial class Client
     /// <summary>
     /// Send Logic for simple packets
     /// </summary>
-    public static void Send<T>(T packet, Channels channel = Channels.Reliable)
+    public static void Send<T>(T packet, Channels channel = Channels.Reliable, bool instant = false)
     {
-        GD.Print("[Client] Send: " + packet.GetType());
+        //GD.Print("[Client] Send: " + packet.GetType());
 
-        serverConnection.Send(packet, channel);
+        serverConnection.Send(packet, channel, instant);
 
     }
 
@@ -202,6 +202,7 @@ public partial class Client
                     if (!serverConnection.isAuthenticated) break;
 
                     batcher.Value.Flush(out ArraySegment<byte> batch);
+
                     MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
                 }
             }

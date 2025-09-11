@@ -61,8 +61,8 @@ public partial class NetworkDebug : Control
             bytesUpAverage /= bytesUpSamples;
         }
 
-        KbpsDwn = bytesDownAverage / 1024.0;
-        KbpsUp = bytesUpAverage / 1024.0;
+        KbpsDwn = bytesDownAverage * 8 / 1000.0; // * 8 For 8 bits in one byte
+        KbpsUp = bytesUpAverage * 8 / 1000.0; // * 8 For 8 bits in one byte
 
         timeCounter = 0.0;
 

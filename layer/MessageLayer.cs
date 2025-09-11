@@ -19,7 +19,7 @@ namespace ArcaneNetworking
         [Export] public ushort Port;
 
         public static MessageLayer Active;
-
+    
         /// <summary>Called when this client connection has throws an error, provided with a message.</summary>
         public Action<byte, string> OnClientError;
         

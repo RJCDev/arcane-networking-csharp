@@ -29,20 +29,32 @@ public class Batcher
         while (QueuedMessages.Count > 0)
         {
             // Get bytes counter
-            bytesCounted += QueuedMessages.Peek().ToArraySegment().Count;
+            int msgBytes = QueuedMessages.Peek().ToArraySegment().Count;
+            int newBytesCounted = bytesCounted + msgBytes;
 
-            if (bytesCounted >= 1300) break; // Time to send batch
+            if (msgBytes >= 1300)
+            {
+                GD.PushWarning("[Batcher] Message Size Excedes MTU!");
+                QueuedMessages.Dequeue();
+                continue; // Skip message
+            }
+            else if (newBytesCounted >= 1300)
+            {
+                break; // Send the Batch;
+            }
+
+            bytesCounted += msgBytes; // Add bytes its valid
 
             NetworkWriter msg = QueuedMessages.Dequeue();
-            var seg = msg.ToArraySegment();
 
-            CurrBatch.WriteBytes(seg); // Write the message
-
+            CurrBatch.WriteBytes(msg.ToArraySegment()); // Write the message
+            
             NetworkPool.Recycle(msg); // We can now get rid of this NetworkWriter that originally wrote the packet
         }
-
-
         batchBytes = CurrBatch.ToArraySegment(); // Flush out
+
+        if (batchBytes.Count == 0)
+            throw new Exception("[Batcher] Batch has ZERO BYTES");
 
         CurrBatch.Reset(); // Reset
 

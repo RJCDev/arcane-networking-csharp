@@ -10,8 +10,7 @@ public enum DisconectBehavior
     Unspawn
 }
 
-[GlobalClass]
-[Icon("res://addons/arcane-networking/icon/network_manager.svg")]
+[GlobalClass, Icon("uid://6quf6arr2n8d")]
 public partial class NetworkManager : Node
 {
     public static NetworkManager manager;

@@ -63,8 +63,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Rot
             if (SyncRotation)
             {
-                Vector3 compressed = CompQuat(TransformNode.Quaternion); // Compress to fit into Vector3
-
                 if (Current.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
                 if (Current.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
                 if (Current.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
