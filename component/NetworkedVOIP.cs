@@ -20,6 +20,7 @@ public partial class NetworkedVOIP : NetworkedComponent
 {
 	//VOIP
 	float[] sendBuffer;
+	Vector2[] recieveBuffer;
 	[Export] string pushToTalkAction = "voipPtt";
 	[Export] AudioStreamPlayer audioInput;
 	[Export] Node audioOutput;
@@ -50,7 +51,8 @@ public partial class NetworkedVOIP : NetworkedComponent
 		
 
 		mixRate = (int)ProjectSettings.GetSetting("audio/driver/mix_rate");
-		sendBuffer = [512];
+		sendBuffer = new float[512 * 2];
+		recieveBuffer = new Vector2[512];
 
 		if (NetworkManager.AmIClient) Client.RegisterPacketHandler<VoIPPacket>(OnReceiveClient);
 		if (NetworkManager.AmIServer) Server.RegisterPacketHandler<VoIPPacket>(OnReceiveServer);
@@ -103,12 +105,17 @@ public partial class NetworkedVOIP : NetworkedComponent
 
 	void OnReceiveClient(VoIPPacket packet)
 	{
+		Array.Resize(ref recieveBuffer, packet.Buffer.Count / 2);
+
 		for (int i = 0; i < packet.Buffer.Count / 2; i++)
 		{
 			float x = packet.Buffer[i * 2];
 			float y = packet.Buffer[i * 2 + 1];
-			playback.PushFrame(new Vector2(x, y));
+
+			recieveBuffer[i] = new Vector2(x, y);
+
 		}
+		playback.PushBuffer(recieveBuffer);
 	}
 	void OnReceiveServer(VoIPPacket packet, int conn)
 	{
