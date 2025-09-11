@@ -31,6 +31,8 @@ public partial class NetworkedVOIP : NetworkedComponent
 
 	int mixRate;
 
+	int maxFrames => (int)(mixRate * 0.1f);
+	int targetFrames => (int)(mixRate * 0.05f);
 	public override void _Ready()
 	{
 		audioInput.Play();
@@ -44,14 +46,16 @@ public partial class NetworkedVOIP : NetworkedComponent
 		{
 			globalPlayer.Play();
 			playback = (AudioStreamGeneratorPlayback)globalPlayer.GetStreamPlayback();
-		} 
+		}
 
 		int idx = AudioServer.GetBusIndex("Record");
 		record = (AudioEffectCapture)AudioServer.GetBusEffect(idx, 0);
-		
+
 
 		mixRate = (int)ProjectSettings.GetSetting("audio/driver/mix_rate");
-		sendBuffer = [512];
+
+		sendBuffer = new float[512 * 2];
+		recieveBuffer = new(512);
 
 		if (NetworkManager.AmIClient) Client.RegisterPacketHandler<VoIPPacket>(OnReceiveClient);
 		if (NetworkManager.AmIServer) Server.RegisterPacketHandler<VoIPPacket>(OnReceiveServer);
@@ -60,7 +64,7 @@ public partial class NetworkedVOIP : NetworkedComponent
 
 	public override void _Process(double delta)
 	{
-		if (recieveBuffer.Count > 512) playback.PushFrame(recieveBuffer.Dequeue());
+		if (recieveBuffer.Count > mixRate * 0.05f) PlayAudio();
 
 		if (!NetworkedNode.AmIOwner) return;
 
@@ -69,6 +73,27 @@ public partial class NetworkedVOIP : NetworkedComponent
 			Record();
 		}
 		else record.ClearBuffer();
+	}
+
+	private void PlayAudio()
+	{
+		if (recieveBuffer.Count > maxFrames)
+		{
+			GD.PushWarning("Audio queue overflow – dropping samples");
+			while (recieveBuffer.Count > targetFrames)
+				recieveBuffer.Dequeue();
+		}
+		
+		// How many frames can we feed into generator right now?
+		int framesWanted = playback.GetFramesAvailable();
+		if (framesWanted > 0 && recieveBuffer.Count >= framesWanted)
+		{
+			Vector2[] chunk = new Vector2[framesWanted];
+			for (int i = 0; i < framesWanted; i++)
+				chunk[i] = recieveBuffer.Dequeue();
+			playback.PushBuffer(chunk);
+		}
+
 	}
 
 	private void Record()
@@ -108,7 +133,7 @@ public partial class NetworkedVOIP : NetworkedComponent
 	{
 		// Push into buffer
 		for (int i = 0; i < packet.Buffer.Count / 2; i++)
-			recieveBuffer.Add(new Vector2(packet.Buffer[i * 2], packet.Buffer[i * 2 + 1]));
+			recieveBuffer.Enqueue(new Vector2(packet.Buffer[i * 2], packet.Buffer[i * 2 + 1]));
 		
 	}
 	void OnReceiveServer(VoIPPacket packet, int conn)
