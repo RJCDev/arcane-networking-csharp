@@ -5,6 +5,22 @@ using Godot.Collections;
 namespace ArcaneNetworking;
 
 /// <summary>
+/// This interface is an optional interface for nodes that have networked nodes under them to use.
+/// This will allow access to when the node is instantiated on the server, disabled, or destroyed
+/// </summary>
+public interface INetworkLogger
+{
+    /// <summary>
+    /// Called right after node is spawned on the server
+    /// </summary>
+    public void _NetworkReady();
+
+    /// <summary>
+    /// Called just before node is destroyed on the server
+    /// </summary>
+    public void _NetworkDestroy();
+}
+/// <summary>
 /// A node that is syncronized across all clients. 
 /// It can have child components that send RPC calls over the network, and is referenced internaly by its guid.
 /// By itself, this node does nothing, it requires child components to send data.

@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace ArcaneNetworking;
@@ -15,6 +16,7 @@ public class NetworkTime
         // Regular packets
         if (msElapsed > 1.0f / NetworkManager.manager.NetworkRate * 1000.0f)
         {
+            
             if (NetworkManager.AmIClient)
             {
                 MessageLayer.Active.PollClient();
@@ -25,6 +27,7 @@ public class NetworkTime
                 MessageLayer.Active.PollServer();
                 Server.Process();
             }
+
 
             lastProcessTime = Time.GetTicksMsec();
         }

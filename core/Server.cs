@@ -116,14 +116,11 @@ public partial class Server : Node
     static void OnServerReceive(ArraySegment<byte> bytes, int connID)
     {
        
-
         var reader = NetworkPool.GetReader(bytes);
 
-        reader.ReadByte(out byte batchMsgCount); // Get batched message count
-
         //GD.Print("[Server] Recieve Length: bytes " + + bytes.Count + " " + batchMsgCount);
-
-        for (int i = 0; i < batchMsgCount; i++)
+        
+        while(reader.RemainingBytes > 0) // Read until end
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
             {
@@ -217,13 +214,20 @@ public partial class Server : Node
         {
             foreach (var batcher in conn.Value.Batchers)
             {
-                // Send all batched messages
-                while (batcher.Value.HasData())
+                try
                 {
-                    if (!conn.Value.isAuthenticated) break;
+                    // Send all batched messages
+                    while (batcher.Value.HasData())
+                    {
+                        if (!conn.Value.isAuthenticated) break;
 
-                    batcher.Value.Flush(out ArraySegment<byte> batch);
-                    MessageLayer.Active.SendTo(batch, batcher.Key, conn.Value);
+                        batcher.Value.Flush(out ArraySegment<byte> batch);
+                        MessageLayer.Active.SendTo(batch, batcher.Key, conn.Value);
+                    }
+                }
+                catch (Exception e)
+                {
+                    GD.PrintErr(e.Message);
                 }
             }
         }
@@ -309,7 +313,11 @@ public partial class Server : Node
             {
                 (spawnedObject as Node3D).Position = position;
                 (spawnedObject as Node3D).GlobalBasis = basis;
-            }      
+            }
+
+            // Check if we should send logger functions
+            if (spawnedObject is INetworkLogger logger)
+                logger._NetworkReady();
         }
         
         NetworkedNodes.Add(netNode.NetID, netNode);
@@ -328,10 +336,10 @@ public partial class Server : Node
 
         GD.Print("[Server] Spawned Networked Node: " + netNode.NetID);
 
-        OnServerSpawn?.Invoke(netNode);
-
         // Relay to Clients
         SendAll(packet, Channels.Reliable);
+
+        OnServerSpawn?.Invoke(netNode);
 
         return spawnedObject;
     }
@@ -348,6 +356,10 @@ public partial class Server : Node
         if (destroy)
         {
             NetworkedNodes.Remove(netNode.NetID);
+
+            // Check if we should send logger functions
+            if (netNode.Node is INetworkLogger logger)
+                logger._NetworkDestroy();
 
             // Will cleanup components as well
             netNode.Node.QueueFree();
@@ -370,17 +382,18 @@ public partial class Server : Node
     /// </summary>
     public static void AddClient(NetworkConnection connection)
     {
-        // Tell them to spawn all net objects that we currenlty have on their client
-        foreach (var node in NetworkedNodes)
+        foreach (var netNode in NetworkedNodes)
         {
+            Node3D node3D = netNode.Value.Node is Node3D ? netNode.Value.Node as Node3D : null;
+
             SpawnNodePacket packet = new()
             {
-                netID = node.Value.NetID,
-                prefabID = node.Value.PrefabID,
-                position = [0, 0, 0],
-                rotation = [0, 0, 0, 1],
-                scale = [1, 1, 1],
-                ownerID = node.Value.OwnerID
+                netID = netNode.Value.NetID,
+                prefabID = netNode.Value.PrefabID,
+                position = node3D != null ? [node3D.GlobalPosition.X, node3D.GlobalPosition.Y, node3D.GlobalPosition.Z] : [0,0,0],
+                rotation = node3D != null ? [node3D.Quaternion.X, node3D.Quaternion.Y, node3D.Quaternion.Z, node3D.Quaternion.W] : [0,0,0,1],
+                scale = node3D != null ? [node3D.Scale.X, node3D.Scale.Y, node3D.Scale.Z] : [0,0,0],
+                ownerID = netNode.Value.OwnerID
 
             };
 

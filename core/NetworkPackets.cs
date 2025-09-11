@@ -81,6 +81,7 @@ namespace ArcaneNetworking
 
         [Key(5)]
         public float[] scale;
+        
 
     }
 

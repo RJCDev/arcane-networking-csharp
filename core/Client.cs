@@ -104,10 +104,8 @@ public partial class Client
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
         var reader = NetworkPool.GetReader(bytes);
-
-        reader.ReadByte(out byte batchMsgCount); // Get batched message count
         
-        for (int i = 0; i < batchMsgCount; i++)
+        while (reader.RemainingBytes > 0) // Read until end
         {
             if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
             {
@@ -116,8 +114,6 @@ public partial class Client
                 switch (type)
                 {
                     case 0: // Regular Packet
-
-                        
 
                         if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                         {
@@ -198,13 +194,20 @@ public partial class Client
     {
         foreach (var batcher in serverConnection.Batchers)
         {
-            // Send all batched messages
-            while (batcher.Value.HasData())
+            try
             {
-                if (!serverConnection.isAuthenticated) break;
+                // Send all batched messages
+                while (batcher.Value.HasData())
+                {
+                    if (!serverConnection.isAuthenticated) break;
 
-                batcher.Value.Flush(out ArraySegment<byte> batch);
-                MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
+                    batcher.Value.Flush(out ArraySegment<byte> batch);
+                    MessageLayer.Active.SendTo(batch, batcher.Key, serverConnection);
+                }
+            }
+            catch (Exception e)
+            {
+                GD.PrintErr(e.Message);
             }
                 
         }
@@ -264,7 +267,7 @@ public partial class Client
                 netNode.PrefabID = packet.prefabID;
                 netNode.NetID = packet.netID;
                 netNode.OwnerID = packet.ownerID;
-         
+
                 if (netNode == null)
                 {
                     GD.PrintErr("Networked Node: " + packet.netID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
@@ -278,16 +281,17 @@ public partial class Client
                 netNode = Server.NetworkedNodes[packet.netID];
                 spawnedObject = netNode.Node;
             }
-            
+
             // Adds to the current loaded world
             NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
 
             // Set Transform
-            if (spawnedObject is Node3D)
+            if (spawnedObject is Node3D spawned3D)
             {
-                (spawnedObject as Node3D).Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
-                (spawnedObject as Node3D).Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
-                (spawnedObject as Node3D).Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
+                GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
+                spawned3D.Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
+                spawned3D.Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
+                spawned3D.Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
             }
 
             NetworkedNodes.Add(packet.netID, netNode);
@@ -299,10 +303,14 @@ public partial class Client
             serverConnection.playerObject = spawnedObject; // Set your player object if its yours
             serverConnection.playerObject.Name = " [Conn ID: " + serverConnection.localID + "]";
         }
-        
-        OnClientSpawn?.Invoke(netNode);
 
         GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
+
+        OnClientSpawn?.Invoke(netNode);
+
+        // Check if we should send logger functions
+        if (spawnedObject is INetworkLogger logger)
+            logger._NetworkReady();
 
     }
 
@@ -320,6 +328,10 @@ public partial class Client
 
             if (packet.destroy)
             {
+                 // Check if we should send logger functions
+                if (netObject.Node is INetworkLogger logger)
+                    logger._NetworkDestroy();
+
                 // Remove from tree if we want to remove this NetworkedObject (keep reference in list though)
                 netObject.Node.GetParent().RemoveChild(netObject.Node);
             }

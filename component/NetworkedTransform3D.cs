@@ -9,7 +9,7 @@ namespace ArcaneNetworking;
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedComponent
 {
-    Node3D TransformNode;
+    [Export] Node3D TransformNode = null;
 
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition;
@@ -19,11 +19,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [ExportCategory("Interpolation And Corrections")]
     [Export] public bool LinearInterpolation = true;
    
-    public float snapShotInterval = 1f / Engine.PhysicsTicksPerSecond;
+    public float snapShotInterval = 1f / Engine.PhysicsTicksPerSecond; 
     float snapshotTimer = 0;
     float Latency => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
 
-    public TransformSnapshot Previous = new(), Current = new();
+    public TransformSnapshot Previous, Current;
 
     public override void _Ready()
     {
@@ -33,8 +33,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
         else
         {
-            // Set Defaults
-            TransformNode = NetworkedNode.Node as Node3D;
+            TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults 
+            Current = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
+            Previous = Current;
         }
 
     }
@@ -64,9 +65,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
             {
                 Vector3 compressed = CompQuat(TransformNode.Quaternion); // Compress to fit into Vector3
 
-                if (Current.Rot.X != TransformNode.Quaternion.X) { changes |= Changed.RotX; valuesChanged.Add(compressed.X); }
-                if (Current.Rot.Y != TransformNode.Quaternion.Y) { changes |= Changed.RotY; valuesChanged.Add(compressed.Y); }
-                if (Current.Rot.Z != TransformNode.Quaternion.Z) { changes |= Changed.RotZ; valuesChanged.Add(compressed.Z); }
+                if (Current.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
+                if (Current.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
+                if (Current.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
             }
 
             // Scale
@@ -104,10 +105,20 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         // Process the samples if we aren't owner
         TransformSnapshot Interp = Previous.InterpWith(Current, t);
-        TransformNode.GlobalPosition = Interp.Pos;
-        TransformNode.Quaternion = Interp.Rot;
-        TransformNode.Scale = Interp.Scale;
 
+        if (LinearInterpolation)
+        {
+            TransformNode.GlobalPosition = Interp.Pos;
+            TransformNode.Quaternion = Interp.Rot;
+            TransformNode.Scale = Interp.Scale;
+        }
+        else
+        {
+             TransformNode.GlobalPosition = Current.Pos;
+            TransformNode.Quaternion = Current.Rot;
+            TransformNode.Scale = Current.Scale;
+        }
+        
     }
 
     [Command(Channels.Unreliable)]
@@ -140,25 +151,25 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         Current.Pos = new()
         {
-            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.X,
-            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Y,
-            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Z,
+            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : Previous.Pos.X,
+            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : Previous.Pos.Y,
+            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : Previous.Pos.Z,
         };
 
-        Current.Rot = DecompQuat(new()
+        Current.Rot = Quaternion.FromEuler(new()
         {
-            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.X,
-            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.Y,
-            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.Z,
+            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : Previous.Rot.X,
+            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : Previous.Rot.Y,
+            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : Previous.Rot.Z,
         });
 
         bool updateScale = (changed & Changed.Scale) > 0;
 
         Current.Scale = new()
         {
-            X = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.X,
-            Y = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.Y,
-            Z = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.Z,
+            X = updateScale ? valuesChanged[readIndex++] : Previous.Scale.X,
+            Y = updateScale ? valuesChanged[readIndex++] : Previous.Scale.Y,
+            Z = updateScale ? valuesChanged[readIndex++] : Previous.Scale.Z,
         };
     }
 
@@ -187,7 +198,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public static Quaternion DecompQuat(Vector3 v)
     {
         float wSquared = 1f - (v.X * v.X + v.Y * v.Y + v.Z * v.Z);
-        float w = wSquared > 0f ? (float)Math.Sqrt(wSquared) : 0f;
+        float w = wSquared > 0f ? (float)Mathf.Sqrt(wSquared) : 0f;
 
         return new Quaternion(v.X, v.Y, v.Z, w);
     }
@@ -215,7 +226,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             return new()
             {
                 Pos = Pos.Lerp(other.Pos, amount),
-                Rot = Rot.Slerp(other.Rot, amount),
+                Rot = Rot.Slerpni(other.Rot, amount),
                 Scale = Scale.Lerp(other.Scale, amount)
             };
         }

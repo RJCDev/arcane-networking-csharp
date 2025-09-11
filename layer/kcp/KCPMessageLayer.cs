@@ -77,19 +77,19 @@ namespace ArcaneNetworking
             if (target == null) GD.PrintErr("[KCP] User Didn't Specify connection to send to!");
 
             var remoteID = target.GetRemoteID();
-            
+
             // Run invokes
             if (remoteID != 0) // Send as server
             {
-                KCPServer.Send(remoteID, bytes, ToKCPChannel(channel));
-
                 OnServerSend?.Invoke(bytes, remoteID);
+
+                KCPServer.Send(remoteID, bytes, ToKCPChannel(channel));
             }
             else // Send as client (use authentication to see if we should send the first packet through the raw socket)
             {
-                KCPClient.Send(bytes, ToKCPChannel(channel));
-
                 OnClientSend?.Invoke(bytes);
+
+                KCPClient.Send(bytes, ToKCPChannel(channel));
             }
 
         }

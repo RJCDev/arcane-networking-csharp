@@ -6,10 +6,12 @@ namespace ArcaneNetworking
 {
     public class NetworkReader
     {
-        internal byte[] Buffer;
+        internal byte[] buffer;
         public int Position { get; private set; }
 
         public int MaxAllocationBytes = 65535;
+
+        public int RemainingBytes => buffer.Length - Position;
 
         public NetworkReader(ArraySegment<byte> bytesIn)
         {
@@ -17,7 +19,7 @@ namespace ArcaneNetworking
         }
         public NetworkReader()
         {
-            Buffer = new byte[MaxAllocationBytes]; // Only allocate once
+            buffer = new byte[MaxAllocationBytes]; // Only allocate once
             Reset();
         }
 
@@ -25,9 +27,9 @@ namespace ArcaneNetworking
         {          
             if (bytes.Count > MaxAllocationBytes)
                 throw new InvalidOperationException(
-                    $"Incoming buffer too large! ({bytes.Array.Length} > {MaxAllocationBytes})");
+                    $"Incoming buffer too large! ({bytes.Count} > {MaxAllocationBytes})");
 
-            Buffer = [.. bytes];
+            buffer = [..bytes];
             Position = 0;
         }
 
@@ -43,7 +45,7 @@ namespace ArcaneNetworking
         public bool Read<T>(out T read, Type concreteType = default)
         {
 
-            var segment = new ReadOnlyMemory<byte>(Buffer, Position, Buffer.Length - Position);
+            var segment = new ReadOnlyMemory<byte>(buffer, Position, buffer.Length - Position);
             var reader = new MessagePackReader(segment);
 
             object msg;
@@ -76,7 +78,7 @@ namespace ArcaneNetworking
         }
 
         public ArraySegment<byte> ToArraySegment(int startPos = 0) =>
-            new ArraySegment<byte>(Buffer, startPos, Position);
+            new ArraySegment<byte>(buffer, startPos, Position);
 
     }
 }

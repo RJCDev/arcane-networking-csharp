@@ -24,7 +24,7 @@ public static class NetworkPool
     public static int GetReaderPoolSize()
     {
         int allBytes = 0;
-        readerPool.ToList().ForEach(x => allBytes += x.Buffer.Length);
+        readerPool.ToList().ForEach(x => allBytes += x.buffer.Length);
         return allBytes;
     } 
 

@@ -12,7 +12,7 @@ namespace ArcaneNetworking
     /// Mid Level message layer that Can be overriden to allow for different networking solutions. 
     /// For example: Steam, Generic IP:Port Connections etc.
     /// </summary>
-    /// [GlobalClass]
+    [GlobalClass]
     [Icon("res://addons/arcane-networking/icon/network_layer.svg")]
     public abstract partial class MessageLayer : Node
     {

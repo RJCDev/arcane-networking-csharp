@@ -60,13 +60,17 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     public void SendHandshake(int netID = 0)
     {
         // if (!isAuthenticated) return; // Bypass
-
         NetworkWriter writer = NetworkPool.GetWriter();
+        try
+        {
+            NetworkPacker.Pack(new HandshakePacket() { netID = netID }, writer);
 
-        writer.Write<byte>(1); // 1 Message for the header
-        NetworkPacker.Pack(new HandshakePacket() { netID = netID }, writer);
-
-        MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send
+            MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr(e.Message);
+        }
 
         NetworkPool.Recycle(writer);
     }
@@ -98,14 +102,20 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     /// Ping connection
     public void Ping(byte pingOrPong)
     {
-        var writer = NetworkPool.GetWriter();
-        writer.WriteBytes(new ArraySegment<byte>([1])); // Include msg count header
-        NetworkPacker.Pack(new PingPongPacket() { PingPong = pingOrPong }, writer); // Pack pingpong
+        try
+        {
+            var writer = NetworkPool.GetWriter();
+            NetworkPacker.Pack(new PingPongPacket() { PingPong = pingOrPong }, writer); // Pack pingpong
 
-        lastPingTime = Time.GetTicksMsec();
-        MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send instantly
+            lastPingTime = Time.GetTicksMsec();
+            MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send instantly
 
-        NetworkPool.Recycle(writer);
+            NetworkPool.Recycle(writer);
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr(e.Message);
+        }
 
     }
 }
