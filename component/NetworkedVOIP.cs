@@ -113,7 +113,7 @@ public partial class NetworkedVOIP : NetworkedComponent
 	void OnReceiveServer(VoIPPacket packet, int conn)
 	{
 		// Relay instantly
-		Server.SendAllExcept(packet, Channels.Reliable, true, NetworkedNode.OwnerID); // Send VOIP
+		Server.SendAllExcept(packet, Channels.Reliable, true, conn); // Send VOIP
 	}
 	
 
