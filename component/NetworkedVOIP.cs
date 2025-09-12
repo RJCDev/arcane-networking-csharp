@@ -12,16 +12,17 @@ using System.Text.RegularExpressions;
 public partial struct VoIPPacket : Packet
 {
 	[Key(0)]
-	public ArraySegment<float> Buffer;
+	public ArraySegment<byte> Buffer;
 }
 
 [GlobalClass]
 public partial class NetworkedVOIP : NetworkedComponent
 {
+	JitterBuffer jitterBuffer;
 	//VOIP
-	Queue<Vector2> sendQueue;
-	Queue<Vector2> receiveQueue;
-	float[] sendBufferRaw;
+	Vector2[] captureBuffer;  // from AudioEffectCapture
+	byte[] sendBuffer;
+	Vector2[] receiveBuffer;
 
 	[Export] string pushToTalkAction = "voipPtt";
 	[Export] AudioStreamPlayer audioInput;
@@ -31,16 +32,16 @@ public partial class NetworkedVOIP : NetworkedComponent
 	AudioStreamGeneratorPlayback playback;
 	private AudioEffectCapture record;
 
-
 	Vector2 lastSample;
 	float interp = 0f;
 
 	int sampleRate;
-	int targetFrames => sampleRate * 50 / 1000;
-	int prebufferFrames => targetFrames * 100 / 1000;
+	int targetFrames => (int)(sampleRate * 0.015f);
 
 	public override void _Ready()
 	{
+		jitterBuffer = new(targetFrames);
+
 		audioInput.Play();
 
 		if (audioOutput is AudioStreamPlayer3D proxPlayer)
@@ -59,9 +60,10 @@ public partial class NetworkedVOIP : NetworkedComponent
 
 
 		sampleRate = (int)ProjectSettings.GetSetting("audio/driver/mix_rate");
-		sendQueue = new();
-		receiveQueue = new();
-		sendBufferRaw = new float[targetFrames * 2]; // 2 Points per sample
+
+		captureBuffer = new Vector2[targetFrames];
+		sendBuffer = new byte[captureBuffer.Length * 2]; // 2 Points per sample
+		receiveBuffer = new Vector2[captureBuffer.Length];
 
 		if (NetworkManager.AmIClient) Client.RegisterPacketHandler<VoIPPacket>(OnReceiveClient);
 		if (NetworkManager.AmIServer) Server.RegisterPacketHandler<VoIPPacket>(OnReceiveServer);
@@ -70,108 +72,126 @@ public partial class NetworkedVOIP : NetworkedComponent
 
 	public override void _Process(double delta)
 	{
-		
-		PlayAudio();
-
 		if (!NetworkedNode.AmIOwner) return;
-
+		
 		if (Input.IsActionPressed(pushToTalkAction))
 		{
 			Record();
 		}
-
 	}
-
-	private void PlayAudio()
-	{
-		// Only start playback after prebuffer
-		if (receiveQueue.Count < prebufferFrames)
-			return;
-
-		int framesWanted = playback.GetFramesAvailable();
-		if (framesWanted <= 0) return;
-
-		// Compute drift
-		int drift = receiveQueue.Count - targetFrames;
-
-		// Small speed adjustment based on drift
-		// Example: ±1% speed
-		float speedAdjustment = Mathf.Clamp(drift / (float)targetFrames, -0.01f, 0.01f);
-		float playbackRate = 1.0f + speedAdjustment;
-
-		Vector2[] chunk = new Vector2[framesWanted];
-
-		for (int i = 0; i < framesWanted; i++)
-		{
-			Vector2 nextSample = receiveQueue.Count > 0 ? receiveQueue.Peek() : lastSample;
-
-			float t = Math.Min(interp, 1f);
-			chunk[i] = lastSample * (1 - t) + nextSample * t;
-
-			interp += playbackRate;
-
-			if (interp >= 1f && receiveQueue.Count > 0)
-			{
-				interp -= 1f;
-				lastSample = receiveQueue.Dequeue();
-			}
-		}
-
-		playback.PushBuffer(chunk);
-
+    public override void _PhysicsProcess(double delta)
+    {
+        PlayAudioIfAvailable();
+		
     }
 
-
-
+	void PlayAudioIfAvailable()
+	{
+		while (jitterBuffer.IsReady && playback.CanPushBuffer(targetFrames))
+		{
+			var frame = jitterBuffer.Pop();
+			playback.PushBuffer(new ReadOnlySpan<Vector2>(frame));
+		}
+	}
 	private void Record()
 	{
-		int available = record.GetFramesAvailable();
-
-		if (available > 0)
+		if (record.CanGetBuffer(targetFrames))
 		{
-			int framesToTake = Math.Min(targetFrames, available);
-			foreach (var frame in record.GetBuffer(framesToTake))
-				sendQueue.Enqueue(frame);
-		}
-
-		// Flush the batch
-		if (sendQueue.Count >= targetFrames) // 50 ms
-		{
-			var packet = CreatePacket(sendQueue);
-			Client.Send(packet, Channels.Reliable, true); // Send VOIP
+			var packet = CreatePacket();
+			Client.Send(packet, Channels.Unreliable, true); // Send VOIP
 
 			if (ListenToSelf) OnReceiveClient(packet); // Should we listen to the output? 
+
 		}
 	}
 
-	VoIPPacket CreatePacket(Queue<Vector2> frames)
+	VoIPPacket CreatePacket()
 	{
-		// Deque samples into raw buffer
-		for (int i = 0; i < targetFrames; i++)
-		{
-			var Sample = sendQueue.Dequeue();
-			sendBufferRaw[i * 2] = Sample.X;
-			sendBufferRaw[i * 2 + 1] = Sample.Y;
-		}
-				
-		return new VoIPPacket() { Buffer = sendBufferRaw };
+		captureBuffer = record.GetBuffer(targetFrames);
+
+		int sendBytes = CompressFrame(captureBuffer, sendBuffer);
+
+		return new VoIPPacket() { Buffer = new ArraySegment<byte>(sendBuffer, 0, sendBytes) };
 	}
 
+	int CompressFrame(Vector2[] buffer, byte[] sendBuffer)
+	{
+		int length = buffer.Length;
+
+		for (int i = 0; i < length; i++)
+		{
+			// Downmix to mono
+			float mono = (buffer[i].X + buffer[i].Y) * 0.5f;
+			short pcm = (short)(Mathf.Clamp(mono, -1f, 1f) * 32767);
+
+			// Write PCM16 into sendBuffer
+			sendBuffer[i * 2] = (byte)(pcm & 0xFF);
+			sendBuffer[i * 2 + 1] = (byte)((pcm >> 8) & 0xFF);
+		}
+
+		return length * 2; // number of bytes written
+	}
+	int DecompressFrame(ArraySegment<byte> data, int byteCount, Vector2[] receiveBuffer)
+	{
+		int sampleCount = byteCount / 2;
+
+		for (int i = 0; i < sampleCount; i++)
+		{
+			short pcm = (short)(data[i * 2] | (data[i * 2 + 1] << 8));
+			float sample = pcm / 32767f;
+
+			// Expand mono to stereo
+			receiveBuffer[i].X = sample;
+			receiveBuffer[i].Y = sample;
+		}
+
+		return sampleCount; // number of Vector2 samples written
+	}
 	void OnReceiveClient(VoIPPacket packet)
 	{
 		// Push into buffer
-		for (int i = 0; i < packet.Buffer.Count / 2; i++)
-		{
-			receiveQueue.Enqueue(new Vector2(packet.Buffer[i * 2], packet.Buffer[i * 2 + 1]));
-		}
-			
-		
+		int read = DecompressFrame(packet.Buffer, packet.Buffer.Count, receiveBuffer);
+
+		var frame = new Vector2[read];
+    	Array.Copy(receiveBuffer, frame, read);
+
+		jitterBuffer.Push(frame);
 	}
 	void OnReceiveServer(VoIPPacket packet, int conn)
 	{
 		// Relay instantly
-		Server.SendAllExcept(packet, Channels.Reliable, true, conn); // Send VOIP
+		Server.SendAllExcept(packet, Channels.Unreliable, true, conn); // Send VOIP
 	}
-	
 
+
+}
+
+public class JitterBuffer
+{
+    private readonly Queue<Vector2[]> buffer = new();
+    private readonly int packetSize;
+
+    public JitterBuffer(int packetSize, int capacityPackets = 3)
+    {
+        this.packetSize = packetSize;
+        for (int i = 0; i < capacityPackets * 2; i++)
+            buffer.Enqueue(new Vector2[packetSize]);
+    }
+
+    private readonly Queue<Vector2[]> filled = new();
+
+    public void Push(Vector2[] samples)
+    {
+        if (filled.Count < buffer.Count)
+        {
+            filled.Enqueue(samples);
+        }
+    }
+
+    public Vector2[] Pop()
+    {
+        return filled.Count > 0 ? filled.Dequeue() : new Vector2[packetSize];
+    }
+
+    public bool IsReady => filled.Count > 0;
 }
