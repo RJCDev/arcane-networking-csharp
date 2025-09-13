@@ -87,7 +87,7 @@ public partial class Server : Node
     /// <summary>
     /// Send Logic for simple packets
     /// </summary>
-    public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable, bool instant = false)
+    public static void Send<T>(T packet, NetworkConnection conn, Channels channel = Channels.Reliable, bool instant = false) where T : Packet
     {
         //GD.Print("[Server] Send: " + packet.GetType() + " To: " + conn.GetRemoteID());
 
@@ -97,13 +97,13 @@ public partial class Server : Node
     /// <summary>
     /// Sends to all clients connected
     /// </summary>
-    public static void SendAll<T>(T packet, Channels channel = Channels.Reliable, bool instant = false)
+    public static void SendAll<T>(T packet, Channels channel = Channels.Reliable, bool instant = false) where T : Packet
     {
         foreach (var client in Connections)
             Send(packet, client.Value, channel, instant);
     }
     
-    public static void SendAllExcept<T>(T packet, Channels channel = Channels.Reliable, bool instant = false, params int[] ignore)
+    public static void SendAllExcept<T>(T packet, Channels channel = Channels.Reliable, bool instant = false, params int[] ignore) where T : Packet
     {
         foreach (var client in Connections)
             if (!ignore.Contains(client.Key))
