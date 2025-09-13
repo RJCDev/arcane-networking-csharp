@@ -82,7 +82,7 @@ public partial class Client
     /// <summary>
     /// Send Logic for simple packets
     /// </summary>
-    public static void Send<T>(T packet, Channels channel = Channels.Reliable, bool instant = false)
+    public static void Send<T>(T packet, Channels channel = Channels.Reliable, bool instant = false) where T : Packet
     {
         //GD.Print("[Client] Send: " + packet.GetType());
 
