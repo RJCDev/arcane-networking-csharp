@@ -68,7 +68,7 @@ public partial class SteamMessageLayer : MessageLayer
     public override void PollClient() => SteamClient.PollMessages(this);
     public override void PollServer() => SteamServer.PollMessages(this);
 
-    public override void SendTo(ArraySegment<byte> bytes, Channels sendType, params NetworkConnection connTarget)
+    public override void SendTo(ArraySegment<byte> bytes, Channels sendType, NetworkConnection connTarget)
     {
         if (connTarget == null) GD.PrintErr($"[Steam] User Didn't Specify connection to send to!");
 

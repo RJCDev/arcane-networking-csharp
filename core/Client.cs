@@ -274,7 +274,7 @@ public partial class Client
         serverConnection.localID = packet.netID;
         
         // Instantiate world, we are now authenticated so we can safely do this.
-        WorldManager.LoadOnlineWorld<Node3D>();
+        WorldManager.LoadOnlineWorld();
 
         OnClientAuthenticated?.Invoke();
 

@@ -11,19 +11,37 @@ public partial class NetworkedTransform3D : NetworkedComponent
 {
     [Export] Node3D TransformNode = null;
 
+    [Export] SendTime SendTiming = SendTime.Process;
+
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition;
     [Export] public bool SyncRotation;
     [Export] public bool SyncScale;
 
     [ExportCategory("Interpolation And Corrections")]
-    [Export] public bool LinearInterpolation = true;
-   
-    public float snapShotInterval = 1f / Engine.PhysicsTicksPerSecond; 
+    InterpolationMode interpMode = InterpolationMode.Process;
+    [Export] InterpolationMode LinearInterpolation
+    {
+        get
+        {
+            return interpMode;
+        }
+        set
+        {
+            Reset();
+            interpMode = value;
+        }
+    }
+
+    [Export] float CatchupSpeed = 1.5f;
+    [Export] int maxSnapshots = 3;
+
+    public float snapShotInterval = 1f / NetworkManager.manager.NetworkRate;
     float snapshotTimer = 0;
-    float Latency => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
 
     public TransformSnapshot Previous, Current;
+
+    Queue<TransformSnapshot> Snapshots = new();
 
     public override void _Ready()
     {
@@ -33,26 +51,49 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
         else
         {
-            TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults            
+            TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults
+            Reset();    
         }
-
     }
+ 
     public override void _NetworkReady()
     {
         if (NetworkedNode.Node is RigidBody3D body && !NetworkedNode.AmIOwner) body.Freeze = true;
-        
-        Current = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
-        Previous = Current;
+       
     }
     public override void _PhysicsProcess(double delta)
     {
+        if (SendTiming == SendTime.Physics)
+            HandleWrite();
 
-        bool clientAuth = AuthorityMode == AuthorityMode.Client && NetworkManager.AmIClient && NetworkedNode.AmIOwner;
-        bool serverAuth = AuthorityMode == AuthorityMode.Server && NetworkManager.AmIServer;
-        bool authorized = clientAuth || serverAuth;
+        if (LinearInterpolation == InterpolationMode.Physics)
+            HandleRead(delta);
+        
+           
+    }
+    public override void _Process(double delta)
+    {
+        if (SendTiming == SendTime.Process)
+            HandleWrite();
 
+        if (LinearInterpolation == InterpolationMode.Process)
+            HandleRead(delta);
+    }
+
+    void Reset()
+    {
+        if (TransformNode == null) return;
+
+        Current = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
+        Previous = Current;
+
+        Snapshots.Clear();
+    }
+
+    void HandleWrite()
+    {
         // Update Position
-        if (authorized)
+        if (NetworkedNode.AmIOwner)
         {
             Changed changes = Changed.None;
             List<float> valuesChanged = [];
@@ -83,9 +124,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                if (serverAuth)
+                if (NetworkManager.AmIServer)
                     RelayChanged(changes, [.. valuesChanged]);
-                else if (clientAuth)
+                else
                     SendChanged(changes, [.. valuesChanged]);
 
                 // Set our current to be this so we can backtest it again above
@@ -95,86 +136,127 @@ public partial class NetworkedTransform3D : NetworkedComponent
             }
 
         }
-
     }
-    public override void _Process(double delta)
+    void HandleRead(double delta)
     {
-        if (NetworkedNode.AmIOwner) return;
-
+        if (NetworkedNode.AmIOwner || NetworkManager.AmIServer) return;
+        
         snapshotTimer += (float)delta;
 
-        float t = (float)(snapshotTimer / snapShotInterval) * Latency;
+        float t = (float)(snapshotTimer / snapShotInterval);
+
+        // Multiply speed by rate to catchup
+
+        for (int i = 0; i < Mathf.Max(Snapshots.Count - maxSnapshots, 0); i++)
+            t *= CatchupSpeed;
+
         t = Math.Clamp(t, 0f, 1f);
 
         // Process the samples if we aren't owner
         TransformSnapshot Interp = Previous.InterpWith(Current, t);
 
-        if (LinearInterpolation)
+        TransformNode.GlobalPosition = Interp.Pos;
+        TransformNode.Quaternion = Interp.Rot;
+        TransformNode.Scale = Interp.Scale;
+        
+        if (t >= 1f) // Put previous as previous and get a new snapshot for current
         {
-            TransformNode.GlobalPosition = Interp.Pos;
-            TransformNode.Quaternion = Interp.Rot;
-            TransformNode.Scale = Interp.Scale;
-        }
-        else
-        {
-             TransformNode.GlobalPosition = Current.Pos;
-            TransformNode.Quaternion = Current.Rot;
-            TransformNode.Scale = Current.Scale;
+            if (Snapshots.TryDequeue(out var cur))
+            {
+                Previous = Current;
+                Current = cur;
+                snapshotTimer = 0f;
+            }
+           
         }
     }
 
     [Command(Channels.Unreliable)]
     public void SendChanged(Changed changed, float[] valuesChanged)
     {
+        // Only set on server if we aren't the owner
+        if (!NetworkedNode.AmIOwner)
+            SetServer(changed, valuesChanged);
+
         // Tell the clients their new info
         RelayChanged(changed, valuesChanged);
-
     }
 
     [Relay(Channels.Unreliable)]
-    public void RelayChanged(Changed changed, float[] valuesChanged)
+    public void RelayChanged(Changed changed, float[] valuesChanged) => SetClient(changed, valuesChanged);
+    void SetServer(Changed changed, float[] valuesChanged)
     {
-        if (NetworkedNode.AmIOwner) return;
         
-        Previous = Current; // Set previous to current
+        Current = ReadSnapshot(changed, valuesChanged);
+        TransformNode.GlobalPosition = Current.Pos;
+        TransformNode.Quaternion = Current.Rot;
+        TransformNode.Scale = Current.Scale;
+    }
+    void SetClient(Changed changed, float[] valuesChanged)
+    {
+        if (LinearInterpolation != InterpolationMode.None)
+        {
+            var newSnap = ReadSnapshot(changed, valuesChanged);
+            Snapshots.Enqueue(newSnap);
 
-        // Read new current
-        ReadSnapshot(changed, valuesChanged);
-        Current.SnaphotTime = Time.GetTicksMsec();
-        snapshotTimer = 0;
+            newSnap.SnaphotTime = Time.GetTicksMsec();
+        }
+        else if (!NetworkedNode.AmIOwner)
+        {
+            Current = ReadSnapshot(changed, valuesChanged);
+            TransformNode.GlobalPosition = Current.Pos;
+            TransformNode.Quaternion = Current.Rot;
+            TransformNode.Scale = Current.Scale;
+        }
+        
     }
 
     /// <summary>
     /// Read a snapshot from values changed
     /// </summary>
-    void ReadSnapshot(Changed changed, float[] valuesChanged)
+    TransformSnapshot ReadSnapshot(Changed changed, float[] valuesChanged)
     {
+        TransformSnapshot snap = new();
+
         int readIndex = 0;
 
-        Current.Pos = new()
+        snap.Pos = new()
         {
-            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : Previous.Pos.X,
-            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : Previous.Pos.Y,
-            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : Previous.Pos.Z,
+            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.X,
+            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Y,
+            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Z,
         };
 
-        Current.Rot = Quaternion.FromEuler(new()
+        snap.Rot = Quaternion.FromEuler(new()
         {
-            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : Previous.Rot.X,
-            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : Previous.Rot.Y,
-            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : Previous.Rot.Z,
+            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.X,
+            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.Y,
+            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.Z,
         });
 
         bool updateScale = (changed & Changed.Scale) > 0;
 
-        Current.Scale = new()
+        snap.Scale = new()
         {
-            X = updateScale ? valuesChanged[readIndex++] : Previous.Scale.X,
-            Y = updateScale ? valuesChanged[readIndex++] : Previous.Scale.Y,
-            Z = updateScale ? valuesChanged[readIndex++] : Previous.Scale.Z,
+            X = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.X,
+            Y = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.Y,
+            Z = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.Z,
         };
+        return snap;
     }
 
+    public enum SendTime
+    {
+        Process,
+        Physics
+    }
+    public enum InterpolationMode
+    {
+        None,
+        Process,
+        Physics,
+
+    }
     // A byte describing what part of the transform was changed
 
     public enum Changed : byte

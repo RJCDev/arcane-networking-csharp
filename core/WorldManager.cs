@@ -9,11 +9,11 @@ public class WorldManager
 
     public static Action OnWorldLoaded;
 
-    public static void LoadOnlineWorld<T>() where T : Node
+    public static void LoadOnlineWorld()
     {
         if (ServerWorld != null) return; // If we already have a server world, just return
 
-        ServerWorld = NetworkManager.manager.OnlineScene.Instantiate<T>();
+        ServerWorld = NetworkManager.manager.OnlineScene.Instantiate();
         NetworkManager.manager.GetTree().Root.AddChild(ServerWorld);
 
         OnWorldLoaded?.Invoke();

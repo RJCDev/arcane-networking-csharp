@@ -31,10 +31,10 @@ public partial class NetworkManager : Node
     [Export] public bool EnableDebug = false;
 
     /// <summary> The rate per second at which the server and clients will send data in ms</summary>
-    [Export] public ulong NetworkRate = 60;
+    [Export] public int NetworkRate = 60;
 
     /// <summary> The rate at which the server and clients will Ping Pong eachother, 0 would be same as NetworkRate</summary>
-    [Export] public ulong PingPongFrequency = 600;
+    [Export] public int PingPongFrequency = 600;
 
     /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
     [Export] public int MaxConnections = 4;

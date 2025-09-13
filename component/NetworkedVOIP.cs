@@ -56,7 +56,7 @@ public partial class NetworkedVOIP : NetworkedComponent
 		}
 
 		int idx = AudioServer.GetBusIndex("Record");
-		record = (AudioEffectCapture)AudioServer.GetBusEffect(idx, 0);
+		record = (AudioEffectCapture)AudioServer.GetBusEffect(idx, 1);
 
 
 		sampleRate = (int)ProjectSettings.GetSetting("audio/driver/mix_rate");
@@ -147,6 +147,7 @@ public partial class NetworkedVOIP : NetworkedComponent
 
 		return sampleCount; // number of Vector2 samples written
 	}
+	
 	void OnReceiveClient(VoIPPacket packet)
 	{
 		// Push into buffer
