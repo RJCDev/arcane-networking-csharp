@@ -1,0 +1,87 @@
+[gd_scene load_steps=2 format=3 uid="uid://sh3j52lk7qr"]
+
+[ext_resource type="Script" uid="uid://c5ps4d5ua7pj0" path="res://addons/arcane-networking/NetworkDebug.cs" id="1_tnhdw"]
+
+[node name="NetworkingDebugGUI" type="CanvasLayer"]
+
+[node name="DebugGUI" type="Control" parent="." node_paths=PackedStringArray("FPS", "RTTLabel", "kbps", "rwBuffers", "AmIClientLabel", "AmIServerLabel", "IsAuthenticatedLabel")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_tnhdw")
+FPS = NodePath("NetworkingGUIBox/FPS")
+RTTLabel = NodePath("NetworkingGUIBox/Latency (RTT)")
+kbps = NodePath("NetworkingGUIBox/UpDownKBPs")
+rwBuffers = NodePath("NetworkingGUIBox/Buffers")
+AmIClientLabel = NodePath("NetworkingGUIBox/AmIClient")
+AmIServerLabel = NodePath("NetworkingGUIBox/AmIServer")
+IsAuthenticatedLabel = NodePath("NetworkingGUIBox/IsAuthenticated")
+
+[node name="NetworkingGUIBox" type="VBoxContainer" parent="DebugGUI"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 264.0
+grow_vertical = 2
+
+[node name="FPS" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "FPS: "
+
+[node name="Buffers" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "Read Buffer: Write Buffer:"
+
+[node name="UpDownKBPs" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "Up: 0kbps | Down: 0kbps"
+
+[node name="Latency (RTT)" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "RTT: _"
+
+[node name="AmIClient" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "Client?  _"
+
+[node name="AmIServer" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "Server?_"
+
+[node name="IsAuthenticated" type="Label" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+text = "Authenticated? _"
+
+[node name="ButtonsBox" type="VBoxContainer" parent="DebugGUI/NetworkingGUIBox"]
+layout_mode = 2
+
+[node name="ServerAndClient" type="Button" parent="DebugGUI/NetworkingGUIBox/ButtonsBox"]
+layout_mode = 2
+text = "Server + Client"
+
+[node name="Headless" type="Button" parent="DebugGUI/NetworkingGUIBox/ButtonsBox"]
+layout_mode = 2
+text = "Server"
+
+[node name="ClientHolder" type="HBoxContainer" parent="DebugGUI/NetworkingGUIBox/ButtonsBox"]
+layout_mode = 2
+
+[node name="Client" type="Button" parent="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Client"
+
+[node name="Endpoint" type="TextEdit" parent="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+text = "127.0.0.1"
+placeholder_text = "Endpoint"
+scroll_fit_content_height = true
+
+[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ServerAndClient" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
+[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/Headless" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
+[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder/Client" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]

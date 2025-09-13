@@ -33,7 +33,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
     }
 
-    [Export] float CatchupSpeed = 1.5f;
     [Export] int maxSnapshots = 3;
 
     public float snapShotInterval = 1f / NetworkManager.manager.NetworkRate;
@@ -43,17 +42,20 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     Queue<TransformSnapshot> Snapshots = new();
 
-    public override void _Ready()
+    float Latency => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
+
+    public override void _EnterTree()
     {
-        if (NetworkedNode.Node is not Node3D)
+        if (TransformNode == null && NetworkedNode.Node is not Node3D)
         {
             GD.PushError("(Network Transform) Networked Node's Parent is NOT a Node3D!");
         }
         else
         {
             TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults
-            Reset();    
         }
+
+        Reset();
     }
  
     public override void _NetworkReady()
@@ -147,10 +149,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         // Multiply speed by rate to catchup
 
-        for (int i = 0; i < Mathf.Max(Snapshots.Count - maxSnapshots, 0); i++)
-            t *= CatchupSpeed;
-
         t = Math.Clamp(t, 0f, 1f);
+
+        if (Snapshots.Count > maxSnapshots)
+            snapshotTimer += (float)delta + (Latency / 2f);
 
         // Process the samples if we aren't owner
         TransformSnapshot Interp = Previous.InterpWith(Current, t);
@@ -159,14 +161,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
         TransformNode.Quaternion = Interp.Rot;
         TransformNode.Scale = Interp.Scale;
         
-        if (t >= 1f) // Put previous as previous and get a new snapshot for current
+        if (t >= 1f && Snapshots.TryDequeue(out var cur)) // Put previous as previous and get a new snapshot for current
         {
-            if (Snapshots.TryDequeue(out var cur))
-            {
-                Previous = Current;
-                Current = cur;
-                snapshotTimer = 0f;
-            }
+            Previous = Current;
+            Current = cur;
+            snapshotTimer = 0f;
            
         }
     }
@@ -232,7 +231,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.X,
             Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.Y,
             Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.Z,
-        });
+        }).Normalized();
 
         bool updateScale = (changed & Changed.Scale) > 0;
 
@@ -269,22 +268,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         RotY = 1 << 5,
         RotZ = 1 << 6,
         Scale = 1 << 7,
-    }
-
-    public static Vector3 CompQuat(Quaternion q)
-    {
-        // Ensure w is non-negative (canonical form)
-        if (q.W < 0f) q = -q;
-
-        return new Vector3(q.X, q.Y, q.Z);
-    }
-
-    public static Quaternion DecompQuat(Vector3 v)
-    {
-        float wSquared = 1f - (v.X * v.X + v.Y * v.Y + v.Z * v.Z);
-        float w = wSquared > 0f ? (float)Mathf.Sqrt(wSquared) : 0f;
-
-        return new Quaternion(v.X, v.Y, v.Z, w);
     }
 
     // A transform snapshot
