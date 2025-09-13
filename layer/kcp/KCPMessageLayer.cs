@@ -72,6 +72,8 @@ namespace ArcaneNetworking
         public override void PollClient() => KCPClient.Tick();
         public override void StopClient() => KCPClient.Disconnect();
 
+        public override void ServerDisconnect(NetworkConnection conn) => KCPServer.Disconnect(conn.GetRemoteID());
+
         public override void SendTo(ArraySegment<byte> bytes, Channels channel, NetworkConnection target)
         {
             if (target == null) GD.PrintErr("[KCP] User Didn't Specify connection to send to!");
@@ -93,7 +95,7 @@ namespace ArcaneNetworking
             }
 
         }
-
+        
         KcpChannel ToKCPChannel(Channels channel)
         {
             return channel switch

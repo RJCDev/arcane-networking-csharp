@@ -27,7 +27,7 @@ public interface INetworkLogger
 /// </summary>
 [GlobalClass]
 [Icon("res://addons/arcane-networking/icon/networked_node.svg")]
-public partial class NetworkedNode : Node
+public partial class NetworkedNode : Node, INetworkLogger
 {
     [ExportGroup("Network Identity")]
 
@@ -119,6 +119,26 @@ public partial class NetworkedNode : Node
     // Actions
     public Action<int, int> OnOwnerChanged;
 
+    public void _NetworkReady()
+    {
+        if (Node is INetworkLogger node) node._NetworkReady();
+
+        foreach (NetworkedComponent comp in NetworkedComponents)
+        {
+            comp._NetworkReady();
+        } 
+    }
+
+    public void _NetworkDestroy()
+    {
+        if (Node is INetworkLogger node) node._NetworkDestroy();
+
+        foreach (NetworkedComponent comp in NetworkedComponents)
+        {
+            comp._NetworkDestroy();
+        } 
+    }
+
     // Find all Networked Components
     public override void _EnterTree()
     {
@@ -145,4 +165,5 @@ public partial class NetworkedNode : Node
         else return;
     }
 
+   
 }

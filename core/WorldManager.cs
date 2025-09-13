@@ -1,0 +1,23 @@
+using System;
+using Godot;
+
+namespace ArcaneNetworking;
+
+public class WorldManager
+{
+    public static Node ServerWorld = null;
+
+    public static Action OnWorldLoaded;
+
+    public static void LoadOnlineWorld<T>() where T : Node
+    {
+        if (ServerWorld != null) return; // If we already have a server world, just return
+
+        ServerWorld = NetworkManager.manager.OnlineScene.Instantiate<T>();
+        NetworkManager.manager.GetTree().Root.AddChild(ServerWorld);
+
+        OnWorldLoaded?.Invoke();
+
+    }
+
+}

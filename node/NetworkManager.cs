@@ -19,7 +19,10 @@ public partial class NetworkManager : Node
     [Export] MessageLayer MsgLayer;
 
     /// <summary> Objects that you wish to be networked MUST be present in this dictionary</summary>
-    [Export] public Array<PackedScene> NetworkObjectPrefabs = new Array<PackedScene>();
+    [Export] public Array<PackedScene> NetworkNodeScenes = [];
+
+    /// <summary> Scene that gets loaded when u join a server</summary>
+    [Export] public PackedScene OnlineScene;
 
     /// <summary> Client Player Prefab (Id in the networked objects list)</summary>
     [Export] public int PlayerPrefabID = -1;
@@ -79,6 +82,20 @@ public partial class NetworkManager : Node
         {
             GD.PrintErr("No Valid Message Layer was found, defaulting to TCP!");
             // Set TCP layer
+        }
+
+    }
+    
+    // Default disconnect behaviors
+    public override void _Notification(int what)
+    {
+        if (what == NotificationCrash || what == NotificationWMCloseRequest)
+        {
+            if (AmIClient)
+                Client.Disconnect();
+
+            if (AmIServer)
+                Server.Stop();
         }
 
     }

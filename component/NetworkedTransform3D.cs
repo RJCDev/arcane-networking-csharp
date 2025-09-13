@@ -33,19 +33,24 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
         else
         {
-            TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults 
-            Current = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
-            Previous = Current;
+            TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults            
         }
 
     }
+    public override void _NetworkReady()
+    {
+        if (NetworkedNode.Node is RigidBody3D body && !NetworkedNode.AmIOwner) body.Freeze = true;
+        
+        Current = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
+        Previous = Current;
+    }
     public override void _PhysicsProcess(double delta)
     {
-        
+
         bool clientAuth = AuthorityMode == AuthorityMode.Client && NetworkManager.AmIClient && NetworkedNode.AmIOwner;
         bool serverAuth = AuthorityMode == AuthorityMode.Server && NetworkManager.AmIServer;
         bool authorized = clientAuth || serverAuth;
-        
+
         // Update Position
         if (authorized)
         {
@@ -90,7 +95,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             }
 
         }
-       
+
     }
     public override void _Process(double delta)
     {
@@ -116,7 +121,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
             TransformNode.Quaternion = Current.Rot;
             TransformNode.Scale = Current.Scale;
         }
-        
     }
 
     [Command(Channels.Unreliable)]

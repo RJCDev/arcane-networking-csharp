@@ -42,17 +42,27 @@ public partial class Client
 
         GD.Print("[Client] Packet Handler Registered: " + packetHash + " " + packetType.FullName);
     }
-    internal static void PacketInvoke(int packetHash, Packet packet)
+    internal static bool PacketInvoke(int packetHash, Packet packet)
     {
         if (PacketInvokes.TryGetValue(packetHash, out var handler))
         {
-            handler(packet);
+            try
+            {
+                handler(packet);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
         else
         {
-            GD.PrintErr("[Client] No handler registered for packet type: " + packet.GetType() + " | Hash: " + packetHash);
+            GD.PrintErr($"[Client] No handler registered for packet type {packet.GetType()}");
+            return false;
         }
     }
+
     internal static void RegisterInternalHandlers()
     {
         // Invokes
@@ -104,57 +114,92 @@ public partial class Client
     static void OnClientReceive(ArraySegment<byte> bytes)
     {
         var reader = NetworkPool.GetReader(bytes);
-        
+
+        //GD.Print("[Server] Recieve Length: bytes " + + bytes.Count + " " + batchMsgCount);
+
         while (reader.RemainingBytes > 0) // Read until end
         {
-            if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
-            {
-                //GD.Print("[Client] Header Valid! " + hash);
-
-                switch (type)
-                {
-                    case 0: // Regular Packet
-
-                        if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
-                        {
-                            PacketInvoke(hash, packet);
-                        }
-
-                        break;
-
-
-                    case 1: // RPC Packet
-
-                        //GD.Print("[Client] RPC Packet");
-
-                        if (reader.Read(out uint callerNetID) && reader.Read(out int callerCompIndex))
-                        {
-                            if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
-                            {
-                                // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
-
-                                //GD.Print("[Client] Unpacking RPC From .." + NetworkedNodes[callerNetID].OwnerID);
-
-                                unpack(reader, NetworkedNodes[callerNetID].NetworkedComponents[callerCompIndex]);
-                            }
-                            else
-                            {
-                                GD.PrintErr("[Client] RPC Method Hash not found! " + hash);
-                            }
-
-                        }
-                        else
-                        {
-                            GD.PrintErr("[Client] Could not read RPC Packet! " + hash);
-                        }
-
-                        break;
-                }
-            }
-            else GD.PrintErr("[Client] Packet header was invalid on receive!");
+            // If we can't unpack this packet, just break, 
+            // The batch is missaligned so we won't be able to read the rest of the batch
+            // This shouldn't EVER happen, but we make sure not to get stuck in an infnite loop
+            if (!Unpack(reader)) break;
+            
         }
         
         NetworkPool.Recycle(reader);
+    }
+
+    static bool Unpack(NetworkReader reader)
+    {
+        if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
+        {
+            //GD.Print("[Server] Header Valid! " + hash);
+
+            switch (type)
+            {
+                case 0: // Regular Packet
+
+                    //GD.Print("[Server] Regular Packet ");
+
+                    if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
+                    {
+                        //GD.Print("[Server] Packet Valid! " + hash);
+                        if (!PacketInvoke(hash, packet)) return false;
+                    }
+
+                    break;
+
+
+                case 1: // RPC Packet
+
+                    //GD.Print("[Client] RPC Packet");
+
+                    if (reader.Read(out uint callerNetID) && reader.Read(out int callerCompIndex))
+                    {
+                        if (ArcaneNetworking.RPCMethods.TryGetValue(hash, out var unpack))
+                        {
+                            // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
+
+                            //GD.PrintErr("[Server] Unpacking RPC..");
+                            if (!NetworkedNodes.TryGetValue(callerNetID, out var netNode))
+                            {
+                                GD.PrintErr("[Client] RPC pointed to invalid Networked Node! " + hash);
+                                return false;
+                            }
+                            try
+                            {
+                                unpack(reader, netNode.NetworkedComponents[callerCompIndex]);
+                            }
+                            catch (Exception e)
+                            {
+                                GD.PrintErr("[Client] RPC Failed to Execute! " + e.Message);
+                                return false;
+                            }
+                            
+                        }
+                        else
+                        {
+                            GD.PrintErr("[Client] RPC Method Hash not found! " + hash);
+                            return false;
+                        }
+
+                    }
+                    else
+                    {
+                        GD.PrintErr("[Client] Could not read RPC Packet! " + hash);
+                        return false;
+                    }
+
+                    break;
+            }
+        }
+        else
+        {
+            GD.PrintErr("[Client] Packet header was invalid on receive!");
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -174,19 +219,19 @@ public partial class Client
         serverConnection = new(host, MessageLayer.Active.Port, 0);
 
         // Setup our MessageLayer to the server
-        MessageLayer.Active.StartClient(serverConnection);    
-        
+        MessageLayer.Active.StartClient(serverConnection);
+
         NetworkManager.AmIClient = true;
+
+        GD.Print("[Client] Client Has Started!");
+        
+        //WorldManager.LoadOnlineWorld(); DO NOT spawn the world yet, wait for handshake as we ARE NOT authenticated here
     }
 
     public static void Disconnect()
     {
-        foreach (var netObject in NetworkedNodes)
-        {
-            OnModify(new ModifyNodePacket() { netID = netObject.Key, enabled = true, destroy = true });
-        }
-
         MessageLayer.Active.StopClient();
+        NetworkManager.AmIClient = false;
         serverConnection = null;
     }
 
@@ -222,13 +267,17 @@ public partial class Client
         {
             // TODO // ENCRYPTED AUTHENTICATION // TODO //   
         }
-
+        
         GD.Print("[Client] Client Authenticated!");
 
         serverConnection.isAuthenticated = true;
         serverConnection.localID = packet.netID;
+        
+        // Instantiate world, we are now authenticated so we can safely do this.
+        WorldManager.LoadOnlineWorld<Node3D>();
 
         OnClientAuthenticated?.Invoke();
+
     }
     static void OnPingPong(PingPongPacket packet)
     {
@@ -256,10 +305,9 @@ public partial class Client
             // We are a client only, just spawn it normally
             if (NetworkManager.AmIClientOnly)
             {
+                spawnedObject = NetworkManager.manager.NetworkNodeScenes[(int)packet.prefabID].Instantiate<Node>();
 
-                spawnedObject = NetworkManager.manager.NetworkObjectPrefabs[(int)packet.prefabID].Instantiate<Node>();
-
-                GD.Print("[Client] Spawning Networked Node: " + packet.netID + " | Prefab ID: " + (int)packet.prefabID);
+                //GD.Print("[Client] Spawning Networked Node: " + packet.netID + " | Prefab ID: " + (int)packet.prefabID);
 
                 // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
                 netNode = spawnedObject.FindChild<NetworkedNode>();
@@ -284,16 +332,17 @@ public partial class Client
             }
 
             // Adds to the current loaded world
-            NetworkManager.manager.GetTree().Root.AddChild(spawnedObject);
+            WorldManager.ServerWorld.AddChild(spawnedObject);
 
             // Set Transform
             if (spawnedObject is Node3D spawned3D)
             {
-                GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
+                //GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
                 spawned3D.Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
                 spawned3D.Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
                 spawned3D.Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
             }
+
 
             NetworkedNodes.Add(packet.netID, netNode);
         }
@@ -309,10 +358,8 @@ public partial class Client
 
         OnClientSpawn?.Invoke(netNode);
 
-        // Check if we should send logger functions
-        if (spawnedObject is INetworkLogger logger)
-            logger._NetworkReady();
-
+        netNode._NetworkReady();
+        
     }
 
     /// <summary>
@@ -334,7 +381,7 @@ public partial class Client
                     logger._NetworkDestroy();
 
                 // Remove from tree if we want to remove this NetworkedObject (keep reference in list though)
-                netObject.Node.GetParent().RemoveChild(netObject.Node);
+                netObject.Node.QueueFree();
             }
         }
     }

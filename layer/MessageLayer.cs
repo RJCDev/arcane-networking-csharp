@@ -73,14 +73,19 @@ namespace ArcaneNetworking
         /// <returns>Valid URI MessageLayer?</returns>
         public abstract void StopClient();
 
+        /// <summary>
+        /// Disconnects a client from the server if you are the server
+        /// </summary>
+        public abstract void ServerDisconnect(NetworkConnection conn);
+
         /// SEND / RECEIVE \\\
 
         /// <summary>
         /// Sends raw data to the MessageLayer and routes it to the connections specified
         /// </summary>
         public abstract void SendTo(ArraySegment<byte> bytes, Channels channel, NetworkConnection conn);
-        
 
+       
     }
 
 }

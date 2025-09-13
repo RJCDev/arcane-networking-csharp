@@ -46,6 +46,20 @@ public class SteamServer
         ConnectionCallback.Dispose();
     }
 
+    public void Disconnect(int connID)
+    {
+        GD.PrintErr("Connection forcefully closed..." + connID);
+
+        var connection = ClientsConnected[connID];
+
+        SteamNetworkingSockets.SetConnectionPollGroup(connection, HSteamNetPollGroup.Invalid);
+        SteamNetworkingSockets.CloseConnection(connection, 0, null, false);
+
+        MessageLayer.Active.OnServerDisconnect?.Invoke(connID);
+
+        ClientsConnected.Remove(connID);
+    }
+
     public void InitLocal()
     {
         uint steam32 = (uint)SteamUser.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID

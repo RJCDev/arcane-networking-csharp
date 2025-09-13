@@ -41,6 +41,8 @@ public partial class SteamMessageLayer : MessageLayer
         // Steam is odd, and we need to do some special stuff for Local Connections
         if (other.isLocalConnection) // Local Connection
         {
+            other.SetEndPoint(SteamUser.GetSteamID().m_SteamID.ToString()); // Set steam ID as target
+            
             SteamClient.StartClient(other);
             SteamServer.InitLocal(); // Invoke client connection callback
         }
@@ -61,6 +63,7 @@ public partial class SteamMessageLayer : MessageLayer
 
     public override void StopClient() => SteamClient.StopClient();
 
+    public override void ServerDisconnect(NetworkConnection conn) => SteamServer.Disconnect(conn.GetRemoteID());
 
     public override void PollClient() => SteamClient.PollMessages(this);
     public override void PollServer() => SteamServer.PollMessages(this);
@@ -87,11 +90,11 @@ public partial class SteamMessageLayer : MessageLayer
 
             // get pointer to the offset inside the pinned array
             IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(bytes.Array, bytes.Offset);
-
+            
             EResult result = SteamNetworkingSockets.SendMessageToConnection(steamConnectionToSend, // Send Message Over SteamNetworkingSockets
                 ptr,
                 (uint)bytes.Count,
-                sendType == Channels.Reliable ? 0 : 8,
+                sendType == Channels.Reliable ? SteamNetworkSendTypes.k_nSteamNetworkingSend_ReliableNoNagle : SteamNetworkSendTypes.k_nSteamNetworkingSend_UnreliableNoNagle,
                 out long msgNum
             );
 

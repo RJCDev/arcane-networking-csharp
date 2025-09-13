@@ -61,6 +61,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     {
         // if (!isAuthenticated) return; // Bypass
         NetworkWriter writer = NetworkPool.GetWriter();
+        
         try
         {
             NetworkPacker.Pack(new HandshakePacket() { netID = netID }, writer);
