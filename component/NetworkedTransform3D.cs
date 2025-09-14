@@ -28,7 +28,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
         set
         {
-            Reset();
+            if (TransformNode != null) Reset();
             interpMode = value;
         }
     }
@@ -38,12 +38,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public float snapShotInterval = 1f / NetworkManager.manager.NetworkRate;
     float snapshotTimer = 0;
 
-    public TransformSnapshot Previous, Current;
-
-    Queue<TransformSnapshot> Snapshots = new();
-
-    float Latency => (Current.SnaphotTime - Previous.SnaphotTime) / 1000.0f;
-
+    TransformSnapshot Local;
+    SortedSet<TransformSnapshot> Snapshots = new();
     public override void _EnterTree()
     {
         if (TransformNode == null && NetworkedNode.Node is not Node3D)
@@ -55,12 +51,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
             TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults
         }
 
-        Reset();
     }
- 
+
     public override void _NetworkReady()
     {
         if (NetworkedNode.Node is RigidBody3D body && !NetworkedNode.AmIOwner) body.Freeze = true;
+        Reset();
        
     }
     public override void _PhysicsProcess(double delta)
@@ -84,11 +80,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     void Reset()
     {
-        if (TransformNode == null) return;
-
-        Current = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
-        Previous = Current;
-
+        Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Time.GetTicksMsec() };
         Snapshots.Clear();
     }
 
@@ -103,38 +95,46 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Pos
             if (SyncPosition)
             {
-                if (Current.Pos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
-                if (Current.Pos.Y != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
-                if (Current.Pos.Z != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
+                if (Local.Pos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+                if (Local.Pos.Y != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
+                if (Local.Pos.Z != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
             }
 
             // Rot
             if (SyncRotation)
             {
-                if (Current.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
-                if (Current.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
-                if (Current.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
+                if (Local.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
+                if (Local.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
+                if (Local.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
+                
             }
 
             // Scale
             if (SyncScale)
             {
-                if (Current.Scale != TransformNode.Scale) { changes |= Changed.Scale; valuesChanged.Add(TransformNode.Scale.X); valuesChanged.Add(TransformNode.Scale.Y); valuesChanged.Add(TransformNode.Scale.Z); }
+                if (Local.Scale != TransformNode.Scale)
+                {
+                    changes |= Changed.Scale;
+                    valuesChanged.Add(TransformNode.Scale.X);
+                    valuesChanged.Add(TransformNode.Scale.Y);
+                    valuesChanged.Add(TransformNode.Scale.Z);
+                }
             }
 
 
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
+                
                 if (NetworkManager.AmIServer)
-                    RelayChanged(changes, [.. valuesChanged]);
+                    RelayChanged(changes, [.. valuesChanged], Time.GetTicksMsec());
                 else
-                    SendChanged(changes, [.. valuesChanged]);
+                    SendChanged(changes, [.. valuesChanged], Time.GetTicksMsec());
 
-                // Set our current to be this so we can backtest it again above
-                Current.Pos = TransformNode.GlobalPosition;
-                Current.Rot = TransformNode.Quaternion;
-                Current.Scale = TransformNode.Scale;
+                // Set our local to be this so we can backtest it again above
+                Local.Pos = TransformNode.GlobalPosition;
+                Local.Rot = TransformNode.Quaternion;
+                Local.Scale = TransformNode.Scale;
             }
 
         }
@@ -142,105 +142,118 @@ public partial class NetworkedTransform3D : NetworkedComponent
     void HandleRead(double delta)
     {
         if (NetworkedNode.AmIOwner || NetworkManager.AmIServer) return;
-        
-        snapshotTimer += (float)delta;
 
-        float t = (float)(snapshotTimer / snapShotInterval);
+        TransformSnapshot? prev = null;
+        TransformSnapshot? next = null;
 
-        // Multiply speed by rate to catchup
+        ulong renderTime = Time.GetTicksMsec() - 100; // 100 MS in the past
 
-        t = Math.Clamp(t, 0f, 1f);
-
-        if (Snapshots.Count > maxSnapshots)
-            snapshotTimer += (float)delta + (Latency / 2f);
-
-        // Process the samples if we aren't owner
-        TransformSnapshot Interp = Previous.InterpWith(Current, t);
-
-        TransformNode.GlobalPosition = Interp.Pos;
-        TransformNode.Quaternion = Interp.Rot;
-        TransformNode.Scale = Interp.Scale;
-        
-        if (t >= 1f && Snapshots.TryDequeue(out var cur)) // Put previous as previous and get a new snapshot for current
+        foreach (var snap in Snapshots)
         {
-            Previous = Current;
-            Current = cur;
-            snapshotTimer = 0f;
-           
+            if (snap.SnaphotTime <= renderTime) prev = snap;
+            if (snap.SnaphotTime > renderTime)
+            {
+                next = snap;
+                break;
+            }
+        }
+
+       if (prev.HasValue && next.HasValue)
+        {
+            float t = Mathf.InverseLerp(
+                (float)prev.Value.SnaphotTime,
+                (float)next.Value.SnaphotTime,
+                (float)renderTime
+            );
+
+            Local = prev.Value.InterpWith(next.Value, t + 0.1f); // Extrap by 100 ms
+
+            TransformNode.GlobalPosition = Local.Pos;
+            TransformNode.Quaternion = Local.Rot;
+            TransformNode.Scale = Local.Scale;
+        }
+
+        // Cleanup: keep buffer small
+        while (Snapshots.Count > maxSnapshots) // safety cap
+        {
+            Snapshots.Remove(Snapshots.Min);
         }
     }
 
     [Command(Channels.Unreliable)]
-    public void SendChanged(Changed changed, float[] valuesChanged)
+    public void SendChanged(Changed changed, float[] valuesChanged, ulong tickMS)
     {
         // Only set on server if we aren't the owner
         if (!NetworkedNode.AmIOwner)
-            SetServer(changed, valuesChanged);
+            SetServer(changed, valuesChanged, tickMS);
+        
 
         // Tell the clients their new info
-        RelayChanged(changed, valuesChanged);
+        RelayChanged(changed, valuesChanged, tickMS);
     }
 
     [Relay(Channels.Unreliable)]
-    public void RelayChanged(Changed changed, float[] valuesChanged) => SetClient(changed, valuesChanged);
-    void SetServer(Changed changed, float[] valuesChanged)
+    public void RelayChanged(Changed changed, float[] valuesChanged, ulong tickMS) => SetClient(changed, valuesChanged, tickMS);
+
+    void SetServer(Changed changed, float[] valuesChanged, ulong tickMS)
     {
-        
-        Current = ReadSnapshot(changed, valuesChanged);
-        TransformNode.GlobalPosition = Current.Pos;
-        TransformNode.Quaternion = Current.Rot;
-        TransformNode.Scale = Current.Scale;
+        Local = ReadSnapshot(changed, valuesChanged, tickMS);
+        TransformNode.GlobalPosition = Local.Pos;
+        TransformNode.Quaternion = Local.Rot;
+        TransformNode.Scale = Local.Scale;
     }
-    void SetClient(Changed changed, float[] valuesChanged)
+
+    void SetClient(Changed changed, float[] valuesChanged, ulong tickMS)
     {
+        if (NetworkedNode.AmIOwner) return;
+
         if (LinearInterpolation != InterpolationMode.None)
         {
-            var newSnap = ReadSnapshot(changed, valuesChanged);
-            Snapshots.Enqueue(newSnap);
-
-            newSnap.SnaphotTime = Time.GetTicksMsec();
+            var newSnap = ReadSnapshot(changed, valuesChanged, tickMS);
+            Snapshots.Add(newSnap);
         }
-        else if (!NetworkedNode.AmIOwner)
+        else
         {
-            Current = ReadSnapshot(changed, valuesChanged);
-            TransformNode.GlobalPosition = Current.Pos;
-            TransformNode.Quaternion = Current.Rot;
-            TransformNode.Scale = Current.Scale;
+            Local = ReadSnapshot(changed, valuesChanged, tickMS);
+            TransformNode.GlobalPosition = Local.Pos;
+            TransformNode.Quaternion = Local.Rot;
+            TransformNode.Scale = Local.Scale;
         }
-        
     }
 
     /// <summary>
     /// Read a snapshot from values changed
     /// </summary>
-    TransformSnapshot ReadSnapshot(Changed changed, float[] valuesChanged)
-    {
+    TransformSnapshot ReadSnapshot(Changed changed, float[] valuesChanged, ulong tickMS)
+    {        
         TransformSnapshot snap = new();
 
         int readIndex = 0;
 
         snap.Pos = new()
         {
-            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.X,
-            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Y,
-            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Z,
+            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : Local.Pos.X,
+            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : Local.Pos.Y,
+            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : Local.Pos.Z,
         };
 
         snap.Rot = Quaternion.FromEuler(new()
         {
-            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.X,
-            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.Y,
-            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalRotation.Z,
+            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : Local.Rot.X,
+            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : Local.Rot.Y,
+            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : Local.Rot.Z,
         }).Normalized();
 
         bool updateScale = (changed & Changed.Scale) > 0;
 
         snap.Scale = new()
         {
-            X = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.X,
-            Y = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.Y,
-            Z = updateScale ? valuesChanged[readIndex++] : TransformNode.Scale.Z,
+            X = updateScale ? valuesChanged[readIndex++] : Local.Scale.X,
+            Y = updateScale ? valuesChanged[readIndex++] : Local.Scale.Y,
+            Z = updateScale ? valuesChanged[readIndex++] : Local.Scale.Z,
         };
+
+        snap.SnaphotTime = tickMS;
         return snap;
     }
 
@@ -271,8 +284,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
     }
 
     // A transform snapshot
-    public struct TransformSnapshot
+    public struct TransformSnapshot: IComparable<TransformSnapshot>
     {
+        ulong TickMs;
         public Vector3 Pos;
         public Quaternion Rot;
         public Vector3 Scale;
@@ -322,6 +336,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
             return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode(), Scale.GetHashCode());
         }
 
+        public int CompareTo(TransformSnapshot other)
+        {
+            return TickMs == other.TickMs ? 0 : (TickMs < other.TickMs ? -1 : 1);
+        }
     }
 
 }

@@ -239,6 +239,9 @@ public partial class Server : Node
 
         NetworkManager.AmIServer = true;
 
+        // Set the time the server started
+        ArcaneNetworking.StartTimeTicks = Time.GetTicksMsec();
+
         // Intiailize world ONLY if we are headless, we will intialize the world on the client if not
         if (isHeadless) WorldManager.LoadOnlineWorld();
 
@@ -456,7 +459,7 @@ public partial class Server : Node
         if (NetworkManager.manager.PlayerPrefabID != -1)
         {
             // Instantiate the player prefab if not -1
-            connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, Vector3.Zero, Basis.Identity, Vector3.One, connection);
+            connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, new Vector3(0f, 5f, 0f), Basis.Identity, Vector3.One, connection);
             connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
         }
 

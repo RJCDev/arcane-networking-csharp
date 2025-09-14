@@ -7,6 +7,7 @@ using System.Collections;
 [Icon("res://addons/arcane-networking/icon/network_debug.svg")]
 public partial class NetworkDebug : Control
 {
+    [Export] TextEdit Endpoint;
     [Export] public Label FPS, RTTLabel, kbps, rwBuffers;
     [Export] public Label AmIClientLabel;
     [Export] public Label AmIServerLabel;
@@ -37,6 +38,9 @@ public partial class NetworkDebug : Control
         MessageLayer.Active.OnServerReceive += OnServerPacketIn;
 
     }
+
+    void StartServer(bool headless) => NetworkManager.manager.StartServer(headless);
+    void StartClient() => NetworkManager.manager.Connect(Endpoint.Text);
 
     public void ClcltPckSz()
     {

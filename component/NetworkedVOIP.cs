@@ -13,6 +13,66 @@ public partial struct VoIPPacket : Packet
 {
 	[Key(0)]
 	public ArraySegment<byte> Buffer;
+	[Key(1)]
+	public uint NetID; 
+}
+
+public class VOIPManager
+{
+	public static Dictionary<uint, NetworkedVOIP> VOIPPois = new();
+	static bool Registered = false;
+	public static void RegisterManagerIfNeeded()
+	{
+		if (Registered) return;
+
+		Client.RegisterPacketHandler<VoIPPacket>(OnReceiveClient);
+		Server.RegisterPacketHandler<VoIPPacket>(OnReceiveServer);
+
+		Registered = true;
+	}
+
+	public static void OnReceiveClient(VoIPPacket packet) => VOIPPois[packet.NetID].OnReceiveData(packet); // Route to correct buffer
+
+	static void OnReceiveServer(VoIPPacket packet, int conn)
+	{
+		// Relay instantly
+		Server.SendAllExcept(packet, Channels.Unreliable, true, conn); // Send VOIP
+	}
+
+	public static int CompressFrame(Vector2[] buffer, byte[] sendBuffer)
+	{
+		int length = buffer.Length;
+
+		for (int i = 0; i < length; i++)
+		{
+			// Downmix to mono
+			float mono = (buffer[i].X + buffer[i].Y) * 0.5f;
+			short pcm = (short)(Mathf.Clamp(mono, -1f, 1f) * 32767);
+
+			// Write PCM16 into sendBuffer
+			sendBuffer[i * 2] = (byte)(pcm & 0xFF);
+			sendBuffer[i * 2 + 1] = (byte)((pcm >> 8) & 0xFF);
+		}
+
+		return length * 2; // number of bytes written
+	}
+	public static int DecompressFrame(ArraySegment<byte> data, int byteCount, Vector2[] receiveBuffer)
+	{
+		int sampleCount = byteCount / 2;
+
+		for (int i = 0; i < sampleCount; i++)
+		{
+			short pcm = (short)(data[i * 2] | (data[i * 2 + 1] << 8));
+			float sample = pcm / 32767f;
+
+			// Expand mono to stereo
+			receiveBuffer[i].X = sample;
+			receiveBuffer[i].Y = sample;
+		}
+
+		return sampleCount; // number of Vector2 samples written
+	}
+	
 }
 
 [GlobalClass]
@@ -65,25 +125,26 @@ public partial class NetworkedVOIP : NetworkedComponent
 		sendBuffer = new byte[captureBuffer.Length * 2]; // 2 Points per sample
 		receiveBuffer = new Vector2[captureBuffer.Length];
 
-		if (NetworkManager.AmIClient) Client.RegisterPacketHandler<VoIPPacket>(OnReceiveClient);
-		if (NetworkManager.AmIServer) Server.RegisterPacketHandler<VoIPPacket>(OnReceiveServer);
+		// Register
+		VOIPManager.RegisterManagerIfNeeded();
 
 	}
+	public override void _NetworkReady() => VOIPManager.VOIPPois.Add(NetworkedNode.NetID, this);
 
 	public override void _Process(double delta)
 	{
 		if (!NetworkedNode.AmIOwner) return;
-		
+
 		if (Input.IsActionPressed(pushToTalkAction))
 		{
 			Record();
 		}
 	}
-    public override void _PhysicsProcess(double delta)
-    {
-        PlayAudioIfAvailable();
-		
-    }
+	public override void _PhysicsProcess(double delta)
+	{
+		PlayAudioIfAvailable();
+
+	}
 
 	void PlayAudioIfAvailable()
 	{
@@ -98,9 +159,10 @@ public partial class NetworkedVOIP : NetworkedComponent
 		if (record.CanGetBuffer(targetFrames))
 		{
 			var packet = CreatePacket();
+			packet.NetID = NetworkedNode.NetID; // Tell which person this packet came from
 			Client.Send(packet, Channels.Unreliable, true); // Send VOIP
 
-			if (ListenToSelf) OnReceiveClient(packet); // Should we listen to the output? 
+			if (ListenToSelf) VOIPManager.OnReceiveClient(packet); // Should we listen to the output? 
 
 		}
 	}
@@ -109,62 +171,21 @@ public partial class NetworkedVOIP : NetworkedComponent
 	{
 		captureBuffer = record.GetBuffer(targetFrames);
 
-		int sendBytes = CompressFrame(captureBuffer, sendBuffer);
+		int sendBytes = VOIPManager.CompressFrame(captureBuffer, sendBuffer);
 
 		return new VoIPPacket() { Buffer = new ArraySegment<byte>(sendBuffer, 0, sendBytes) };
 	}
 
-	int CompressFrame(Vector2[] buffer, byte[] sendBuffer)
-	{
-		int length = buffer.Length;
-
-		for (int i = 0; i < length; i++)
-		{
-			// Downmix to mono
-			float mono = (buffer[i].X + buffer[i].Y) * 0.5f;
-			short pcm = (short)(Mathf.Clamp(mono, -1f, 1f) * 32767);
-
-			// Write PCM16 into sendBuffer
-			sendBuffer[i * 2] = (byte)(pcm & 0xFF);
-			sendBuffer[i * 2 + 1] = (byte)((pcm >> 8) & 0xFF);
-		}
-
-		return length * 2; // number of bytes written
-	}
-	int DecompressFrame(ArraySegment<byte> data, int byteCount, Vector2[] receiveBuffer)
-	{
-		int sampleCount = byteCount / 2;
-
-		for (int i = 0; i < sampleCount; i++)
-		{
-			short pcm = (short)(data[i * 2] | (data[i * 2 + 1] << 8));
-			float sample = pcm / 32767f;
-
-			// Expand mono to stereo
-			receiveBuffer[i].X = sample;
-			receiveBuffer[i].Y = sample;
-		}
-
-		return sampleCount; // number of Vector2 samples written
-	}
-	
-	void OnReceiveClient(VoIPPacket packet)
+	public void OnReceiveData(VoIPPacket packet)
 	{
 		// Push into buffer
-		int read = DecompressFrame(packet.Buffer, packet.Buffer.Count, receiveBuffer);
+		int read = VOIPManager.DecompressFrame(packet.Buffer, packet.Buffer.Count, receiveBuffer);
 
 		var frame = new Vector2[read];
-    	Array.Copy(receiveBuffer, frame, read);
+		Array.Copy(receiveBuffer, frame, read);
 
 		jitterBuffer.Push(frame);
 	}
-	void OnReceiveServer(VoIPPacket packet, int conn)
-	{
-		// Relay instantly
-		Server.SendAllExcept(packet, Channels.Unreliable, true, conn); // Send VOIP
-	}
-
-
 }
 
 public class JitterBuffer

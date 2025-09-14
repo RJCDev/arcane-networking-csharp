@@ -4,7 +4,7 @@
 
 [node name="NetworkingDebugGUI" type="CanvasLayer"]
 
-[node name="DebugGUI" type="Control" parent="." node_paths=PackedStringArray("FPS", "RTTLabel", "kbps", "rwBuffers", "AmIClientLabel", "AmIServerLabel", "IsAuthenticatedLabel")]
+[node name="DebugGUI" type="Control" parent="." node_paths=PackedStringArray("Endpoint", "FPS", "RTTLabel", "kbps", "rwBuffers", "AmIClientLabel", "AmIServerLabel", "IsAuthenticatedLabel")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -13,6 +13,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_tnhdw")
+Endpoint = NodePath("NetworkingGUIBox/ButtonsBox/ClientHolder/Endpoint")
 FPS = NodePath("NetworkingGUIBox/FPS")
 RTTLabel = NodePath("NetworkingGUIBox/Latency (RTT)")
 kbps = NodePath("NetworkingGUIBox/UpDownKBPs")
@@ -83,5 +84,8 @@ placeholder_text = "Endpoint"
 scroll_fit_content_height = true
 
 [connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ServerAndClient" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
+[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ServerAndClient" to="DebugGUI" method="StartServer" binds= [false]]
 [connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/Headless" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
+[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/Headless" to="DebugGUI" method="StartServer" binds= [true]]
+[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder/Client" to="DebugGUI" method="StartClient"]
 [connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder/Client" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
