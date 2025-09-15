@@ -80,8 +80,9 @@ public partial class NetworkManager : Node
         }
         else
         {
-            GD.PrintErr("No Valid Message Layer was found, defaulting to TCP!");
-            // Set TCP layer
+            GD.PrintErr("[Network Manager] No Valid Message Layer was found, defaulting to KCP!");
+
+            MessageLayer.Active = ResourceLoader.Load<PackedScene>("res://addons/arcane-networking/layer/built-in/KcpMessageLayer.tscn").Instantiate<KCPMessageLayer>();
         }
 
     }

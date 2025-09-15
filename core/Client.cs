@@ -240,6 +240,7 @@ public partial class Client
 
     public static void Process()
     {
+        
         foreach (var batcher in serverConnection.Batchers)
         {
             try
@@ -258,7 +259,7 @@ public partial class Client
             {
                 GD.PrintErr(e.Message);
             }
-                
+
         }
     }
 

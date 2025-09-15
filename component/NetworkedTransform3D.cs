@@ -35,8 +35,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     [Export] int maxSnapshots = 3;
 
-    public float snapShotInterval = 1f / NetworkManager.manager.NetworkRate;
-
     float interpT = 1;
 
     TransformSnapshot Previous, Local, Current;
@@ -146,11 +144,13 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
     }
 
-    void Pop()
+    void PopEarliest()
     {
         Previous = Snapshots.Min;
         Snapshots.Remove(Snapshots.Min);
-
+    }
+    void PopCurrent()
+    {
         Current = Snapshots.Min;
         Snapshots.Remove(Snapshots.Min);
     }
@@ -159,24 +159,35 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         if (NetworkedNode.AmIOwner || NetworkManager.AmIServer) return;
 
+        long lat = Current.SnaphotTime - Previous.SnaphotTime;
+
+        long bufferMS = Client.TickMS - lat;
+
         // Pop the 2 newest from the snapshots list
-        if (Snapshots.Count >= maxSnapshots + 2 && interpT >= 1.0) // Check if we are finished with most recent interp
+        if (Snapshots.Count >= maxSnapshots + 2)
         {
-            Pop(); // Pop 2 oldest that are now valid
-        }
+            // If interpT > 1 we are falling behind, pop earliest until syncronized
 
-        long snapshotOffsetMS = (long)(snapShotInterval * 1000f) * maxSnapshots + 2;
-        long bufferMS = Client.TickMS - snapshotOffsetMS;// Get data from the networkrate times max snapshots ago to get the buffer ms
+            while (interpT > 1.0f)
+            {
+                // Get the time between the normalized and the end
+                interpT = Mathf.InverseLerp(
+                Previous.SnaphotTime,
+                Current.SnaphotTime,
+                bufferMS);
+
+                PopEarliest(); // Pop 2 oldest that are now valid
+            }
+
+            PopCurrent(); // Now pop the one we want to move to
+           
+        } 
         
-        // Get the time between the normalized and the end
-        interpT = Mathf.InverseLerp(
-        Previous.SnaphotTime,
-        Current.SnaphotTime, 
-        bufferMS);
+        
+        interpT = Mathf.Clamp(interpT, 0f, float.MaxValue);
 
-        //GD.Print(Snapshots.Count);
         GD.Print(Previous.SnaphotTime + " " + Current.SnaphotTime + " " + bufferMS + " " + interpT);
-        
+
         // Lerp
         Local = Previous.InterpWith(Current, interpT);
 

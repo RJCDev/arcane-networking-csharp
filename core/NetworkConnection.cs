@@ -77,6 +77,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     }
     public void Send<T>(T packet, Channels channel, bool instant = false)
     {
+  
         if (!isAuthenticated) return;
         
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
