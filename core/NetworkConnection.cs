@@ -64,7 +64,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
         
         try
         {
-            NetworkPacker.Pack(new HandshakePacket() { netID = netID, ServerStartTicks }, writer);
+            NetworkPacker.Pack(new HandshakePacket() { netID = netID, ServerStartMSUnix = Server.StartTimeMS }, writer);
 
             MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send
         }

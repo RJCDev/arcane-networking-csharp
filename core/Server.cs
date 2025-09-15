@@ -17,6 +17,9 @@ public partial class Server : Node
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
     static uint CurrentNodeID = 0;
 
+    public static long TickMS => StartTimeMS == 0 ? 0 : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - StartTimeMS; 
+    internal static long StartTimeMS;
+
     // Connections to clients that are connected to this server
     public static Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
@@ -240,7 +243,7 @@ public partial class Server : Node
         NetworkManager.AmIServer = true;
 
         // Set the time the server started
-        ArcaneNetworking.StartTimeTicks = Time.GetTicksMsec();
+        StartTimeMS = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         // Intiailize world ONLY if we are headless, we will intialize the world on the client if not
         if (isHeadless) WorldManager.LoadOnlineWorld();
@@ -307,7 +310,6 @@ public partial class Server : Node
         conn.SendHandshake(fromConnection);
 
         GD.Print("[Server] Client Authenticated!");
-
 
     }
 

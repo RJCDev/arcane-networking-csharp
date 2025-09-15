@@ -30,6 +30,9 @@ public partial class Client
     public static Action OnClientAuthenticated;
     public static Action<NetworkedNode> OnClientSpawn;
 
+    public static long TickMS => StartTimeMS == 0 ? 0 : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - StartTimeMS; 
+    static long StartTimeMS;
+
     /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
@@ -267,12 +270,14 @@ public partial class Client
         {
             // TODO // ENCRYPTED AUTHENTICATION // TODO //   
         }
-        
-        GD.Print("[Client] Client Authenticated!");
+
+        StartTimeMS = packet.ServerStartMSUnix;
+
+        GD.Print("[Client] Client Authenticated! ");
 
         serverConnection.isAuthenticated = true;
         serverConnection.localID = packet.netID;
-        
+
         // Instantiate world, we are now authenticated so we can safely do this.
         WorldManager.LoadOnlineWorld();
 
@@ -354,7 +359,7 @@ public partial class Client
             serverConnection.playerObject.Name = " [Conn ID: " + serverConnection.localID + "]";
         }
 
-        GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
+        //GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
 
         OnClientSpawn?.Invoke(netNode);
 

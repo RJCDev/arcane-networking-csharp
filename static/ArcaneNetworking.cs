@@ -16,9 +16,6 @@ public delegate void RPCUnpackDelegate(NetworkReader reader, NetworkedComponent 
 /// </summary>
 public static class ArcaneNetworking
 {
-    public static ulong StartTimeTicks = 0;
-    internal static ulong ServerTick => Time.GetTicksMsec() - StartTimeTicks;
-
     public static readonly Dictionary<int, Type> PacketTypes = new Dictionary<int, Type>();
     
     public static readonly Dictionary<int, RPCUnpackDelegate> RPCMethods = new Dictionary<int, RPCUnpackDelegate>();

@@ -28,8 +28,9 @@ namespace ArcaneNetworking
     {
         [Key(0)] // Your Local ID
         public int netID;
-        [Key(1)]
-        public ulong ServerStartTicks;
+
+        [Key(1)] // The start time of the server in Unix MS
+        public long ServerStartMSUnix;
 
         [Key(2)] // Authentication Payload
         public ArraySegment<byte> AuthPayload;
