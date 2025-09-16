@@ -291,10 +291,13 @@ public partial class Client
         if (packet.PingPong == 0)
         {
             //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
-            serverConnection.Ping(1); // Send Pong if it was a Ping, if it was a Pong
+            serverConnection.Ping(1); // Send Pong if it was a Ping
         }
         else // This was a pong, we need to record the RTT
-            serverConnection.rtt = Time.GetTicksMsec() - serverConnection.lastPingTime;
+        {
+            serverConnection.rtt = TickMS - packet.tickSent;
+            NetworkTime.AddRTTSample((ulong)serverConnection.rtt);
+        }
     }
     static void OnSpawn(SpawnNodePacket packet)
     {

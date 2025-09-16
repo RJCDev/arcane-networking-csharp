@@ -320,10 +320,13 @@ public partial class Server : Node
         if (packet.PingPong == 0)
         {
             //GD.Print("[Server] Sending Pong! " + Time.GetTicksMsec());
-            Connections[fromConnection].Ping(1); // Send Pong if it was a Ping, if it was a Pong
+            Connections[fromConnection].Ping(1); // Send Pong if it was a Ping
+
         }
         else // This was a pong, we need to record the RTT
-            Connections[fromConnection].rtt = Time.GetTicksMsec() - Connections[fromConnection].lastPingTime;
+        {
+            Connections[fromConnection].rtt = TickMS - packet.tickSent;
+        }
     } 
 
     /// <summary>

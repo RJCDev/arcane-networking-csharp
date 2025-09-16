@@ -16,7 +16,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition;
     [Export] public bool SyncRotation;
-    [Export] public bool SyncScale;
 
     [ExportCategory("Interpolation And Corrections")]
     InterpolationMode interpMode = InterpolationMode.Process;
@@ -78,7 +77,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         if (SendTiming == SendTime.Process)
             HandleWrite();
 
-        HandleRead();
+        HandleRead(delta);
     }
 
     void Reset()
@@ -107,22 +106,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
             // Rot
             if (SyncRotation)
             {
-                if (Local.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
-                if (Local.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
-                if (Local.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
-
-            }
-
-            // Scale
-            if (SyncScale)
-            {
-                if (Local.Scale != TransformNode.Scale)
-                {
-                    changes |= Changed.Scale;
-                    valuesChanged.Add(TransformNode.Scale.X);
-                    valuesChanged.Add(TransformNode.Scale.Y);
-                    valuesChanged.Add(TransformNode.Scale.Z);
-                }
+                if (Local.Rot.X != TransformNode.Quaternion.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.Quaternion.X); }
+                if (Local.Rot.Y != TransformNode.Quaternion.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.Quaternion.Y); }
+                if (Local.Rot.Z != TransformNode.Quaternion.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.Quaternion.Z); }
+                if (Local.Rot.W != TransformNode.Quaternion.W) { changes |= Changed.RotW; valuesChanged.Add(TransformNode.Quaternion.W); }
             }
   
             // Send RPC if changes occured
@@ -144,14 +131,16 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
     }
 
-    void HandleRead()
+    void HandleRead(double delta)
     {
         if (NetworkedNode.AmIOwner || NetworkManager.AmIServer)
             return;
 
         // ms per snapshot interval
-        long expectedDiffMs = (long)(1000.0f / NetworkManager.manager.NetworkRate);
+        long expectedDiffMs = (long)(1000.0f / NetworkManager.manager.NetworkRate) + (long)NetworkTime.GetRTTAvg() / 2;
         long bufferSliderMs = Client.TickMS - expectedDiffMs * maxBufferSize;
+
+        //GD.Print((long)NetworkTime.GetRTTAvg());
 
         if (Snapshots.Count < 2)
             return; // Need at least two for interpolation
@@ -162,6 +151,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // Find bracketing snapshots
         foreach (var snap in Snapshots)
         {
+           
             if (snap.SnaphotTime <= bufferSliderMs)
             {
                 prev = snap;
@@ -179,7 +169,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         Previous = prev;
         Current = curr;
 
-    
         // Step 1: Interpolate at buffer time
         float lerpState = Mathf.Clamp(
             Mathf.InverseLerp(
@@ -189,7 +178,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             ),
             0f, 1f
         );
-        
+
         TransformSnapshot interpolated = Previous.Value.InterpWith(Current.Value, lerpState);
 
         // Step 2: Extrapolate forward from buffer time to "now"
@@ -206,7 +195,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         {
             Snapshots.Remove(Snapshots.Min);
         }
-
 
         //GD.Print($"{Previous.Value.SnaphotTime} | (Buffer) {bufferSliderMs} | {Current.Value.SnaphotTime} | Lerp={lerpState} | Extrap={extrapolateSec:F3}s");
         //GD.Print(Snapshots.Count);
@@ -268,20 +256,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
             Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : snap.Pos.Z,
         };
 
-        snap.Rot = Quaternion.FromEuler(new()
+        snap.Rot = new()
         {
             X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : snap.Rot.X,
             Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : snap.Rot.Y,
             Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : snap.Rot.Z,
-        }).Normalized();
-
-        bool updateScale = (changed & Changed.Scale) > 0;
-
-        snap.Scale = new()
-        {
-            X = updateScale ? valuesChanged[readIndex++] : snap.Scale.X,
-            Y = updateScale ? valuesChanged[readIndex++] : snap.Scale.Y,
-            Z = updateScale ? valuesChanged[readIndex++] : snap.Scale.Z,
+            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : snap.Rot.W,
         };
     
         snap.SnaphotTime = tickMS;
@@ -310,7 +290,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         RotX = 1 << 4,
         RotY = 1 << 5,
         RotZ = 1 << 6,
-        Scale = 1 << 7,
+        RotW = 1 << 7,
     }
 
     // A transform snapshot
@@ -337,7 +317,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             {
                 SnaphotTime = SnaphotTime,
                 Pos = Pos.Lerp(other.Pos, amount),
-                Rot = Rot.Slerpni(other.Rot.Normalized(), amount).Normalized(),
+                Rot = Rot.Slerp(other.Rot.Normalized(), amount).Normalized(),
                 Scale = Scale.Lerp(other.Scale, amount)
             };
         }

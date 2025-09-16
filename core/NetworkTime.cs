@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace ArcaneNetworking;
@@ -6,32 +8,46 @@ namespace ArcaneNetworking;
 public class NetworkTime
 {
     // Message processing timing
-    static ulong lastProcessTime, lastPingPongTime;
+    static ulong lastPingPongTime;
 
+    static readonly Queue<ulong> rttSamples = [];
+
+    public static void AddRTTSample(ulong sample)
+    {
+        rttSamples.Enqueue(sample);
+
+        if (rttSamples.Count > 60)
+            rttSamples.Dequeue();
+    }
+
+    public static ulong GetRTTAvg()
+    {
+        if (rttSamples.Count == 0) return 0;
+
+        ulong avg = 0;
+        uint count = (uint)rttSamples.Count;
+        for (int i = 0; i < count; i++)
+        {
+            avg += rttSamples.ElementAt(i);
+        }
+        avg /= count;
+        return avg;
+    }
+    
     // Process loop
     public static void Process()
     {
-        double msElapsed = Time.GetTicksMsec() - lastProcessTime;
-
-        // Regular packets
-        if (msElapsed > 1.0f / NetworkManager.manager.NetworkRate * 1000.0f)
+       if (NetworkManager.AmIClient)
         {
-            
-            if (NetworkManager.AmIClient)
-            {
-                MessageLayer.Active.PollClient();
-                Client.Process();
-            }
-            if (NetworkManager.AmIServer)
-            {
-                MessageLayer.Active.PollServer();
-                Server.Process();
-            }
-
-
-            lastProcessTime = Time.GetTicksMsec();
+            MessageLayer.Active.PollClient();
+            Client.Process();
         }
-
+        if (NetworkManager.AmIServer)
+        {
+            MessageLayer.Active.PollServer();
+            Server.Process();
+        }
+        
         // Process our ping pong events
         PingPongs();
     }

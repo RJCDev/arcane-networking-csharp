@@ -98,6 +98,8 @@ public partial class NetworkedVOIP : NetworkedComponent
 	int sampleRate;
 	int targetFrames => (int)(sampleRate * 0.015f);
 
+	public Action<Vector2[]> OnReceiveFrame;
+
 	public override void _Ready()
 	{
 		jitterBuffer = new(targetFrames);
@@ -185,6 +187,8 @@ public partial class NetworkedVOIP : NetworkedComponent
 		Array.Copy(receiveBuffer, frame, read);
 
 		jitterBuffer.Push(frame);
+
+		OnReceiveFrame?.Invoke(frame);
 	}
 }
 
@@ -193,7 +197,7 @@ public class JitterBuffer
     private readonly Queue<Vector2[]> buffer = new();
     private readonly int packetSize;
 
-    public JitterBuffer(int packetSize, int capacityPackets = 3)
+    public JitterBuffer(int packetSize, int capacityPackets = 4)
     {
         this.packetSize = packetSize;
         for (int i = 0; i < capacityPackets * 2; i++)

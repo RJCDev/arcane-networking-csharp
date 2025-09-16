@@ -40,7 +40,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
     // pingTime is the last time we sent a ping since the game was started
     // The round trip time in ms of the network connection (populates by calling Ping())
-    public ulong lastPingTime, rtt;
+    public long rtt;
 
     public ushort GetPort() => connectionPort;
     public int GetRemoteID() => remoteID;
@@ -110,9 +110,15 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
         try
         {
             var writer = NetworkPool.GetWriter();
-            NetworkPacker.Pack(new PingPongPacket() { PingPong = pingOrPong }, writer); // Pack pingpong
+            
+            NetworkPacker.Pack(new PingPongPacket()
+            {
+                PingPong = pingOrPong,
+                tickSent = NetworkManager.AmIServer ? Server.TickMS : Client.TickMS
 
-            lastPingTime = Time.GetTicksMsec();
+            }, writer); // Pack pingpong
+
+
             MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send instantly
 
             NetworkPool.Recycle(writer);

@@ -61,7 +61,11 @@ namespace ArcaneNetworking
     {
         ///<summary> 0 = Ping, 1 = Pong </summary>
         [Key(0)]
-        public byte PingPong; 
+        public byte PingPong;
+
+        ///<summary> Tick the ping was sent at </summary>
+        [Key(1)]
+        public long tickSent;
     }
     // Instantiates an object over the network
     [MessagePackObject]
