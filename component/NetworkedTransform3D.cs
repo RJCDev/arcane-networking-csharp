@@ -33,14 +33,15 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
     }
 
-    [Export] int maxSnapshots = 3;
+    [Export(PropertyHint.Range, "2, 50, 0.05")] int maxBufferSize;
 
-    float interpT = 1;
+    float lerpState = 1;
 
-    TransformSnapshot Previous, Local, Current;
+    TransformSnapshot Local;
     SortedSet<TransformSnapshot> Snapshots = new();
-    
-    
+
+    public override void _AuthoritySet() { }
+
     public override void _EnterTree()
     {
         if (TransformNode == null && NetworkedNode.Node is not Node3D)
@@ -57,8 +58,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     public override void _NetworkReady()
     {
-        if (NetworkedNode.Node is RigidBody3D body && !NetworkedNode.AmIOwner) body.Freeze = true;
-       
+        if (NetworkManager.AmIClient && TransformNode is RigidBody3D rb) rb.Freeze = true; 
     }
     public override void _PhysicsProcess(double delta)
     {
@@ -82,8 +82,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
     void Reset()
     {
         Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Client.TickMS };
-        Previous = Local;
-        Current = Local;
 
         Snapshots.Clear();
     }
@@ -110,7 +108,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 if (Local.Rot.X != TransformNode.GlobalRotation.X) { changes |= Changed.RotX; valuesChanged.Add(TransformNode.GlobalRotation.X); }
                 if (Local.Rot.Y != TransformNode.GlobalRotation.Y) { changes |= Changed.RotY; valuesChanged.Add(TransformNode.GlobalRotation.Y); }
                 if (Local.Rot.Z != TransformNode.GlobalRotation.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.GlobalRotation.Z); }
-                
+
             }
 
             // Scale
@@ -124,15 +122,15 @@ public partial class NetworkedTransform3D : NetworkedComponent
                     valuesChanged.Add(TransformNode.Scale.Z);
                 }
             }
-
-
+  
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
-                
-                if (NetworkManager.AmIServer)
+
+                if (NetworkManager.AmIServer && AuthorityMode == AuthorityMode.Server)
                     RelayChanged(changes, [.. valuesChanged], Server.TickMS);
-                else
+
+                else if (NetworkManager.AmIClient && AuthorityMode == AuthorityMode.Client)
                     SendChanged(changes, [.. valuesChanged], Client.TickMS);
 
                 // Set our local to be this so we can backtest it again above
@@ -144,58 +142,63 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
     }
 
-    void PopEarliest()
+    TransformSnapshot PopEarliest()
     {
-        Previous = Snapshots.Min;
+        var snap = Snapshots.Min;
         Snapshots.Remove(Snapshots.Min);
+        return snap;
     }
-    void PopCurrent()
-    {
-        Current = Snapshots.Min;
-        Snapshots.Remove(Snapshots.Min);
-    }
+
 
     void HandleRead(double delta)
     {
-        if (NetworkedNode.AmIOwner || NetworkManager.AmIServer) return;
+        if (NetworkedNode.AmIOwner || NetworkManager.AmIServer || Snapshots.Count < 2) return;
 
-        long lat = Current.SnaphotTime - Previous.SnaphotTime;
+        long expectedDiff = (long)(1f / NetworkManager.manager.NetworkRate) * 1000L; // The expected time offset in ms until we get the next snapsho
+        long bufferMidStepMS = Client.TickMS - expectedDiff * maxBufferSize; // The time we are at in the buffer (buffer slider)
 
-        long bufferMS = Client.TickMS - lat;
+        // If the snapshots contained are greater than our max buffer size, 
+        // and our oldest buffer entry is older than our buffer timestamp, process the buffer
 
-        // Pop the 2 newest from the snapshots list
-        if (Snapshots.Count >= maxSnapshots + 2)
+        TransformSnapshot? from = null;
+        TransformSnapshot? to = null;
+
+
+        if (Snapshots.Min.SnaphotTime < bufferMidStepMS)
         {
-            // If interpT > 1 we are falling behind, pop earliest until syncronized
+            // Get the oldest one in the buffer, this will always be older due to the if above
+            from = PopEarliest();
 
-            while (interpT > 1.0f)
+            while (Snapshots.Min.SnaphotTime <= bufferMidStepMS && Snapshots.Count > 0) // Keep popping until we find one that is ahead of our buffer range
             {
-                // Get the time between the normalized and the end
-                interpT = Mathf.InverseLerp(
-                Previous.SnaphotTime,
-                Current.SnaphotTime,
-                bufferMS);
-
-                PopEarliest(); // Pop 2 oldest that are now valid
+                to = PopEarliest(); // Now pop the one we want to move to
             }
 
-            PopCurrent(); // Now pop the one we want to move to
-           
-        } 
-        
-        
-        interpT = Mathf.Clamp(interpT, 0f, float.MaxValue);
+            // At this point we have 2 valid samples that can be used for interpolation
 
-        GD.Print(Previous.SnaphotTime + " " + Current.SnaphotTime + " " + bufferMS + " " + interpT);
+            // float realDiff = bufferMidStepMS - Current.SnaphotTime;
+            // float extrapSecs = 1.0f + realDiff - realDiff;
+            // ApplyExtrap(extrapSecs);
 
-        // Lerp
-        Local = Previous.InterpWith(Current, interpT);
+        }
+
+        if (!from.HasValue || !to.HasValue) return;
+
+        lerpState = Mathf.InverseLerp( // The fractional value between the 2 samples that we are in between in relation to the buffer buffer step
+            from.Value.SnaphotTime,
+            to.Value.SnaphotTime,
+            bufferMidStepMS);
+
+        GD.Print(from.Value.SnaphotTime + " | (Buffer) " +  bufferMidStepMS + " | " + to.Value.SnaphotTime + " | " + lerpState);
+
+        // Lerp between our 2 states based on the fractional lerp state value
+        Local = from.Value.InterpWith(to.Value, lerpState);
 
         TransformNode.GlobalPosition = Local.Pos;
         TransformNode.Quaternion = Local.Rot;
         TransformNode.Scale = Local.Scale;
-        
 
+        
     }
 
     [Command(Channels.Unreliable)]
@@ -203,24 +206,14 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         // Only set on server if we as the server don't own this
         if (!NetworkedNode.AmIOwner)
-            SetServer(changed, valuesChanged, tickMS);
+            SetLocal(changed, valuesChanged, tickMS);
 
         // Tell the clients their new info
         RelayChanged(changed, valuesChanged, tickMS);
     }
 
     [Relay(Channels.Unreliable)]
-    public void RelayChanged(Changed changed, float[] valuesChanged, long tickMS) => SetClient(changed, valuesChanged, tickMS);
-
-    void SetServer(Changed changed, float[] valuesChanged, long tickMS)
-    {
-        Local = ReadSnapshot(changed, valuesChanged, tickMS);
-        TransformNode.GlobalPosition = Local.Pos;
-        TransformNode.Quaternion = Local.Rot;
-        TransformNode.Scale = Local.Scale;
-    }
-
-    void SetClient(Changed changed, float[] valuesChanged, long tickMS)
+    public void RelayChanged(Changed changed, float[] valuesChanged, long tickMS)
     {
         if (NetworkedNode.AmIOwner) return;
 
@@ -228,15 +221,23 @@ public partial class NetworkedTransform3D : NetworkedComponent
         {
             var newSnap = ReadSnapshot(changed, valuesChanged, tickMS);
             Snapshots.Add(newSnap);
+
         }
         else
         {
-            Local = ReadSnapshot(changed, valuesChanged, tickMS);
-            TransformNode.GlobalPosition = Local.Pos;
-            TransformNode.Quaternion = Local.Rot;
-            TransformNode.Scale = Local.Scale;
+            SetLocal(changed, valuesChanged, tickMS);
         }
     }
+
+    void SetLocal(Changed changed, float[] valuesChanged, long tickMS)
+    {
+        Local = ReadSnapshot(changed, valuesChanged, tickMS);
+        TransformNode.GlobalPosition = Local.Pos;
+        TransformNode.Quaternion = Local.Rot;
+        TransformNode.Scale = Local.Scale;
+    }
+
+
 
     /// <summary>
     /// Read a snapshot from values changed
@@ -320,8 +321,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
         /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
         public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
         {
+            if (amount > 1) amount = -amount; // Extrap, flip
+
             return new()
             {
+                SnaphotTime = SnaphotTime,
                 Pos = Pos.Lerp(other.Pos, amount),
                 Rot = Rot.Slerpni(other.Rot, amount),
                 Scale = Scale.Lerp(other.Scale, amount)

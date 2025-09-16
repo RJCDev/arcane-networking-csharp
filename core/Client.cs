@@ -115,7 +115,7 @@ public partial class Client
     /// <para> Stream has [byte][data][data][data] etc. </para>
     /// </summary>
     static void OnClientReceive(ArraySegment<byte> bytes)
-    {
+    {        
         var reader = NetworkPool.GetReader(bytes);
 
         //GD.Print("[Server] Recieve Length: bytes " + + bytes.Count + " " + batchMsgCount);
@@ -165,8 +165,8 @@ public partial class Client
 
                             //GD.PrintErr("[Server] Unpacking RPC..");
                             if (!NetworkedNodes.TryGetValue(callerNetID, out var netNode))
-                            {
-                                GD.PrintErr("[Client] RPC pointed to invalid Networked Node! " + hash);
+                            { 
+                                // Silently return here, this can happen before we are authenticated
                                 return false;
                             }
                             try
@@ -376,6 +376,8 @@ public partial class Client
 
         if (FindNetworkedNode(packet.netID, out NetworkedNode netObject))
         {
+            netObject.OwnerID = packet.newOwner;
+
             // This means its visibility can be changed
             if (netObject.Node.HasMethod("show"))
                 netObject.Node.Set("visible", packet.enabled);

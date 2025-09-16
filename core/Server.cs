@@ -69,7 +69,7 @@ public partial class Server : Node
         }
         else
         {
-            GD.PrintErr($"[Server] No handler registered for packet type {packet.GetType()}");
+            GD.PushError($"[Server] No handler registered for packet type {packet.GetType()}");
             return false;
         }
     }
@@ -188,7 +188,7 @@ public partial class Server : Node
                             //GD.PrintErr("[Server] Unpacking RPC..");
                             if (!NetworkedNodes.TryGetValue(callerNetID, out var netNode))
                             {
-                                GD.PrintErr("[Server] RPC pointed to invalid Networked Node! " + hash);
+                                GD.PushError("[Server] RPC pointed to invalid Networked Node! " + hash);
                                 return false;
                             }
                             try
@@ -197,20 +197,20 @@ public partial class Server : Node
                             }
                             catch (Exception e)
                             {
-                                GD.PrintErr("[Server] RPC Failed to Execute! " + e.Message);
+                                GD.PushError("[Server] RPC Failed to Execute! " + e.Message);
                                 return false;
                             }
                         }
                         else
                         {
-                            GD.PrintErr("[Server] RPC Method Hash not found! " + hash);
+                            GD.PushError("[Server] RPC Method Hash not found! " + hash);
                             return false;
                         }
 
                     }
                     else
                     {
-                        GD.PrintErr("[Server] Could not read RPC Packet! " + hash);
+                        GD.PushError("[Server] Could not read RPC Packet! " + hash);
                         return false;
                     }
 
@@ -219,7 +219,7 @@ public partial class Server : Node
         }
         else
         {
-            GD.PrintErr("[Server] Packet header was invalid on receive!");
+            GD.PushError("[Server] Packet header was invalid on receive!");
             return false;
         }
 
@@ -409,6 +409,7 @@ public partial class Server : Node
             netID = netNode.NetID,
             enabled = enabled,
             destroy = destroy,
+            newOwner = netNode.OwnerID,
         };
 
         SendAll(packet, Channels.Reliable);

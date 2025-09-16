@@ -10,6 +10,7 @@ namespace ArcaneNetworking;
 /// </summary>
 public interface INetworkLogger
 {
+    public void _AuthoritySet();
     /// <summary>
     /// Called right after node is spawned on the server
     /// </summary>
@@ -119,6 +120,8 @@ public partial class NetworkedNode : Node, INetworkLogger
     // Actions
     public Action<int, int> OnOwnerChanged;
 
+    public void _AuthoritySet() { }
+
     public void _NetworkReady()
     {
         if (Node is INetworkLogger node) node._NetworkReady();
@@ -126,7 +129,7 @@ public partial class NetworkedNode : Node, INetworkLogger
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
             comp._NetworkReady();
-        } 
+        }
     }
 
     public void _NetworkDestroy()

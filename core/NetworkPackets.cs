@@ -99,6 +99,9 @@ namespace ArcaneNetworking
 
         [Key(2)]
         public bool destroy;
+
+        [Key(3)]
+        public int newOwner;
     }
 
 }
