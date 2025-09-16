@@ -40,7 +40,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
     // pingTime is the last time we sent a ping since the game was started
     // The round trip time in ms of the network connection (populates by calling Ping())
-    public long rtt;
+    public long rtt, lastPingTime;
 
     public ushort GetPort() => connectionPort;
     public int GetRemoteID() => remoteID;
@@ -61,10 +61,10 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     {
         // if (!isAuthenticated) return; // Bypass
         NetworkWriter writer = NetworkPool.GetWriter();
-        
+
         try
         {
-            NetworkPacker.Pack(new HandshakePacket() { netID = netID, ServerStartMSUnix = Server.StartTimeMS }, writer);
+            NetworkPacker.Pack(new HandshakePacket() { netID = netID }, writer);
 
             MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send
         }
@@ -77,9 +77,9 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     }
     public void Send<T>(T packet, Channels channel, bool instant = false)
     {
-  
+
         if (!isAuthenticated) return;
-        
+
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
         //GD.Print("[NetworkConnection] GetWriter(): " + packet.GetType());
@@ -92,7 +92,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
             if (!instant) Batchers[channel].Push(writer);
             else MessageLayer.Active.SendTo(writer.ToArraySegment(), channel, this);
-            
+
             //GD.Print("[NetworkConnection] Done! " + packet.GetType());
         }
         catch (Exception e)
@@ -105,16 +105,39 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     }
 
     /// Ping connection
-    public void Ping(byte pingOrPong)
+    public void Ping()
     {
         try
         {
             var writer = NetworkPool.GetWriter();
-            
-            NetworkPacker.Pack(new PingPongPacket()
+
+            NetworkPacker.Pack(new PingPacket()
             {
-                PingPong = pingOrPong,
-                tickSent = NetworkManager.AmIServer ? Server.TickMS : Client.TickMS
+                sendTick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+
+            }, writer); // Pack pingpong
+
+            MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send instantly
+
+            NetworkPool.Recycle(writer);
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr(e.Message);
+        }
+
+    }
+    /// Send Pong To Connection
+    public void Pong(long pingTime)
+    {
+        try
+        {
+            var writer = NetworkPool.GetWriter();
+
+            NetworkPacker.Pack(new PongPacket()
+            {
+                sendTick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                pingTick = pingTime
 
             }, writer); // Pack pingpong
 

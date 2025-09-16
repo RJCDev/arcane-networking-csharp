@@ -31,8 +31,7 @@ public partial class Client
     public static Action OnClientAuthenticated;
     public static Action<NetworkedNode> OnClientSpawn;
 
-    static SyncedStopwatch syncedStopwatch;
-    public static long TickMS => syncedStopwatch.ElapsedMs;
+    public static long TickMS => NetworkTime.NowServerTimeMs;
 
     /// <summary>
     /// Registers a function to handle a packet of type T.
@@ -78,7 +77,8 @@ public partial class Client
         RegisterPacketHandler<HandshakePacket>(OnHandshake);
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
-        RegisterPacketHandler<PingPongPacket>(OnPingPong);
+        RegisterPacketHandler<PingPacket>(OnPing);
+        RegisterPacketHandler<PongPacket>(OnPong);
 
         GD.Print("[Client] Internal Handlers Registered");
     }
@@ -273,10 +273,6 @@ public partial class Client
             // TODO // ENCRYPTED AUTHENTICATION // TODO //   
         }
 
-        long timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-        syncedStopwatch = new(packet.ServerStartMSUnix);
-
         GD.Print("[Client] Client Authenticated! ");
 
         serverConnection.isAuthenticated = true;
@@ -288,19 +284,20 @@ public partial class Client
         OnClientAuthenticated?.Invoke();
 
     }
-    static void OnPingPong(PingPongPacket packet)
+    static void OnPing(PingPacket packet)
     {
-        // Send back if it was a ping
-        if (packet.PingPong == 0)
-        {
-            //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
-            serverConnection.Ping(1); // Send Pong if it was a Ping
-        }
-        else // This was a pong, we need to record the RTT
-        {
-            serverConnection.rtt = TickMS - packet.tickSent;
-            NetworkTime.AddRTTSample((ulong)serverConnection.rtt);
-        }
+        //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
+        serverConnection.Pong(packet.sendTick); // Send Pong if it was a Ping
+    }
+    
+    static void OnPong(PongPacket packet)
+    {
+        serverConnection.rtt = TickMS - packet.sendTick;
+
+        NetworkTime.ClientSync(packet.pingTick, packet.pingTick, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+        NetworkTime.AddRTTSample((ulong)serverConnection.rtt);
+    
     }
     static void OnSpawn(SpawnNodePacket packet)
     {
@@ -371,7 +368,7 @@ public partial class Client
         OnClientSpawn?.Invoke(netNode);
 
         netNode._NetworkReady();
-        
+
     }
 
     /// <summary>

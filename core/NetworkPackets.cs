@@ -29,10 +29,7 @@ namespace ArcaneNetworking
         [Key(0)] // Your Local ID
         public int netID;
 
-        [Key(1)] // The start time of the server in Unix MS
-        public long ServerStartMSUnix;
-
-        [Key(2)] // Authentication Payload
+        [Key(1)] // Authentication Payload
         public ArraySegment<byte> AuthPayload;
     }
     
@@ -57,16 +54,26 @@ namespace ArcaneNetworking
 
     // Ping Pong packet
     [MessagePackObject]
-    public struct PingPongPacket : Packet
+    public struct PingPacket : Packet
     {
-        ///<summary> 0 = Ping, 1 = Pong </summary>
-        [Key(0)]
-        public byte PingPong;
-
         ///<summary> Tick the ping was sent at </summary>
-        [Key(1)]
-        public long tickSent;
+        [Key(0)]
+        public long sendTick;
     }
+
+    // Ping Pong packet
+    [MessagePackObject]
+    public struct PongPacket : Packet
+    {
+        ///<summary> Tick the original ping was sent at </summary>
+        [Key(0)]
+        public long pingTick;
+
+        ///<summary> Tick the pong is being sent </summary>
+        [Key(1)]
+        public long sendTick;
+    }
+    
     // Instantiates an object over the network
     [MessagePackObject]
     public struct SpawnNodePacket : Packet

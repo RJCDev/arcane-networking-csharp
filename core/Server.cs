@@ -18,9 +18,8 @@ public partial class Server : Node
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
     static uint CurrentNodeID = 0;
 
-    static SyncedStopwatch syncStopwatch;
-    public static long TickMS => syncStopwatch.ElapsedMs; 
-    internal static long StartTimeMS;
+
+    public static long TickMS => NetworkTime.NowServerTimeMs;
 
     // Connections to clients that are connected to this server
     public static Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
@@ -84,7 +83,8 @@ public partial class Server : Node
 
         // Packet Handlers
         RegisterPacketHandler<HandshakePacket>(OnHandshake);
-        RegisterPacketHandler<PingPongPacket>(OnPingPong);
+        RegisterPacketHandler<PingPacket>(OnPing);
+        RegisterPacketHandler<PongPacket>(OnPong);
 
         GD.Print("[Server] Internal Handlers Registered");
     }
@@ -244,10 +244,6 @@ public partial class Server : Node
 
         NetworkManager.AmIServer = true;
 
-        // Set the time the server started
-        StartTimeMS = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        syncStopwatch = new(StartTimeMS);
-
         // Intiailize world ONLY if we are headless, we will intialize the world on the client if not
         if (isHeadless) WorldManager.LoadOnlineWorld();
 
@@ -317,20 +313,20 @@ public partial class Server : Node
 
     }
 
-    static void OnPingPong(PingPongPacket packet, int fromConnection)
+    static void OnPing(PingPacket packet, int fromConnection)
     {
-        // Send back if it was a ping
-        if (packet.PingPong == 0)
-        {
-            //GD.Print("[Server] Sending Pong! " + Time.GetTicksMsec());
-            Connections[fromConnection].Ping(1); // Send Pong if it was a Ping
+        //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
+        Connections[fromConnection].Pong(packet.sendTick); // Send Pong if it was a Ping
+    }
+    
+    static void OnPong(PongPacket packet, int fromConnection)
+    {
+        Connections[fromConnection].rtt = TickMS - packet.sendTick;
 
-        }
-        else // This was a pong, we need to record the RTT
-        {
-            Connections[fromConnection].rtt = TickMS - packet.tickSent;
-        }
-    } 
+        NetworkTime.AddRTTSample((ulong)Connections[fromConnection].rtt);
+    
+    }
+
 
     /// <summary>
     /// Spawns a Node on the server and relays to all connections
