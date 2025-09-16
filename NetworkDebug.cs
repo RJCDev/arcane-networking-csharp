@@ -8,7 +8,7 @@ using System.Collections;
 public partial class NetworkDebug : Control
 {
     [Export] TextEdit Endpoint;
-    [Export] public Label FPS, RTTLabel, kbps, rwBuffers;
+    [Export] public Label ServerTick, FPS, RTTLabel, kbps, rwBuffers;
     [Export] public Label AmIClientLabel;
     [Export] public Label AmIServerLabel;
     [Export] public Label IsAuthenticatedLabel;
@@ -75,7 +75,7 @@ public partial class NetworkDebug : Control
     public override void _PhysicsProcess(double delta)
     {
 
-
+        ServerTick.Text = "Server Tick " + Client.TickMS.ToString();
         FPS.Text = "FPS: " + ((int)Engine.GetFramesPerSecond()).ToString();
         rwBuffers.Text = "RdBfr: " + NetworkPool.GetReaderPoolSize() + "b |" + "WrtBfr: " + NetworkPool.GetWriterPoolSize() + "b";
 
