@@ -3,6 +3,7 @@ using MessagePack;
 using MessagePack.Formatters;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -17,7 +18,8 @@ public partial class Server : Node
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
     static uint CurrentNodeID = 0;
 
-    public static long TickMS => StartTimeMS == 0 ? 0 : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - StartTimeMS; 
+    static SyncedStopwatch syncStopwatch;
+    public static long TickMS => syncStopwatch.ElapsedMs; 
     internal static long StartTimeMS;
 
     // Connections to clients that are connected to this server
@@ -244,6 +246,7 @@ public partial class Server : Node
 
         // Set the time the server started
         StartTimeMS = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        syncStopwatch = new(StartTimeMS);
 
         // Intiailize world ONLY if we are headless, we will intialize the world on the client if not
         if (isHeadless) WorldManager.LoadOnlineWorld();

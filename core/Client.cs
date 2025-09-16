@@ -2,6 +2,7 @@ using Godot;
 using MessagePack;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
@@ -30,8 +31,8 @@ public partial class Client
     public static Action OnClientAuthenticated;
     public static Action<NetworkedNode> OnClientSpawn;
 
-    public static long TickMS => StartTimeMS == 0 ? 0 : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - StartTimeMS; 
-    static long StartTimeMS;
+    static SyncedStopwatch syncedStopwatch;
+    public static long TickMS => syncedStopwatch.ElapsedMs;
 
     /// <summary>
     /// Registers a function to handle a packet of type T.
@@ -272,7 +273,9 @@ public partial class Client
             // TODO // ENCRYPTED AUTHENTICATION // TODO //   
         }
 
-        StartTimeMS = packet.ServerStartMSUnix;
+        long timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        syncedStopwatch = new(packet.ServerStartMSUnix);
 
         GD.Print("[Client] Client Authenticated! ");
 
