@@ -31,7 +31,7 @@ public partial class Server : Node
 
     public static Action<NetworkedNode> OnServerSpawn;
 
-    public static long TickMS => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    public static long TickMS => ServerTime.LocalTimeMs();
 
     public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
 
@@ -320,7 +320,7 @@ public partial class Server : Node
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
-        Connections[fromConnection].lastRTT = TickMS - packet.sendTick;
+        Connections[fromConnection].lastRTT = TickMS - packet.pongSendTick;
 
         NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);
     

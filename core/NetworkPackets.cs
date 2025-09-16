@@ -70,11 +70,11 @@ namespace ArcaneNetworking
     {
         ///<summary> Tick the original ping was sent at </summary>
         [Key(0)]
-        public long pingTick;
+        public long pingSendTick;
 
         ///<summary> Tick the pong is being sent </summary>
         [Key(1)]
-        public long sendTick;
+        public long pongSendTick;
     }
     
     // Instantiates an object over the network

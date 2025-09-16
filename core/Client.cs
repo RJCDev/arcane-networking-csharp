@@ -294,11 +294,16 @@ public partial class Client
     
     static void OnPong(PongPacket packet)
     {
-        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        serverConnection.lastRTT = now - packet.pingTick;
+        long t3 = ServerTime.LocalTimeMs(); // client receive
+        long t0 = packet.pingSendTick; // client send
+        long t1 = packet.pongSendTick; // server receive
+        long t2 = packet.pongSendTick;    // server send
 
-        Time.Sync(packet.pingTick, packet.sendTick, now); // Syncronize clock if off
+        serverConnection.lastRTT = t3 - packet.pingSendTick;
+
+
+        Time.AddSample(t0, t1, t2, t3);
 
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
     
