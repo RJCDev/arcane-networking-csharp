@@ -31,7 +31,9 @@ public partial class Client
     public static Action OnClientAuthenticated;
     public static Action<NetworkedNode> OnClientSpawn;
 
-    public static long TickMS => NetworkTime.NowServerTimeMs;
+    static readonly ServerTime Time = new();
+
+    public static long TickMS => Time.NowMs;
 
     /// <summary>
     /// Registers a function to handle a packet of type T.
@@ -292,11 +294,13 @@ public partial class Client
     
     static void OnPong(PongPacket packet)
     {
-        serverConnection.rtt = TickMS - packet.sendTick;
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        NetworkTime.ClientSync(packet.pingTick, packet.pingTick, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        serverConnection.lastRTT = now - packet.pingTick;
 
-        NetworkTime.AddRTTSample((ulong)serverConnection.rtt);
+        Time.Sync(packet.pingTick, packet.sendTick, now); // Syncronize clock if off
+
+        NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
     
     }
     static void OnSpawn(SpawnNodePacket packet)

@@ -40,7 +40,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
     // pingTime is the last time we sent a ping since the game was started
     // The round trip time in ms of the network connection (populates by calling Ping())
-    public long rtt, lastPingTime;
+    public long lastRTT, lastPingTime;
 
     public ushort GetPort() => connectionPort;
     public int GetRemoteID() => remoteID;

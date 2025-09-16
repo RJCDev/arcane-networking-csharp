@@ -29,7 +29,10 @@ namespace ArcaneNetworking
         [Key(0)] // Your Local ID
         public int netID;
 
-        [Key(1)] // Authentication Payload
+        [Key(1)]
+        public long sendTime;
+
+        [Key(2)] // Authentication Payload
         public ArraySegment<byte> AuthPayload;
     }
     

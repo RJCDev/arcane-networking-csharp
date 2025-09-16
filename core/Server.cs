@@ -18,9 +18,6 @@ public partial class Server : Node
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
     static uint CurrentNodeID = 0;
 
-
-    public static long TickMS => NetworkTime.NowServerTimeMs;
-
     // Connections to clients that are connected to this server
     public static Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
@@ -33,6 +30,8 @@ public partial class Server : Node
     public static Action<NetworkConnection> OnServerDisconnect;
 
     public static Action<NetworkedNode> OnServerSpawn;
+
+    public static long TickMS => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
 
@@ -321,9 +320,9 @@ public partial class Server : Node
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
-        Connections[fromConnection].rtt = TickMS - packet.sendTick;
+        Connections[fromConnection].lastRTT = TickMS - packet.sendTick;
 
-        NetworkTime.AddRTTSample((ulong)Connections[fromConnection].rtt);
+        NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);
     
     }
 

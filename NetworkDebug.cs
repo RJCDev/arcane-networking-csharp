@@ -86,7 +86,7 @@ public partial class NetworkDebug : Control
 
         if (Client.serverConnection != null)
         {
-            RTTLabel.Text = Client.serverConnection.rtt.ToString() + " MS";
+            RTTLabel.Text = Client.serverConnection.lastRTT.ToString() + " MS";
             IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
         } 
 

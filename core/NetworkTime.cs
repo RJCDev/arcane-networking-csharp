@@ -12,23 +12,6 @@ public class NetworkTime
 
     static readonly Queue<ulong> rttSamples = [];
 
-    public static long OffsetMs = 0; // server - client
-
-    public static void ClientSync(long clientSendTime, long serverTime, long clientReceiveTime)
-    {
-        var RTT = clientReceiveTime - clientSendTime;
-        long latency = RTT / 2;
-
-        // Offset = server time - (client mid-point)
-        OffsetMs = serverTime - (clientSendTime + latency);
-    }
-
-    /// <summary>
-    /// Returns the best estimate of the current server time in Unix ms
-    /// </summary>
-    public static long NowServerTimeMs =>
-        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + OffsetMs;
-
     public static void AddRTTSample(ulong sample)
     {
         rttSamples.Enqueue(sample);
