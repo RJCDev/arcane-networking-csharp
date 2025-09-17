@@ -22,7 +22,7 @@ public class WorldManager
 
     public static void UnloadOnlineWorld()
     {
-        if (ServerWorld == null) return; // If we already have a server world, just return
+        if (ServerWorld == null) return; // If we have no server world, just return
 
         ServerWorld.QueueFree();
         

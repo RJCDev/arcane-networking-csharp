@@ -58,7 +58,7 @@ public class NetworkTime
         double msElapsedPing = Time.GetTicksMsec() - lastPingPongTime;
 
         // Queue Ping Pong Packets
-        if (msElapsedPing > NetworkManager.manager.PingPongFrequency)
+        if (msElapsedPing > NetworkManager.manager.PingFrequency)
         {
             lastPingPongTime = Time.GetTicksMsec();
 
