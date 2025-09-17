@@ -31,7 +31,7 @@ public partial class Server : Node
 
     public static Action<NetworkedNode> OnServerSpawn;
 
-    public static long TickMS => ServerTime.LocalTimeMs();
+    public static long TickMS => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
 

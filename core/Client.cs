@@ -302,14 +302,13 @@ public partial class Client
 
         long t3 = ServerTime.LocalTimeMs(); // client receive (monotonic)
 
-
         serverConnection.lastRTT = t3 - t0;
 
-        // GD.Print("Client Send:" + t0);
-        // GD.Print("Server Receive:" + t1);
-        // GD.Print("Client Receive:" + t3);
-
         Time.AddSample(t0, t1, t2, t3);
+
+        
+        GD.Print("Current Time:" + TickMS);
+
 
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
     
