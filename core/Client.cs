@@ -294,14 +294,20 @@ public partial class Client
     
     static void OnPong(PongPacket packet)
     {
+        long t0 = packet.pingSendTick; // client send (monotonic)
+        
+        long t1 = packet.pongSendTick; // server receive (Utc)
 
-        long t3 = ServerTime.LocalTimeMs(); // client receive
-        long t0 = packet.pingSendTick; // client send
-        long t1 = packet.pongSendTick; // server receive
-        long t2 = packet.pongSendTick;    // server send
+        long t2 = packet.pongSendTick; // server send (Utc)
 
-        serverConnection.lastRTT = t3 - packet.pingSendTick;
+        long t3 = ServerTime.LocalTimeMs(); // client receive (monotonic)
 
+
+        serverConnection.lastRTT = t3 - t0;
+
+        // GD.Print("Client Send:" + t0);
+        // GD.Print("Server Receive:" + t1);
+        // GD.Print("Client Receive:" + t3);
 
         Time.AddSample(t0, t1, t2, t3);
 

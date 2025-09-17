@@ -74,7 +74,7 @@ public partial class NetworkDebug : Control
 
     public override void _PhysicsProcess(double delta)
     {
-
+        ServerTick.Text = "Server Tick " + Client.TickMS.ToString();
         FPS.Text = "FPS: " + ((int)Engine.GetFramesPerSecond()).ToString();
         rwBuffers.Text = "RdBfr: " + NetworkPool.GetReaderPoolSize() + "b |" + "WrtBfr: " + NetworkPool.GetWriterPoolSize() + "b";
 
@@ -85,7 +85,6 @@ public partial class NetworkDebug : Control
 
         if (Client.serverConnection != null && Client.serverConnection.isAuthenticated)
         {
-            ServerTick.Text = "Server Tick " + Client.TickMS.ToString();
             RTTLabel.Text = Client.serverConnection.lastRTT.ToString() + " MS";
             IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
         } 

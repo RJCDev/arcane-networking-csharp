@@ -326,7 +326,6 @@ public partial class Server : Node
     
     }
 
-
     /// <summary>
     /// Spawns a Node on the server and relays to all connections
     /// </summary>

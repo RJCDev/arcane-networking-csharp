@@ -69,15 +69,6 @@ public class NetworkTime
                 Client.serverConnection.Ping();
 
             }
-            if (NetworkManager.AmIServer)
-            {
-                foreach (var connection in Server.Connections)
-                {
-                    //GD.Print("[Server] Pinging At:" + Time.GetTicksMsec());
-
-                    connection.Value.Ping();
-                }
-            }
         }
     }
 }

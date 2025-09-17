@@ -42,8 +42,8 @@ public class ServerTime
     public void AddSample(long t0, long t1, long t2, long t3)
     {
         // Do math in doubles to avoid integer truncation
-        double offset = ((t1 - (double)t0) + (t2 - (double)t3)) / 2.0;
-        double delay = (t3 - (double)t0) - (t2 - (double)t1);
+        long offset = ((t1 - t0) + (t2 - t3)) / 2;
+        long delay = (t3 - t0) - (t2 - t1);
 
         var s = new Sample { T0 = t0, T1 = t1, T2 = t2, T3 = t3, Offset = offset, Delay = delay };
 
@@ -73,7 +73,7 @@ public class ServerTime
         get
         {
             if (!hasOffset)
-                throw new InvalidOperationException("ServerClock has no samples yet.");
+                return 0;
 
             double local = LocalTimeMs();
             return (long)Math.Round(local + chosenOffsetMs);
