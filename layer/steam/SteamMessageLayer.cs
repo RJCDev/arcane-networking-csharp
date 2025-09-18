@@ -4,7 +4,7 @@ using Steamworks;
 using System;
 using System.Runtime.InteropServices;
 
-namespace ArcaneNetworkingSteam;
+namespace ArcaneNetworking;
 
 /// <summary>
 /// Message layer that utilizes SteamNetworkingMessages.

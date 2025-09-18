@@ -23,7 +23,6 @@ public class Server
     public static Action<NetworkConnection> OnServerConnect;
     public static Action<NetworkConnection> OnServerAuthenticate;
     public static Action<NetworkConnection> OnServerDisconnect;
-
     public static Action<NetworkedNode> OnServerSpawn;
 
     public static long TickMS => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();

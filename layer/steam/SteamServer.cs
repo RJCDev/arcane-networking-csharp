@@ -6,7 +6,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace ArcaneNetworkingSteam;
+namespace ArcaneNetworking;
 
 public class SteamServer
 {

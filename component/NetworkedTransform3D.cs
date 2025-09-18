@@ -9,7 +9,7 @@ namespace ArcaneNetworking;
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedComponent
 {
-    Node3D TransformNode = null;
+    [Export] Node3D TransformNode = null;
     [Export] SendTime SendTiming = SendTime.Process;
 
     [ExportCategory("What To Sync")]
@@ -43,7 +43,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     SortedSet<TransformSnapshot> Snapshots = new();
     public override void _EnterTree()
     {
-        if (NetworkedNode.Node is not Node3D)
+        if (NetworkedNode == null || NetworkedNode.Node is not Node3D)
         {
             GD.PushError("(Network Transform) Networked Node's Parent is NOT a Node3D!");
         }

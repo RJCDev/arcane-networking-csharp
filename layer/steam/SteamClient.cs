@@ -5,7 +5,7 @@ using System;
 using System.Buffers;
 using System.Runtime.InteropServices;
 
-namespace ArcaneNetworkingSteam;
+namespace ArcaneNetworking;
 
 public class SteamClient
 {
