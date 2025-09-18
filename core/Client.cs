@@ -1,23 +1,10 @@
 using Godot;
-using MessagePack;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
-using System.Text.Json;
 
 namespace ArcaneNetworking;
 
-public enum ConnetionStatus
-{
-    Connected,
-    Connecting,
-    Disconnected,
-    Diconnecting,
-}
-
-public partial class Client
+public class Client
 {
     internal static readonly Dictionary<int, Action<Packet>> PacketInvokes = [];
 
@@ -307,10 +294,8 @@ public partial class Client
         serverConnection.lastRTT = t3 - t0;
 
         Time.AddSample(t0, t1, t2, t3);
-
         
         //GD.Print("Current Time:" + TickMS);
-
 
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
     

@@ -21,15 +21,11 @@ public enum SendTime
 [GlobalClass, Icon("res://addons/arcane-networking/icon/networked_component.svg")]
 public abstract partial class NetworkedComponent : Node, INetworkLogger
 {
-
     public int GetIndex() => NetworkedNode.NetworkedComponents.IndexOf(this);
-    
     public virtual void SetAuthorityMode(AuthorityMode auth) { AuthorityMode = auth; _AuthoritySet(); }
-    
-    public virtual void _AuthoritySet() { }
-    public virtual void _NetworkReady() { }
-
+    public virtual void _NetworkReady() {}
     public virtual void _NetworkDestroy() {}
+    public virtual void _AuthoritySet() {}
 
     public NetworkedNode NetworkedNode;
 

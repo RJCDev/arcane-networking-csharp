@@ -1,7 +1,8 @@
-using ArcaneNetworking;
+
 using Godot;
 using System;
-using System.Threading.Tasks;
+
+namespace ArcaneNetworking;
 
 public enum Simulate
 {
@@ -9,6 +10,7 @@ public enum Simulate
     Client,
     Both,
 }
+[GlobalClass]
 public partial class LatencyLayer : MessageLayer
 {
     [Export] MessageLayer Underlying;
@@ -25,18 +27,18 @@ public partial class LatencyLayer : MessageLayer
          _eventsHooked = true;
         
         // Client
-        Underlying.OnClientConnect    += () => OnClientConnect?.Invoke();
-        Underlying.OnClientReceive    += (msg) => OnClientReceive?.Invoke(msg);
-        Underlying.OnClientDisconnect += () => OnClientDisconnect?.Invoke();
-        Underlying.OnClientSend       += (msg) => OnClientSend?.Invoke(msg);
-        Underlying.OnClientError      += (code, msg) => OnClientError?.Invoke(code, msg);
+        Underlying.OnClientConnect    = OnClientConnect;
+        Underlying.OnClientReceive    = OnClientReceive;
+        Underlying.OnClientDisconnect = OnClientDisconnect;
+        Underlying.OnClientSend       = OnClientSend;
+        Underlying.OnClientError      = OnClientError;
 
         // Server
-        Underlying.OnServerConnect    += (conn) => OnServerConnect?.Invoke(conn);
-        Underlying.OnServerReceive    += (conn, msg) => OnServerReceive?.Invoke(conn, msg);
-        Underlying.OnServerDisconnect += (conn) => OnServerDisconnect?.Invoke(conn);
-        Underlying.OnServerSend       += (conn, msg) => OnServerSend?.Invoke(conn, msg);
-        Underlying.OnServerError      += (conn, code, msg) => OnServerError?.Invoke(conn, code, msg);
+        Underlying.OnServerConnect    = OnServerConnect;
+        Underlying.OnServerReceive    = OnServerReceive;
+        Underlying.OnServerDisconnect = OnServerDisconnect;
+        Underlying.OnServerSend       = OnServerSend;
+        Underlying.OnServerError      = OnServerError;
 
     }
 

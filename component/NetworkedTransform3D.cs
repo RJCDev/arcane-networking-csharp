@@ -9,8 +9,7 @@ namespace ArcaneNetworking;
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedComponent
 {
-    [Export] Node3D TransformNode = null;
-
+    Node3D TransformNode = null;
     [Export] SendTime SendTiming = SendTime.Process;
 
     [ExportCategory("What To Sync")]
@@ -42,16 +41,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
     TransformSnapshot? Previous, Current;
 
     SortedSet<TransformSnapshot> Snapshots = new();
-
-    public override void _AuthoritySet()
-    {
-        if (NetworkManager.AmIClient && TransformNode is RigidBody3D rb)
-            rb.Freeze = AuthorityMode == AuthorityMode.Server;
-    }
-
     public override void _EnterTree()
     {
-        if (TransformNode == null && NetworkedNode.Node is not Node3D)
+        if (NetworkedNode.Node is not Node3D)
         {
             GD.PushError("(Network Transform) Networked Node's Parent is NOT a Node3D!");
         }
@@ -62,10 +54,14 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
 
     }
-
+    public override void _AuthoritySet()
+    {
+        if (NetworkManager.AmIClientOnly && TransformNode is RigidBody3D rb)
+            rb.Freeze = AuthorityMode == AuthorityMode.Server;
+    }
     public override void _NetworkReady()
     {
-        if (NetworkManager.AmIClient && TransformNode is RigidBody3D rb) rb.Freeze = true;
+        _AuthoritySet();
     }
     public override void _PhysicsProcess(double delta)
     {
@@ -78,12 +74,13 @@ public partial class NetworkedTransform3D : NetworkedComponent
         if (SendTiming == SendTime.Process)
             HandleWrite();
 
-        HandleRead(delta);
+        if (interpMode == InterpolationMode.Process)
+            HandleInterpolate();
     }
 
     void Reset()
     {
-        Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, Scale = TransformNode.Scale, SnaphotTime = Client.TickMS };
+        Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = Client.TickMS };
 
         Snapshots.Clear();
     }
@@ -126,13 +123,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 // Set our local to be this so we can backtest it again above
                 Local.Pos = TransformNode.GlobalPosition;
                 Local.Rot = TransformNode.Quaternion;
-                Local.Scale = TransformNode.Scale;
             }
 
         }
     }
 
-    void HandleRead(double delta)
+    void HandleInterpolate()
     {
         if (NetworkedNode.AmIOwner || NetworkManager.AmIServer)
             return;
@@ -140,8 +136,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // ms per snapshot interval
         long expectedDiffMs = (long)(1000.0f / NetworkManager.manager.NetworkRate) + (long)NetworkTime.GetRTTAvg() / 2;
         long bufferSliderMs = Client.TickMS - expectedDiffMs * maxBufferSize;
-
-        //GD.Print((long)NetworkTime.GetRTTAvg());
 
         if (Snapshots.Count < 2)
             return; // Need at least two for interpolation
@@ -193,7 +187,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // Apply transform
         TransformNode.GlobalPosition = Local.Pos;
         TransformNode.Quaternion = Local.Rot;
-        TransformNode.Scale = Local.Scale;
 
         // Clean Buffer
         while (Snapshots.Count > 0 && Snapshots.Min.SnaphotTime < Previous.Value.SnaphotTime)
@@ -238,7 +231,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         Local = ReadSnapshot(changed, valuesChanged, tickMS);
         TransformNode.GlobalPosition = Local.Pos;
         TransformNode.Quaternion = Local.Rot;
-        TransformNode.Scale = Local.Scale;
     }
 
     /// <summary>
@@ -303,14 +295,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         public Vector3 Pos;
         public Quaternion Rot;
-        public Vector3 Scale;
 
         public long SnaphotTime;
         public TransformSnapshot()
         {
             Pos = Vector3.Zero;
             Rot = Quaternion.Identity;
-            Scale = Vector3.One;
         }
         /// <summary>
         /// TO Extrapolate, use a value larger than 1 for amount
@@ -324,7 +314,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 SnaphotTime = SnaphotTime,
                 Pos = Pos.Lerp(other.Pos, amount),
                 Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
-                Scale = Scale.Lerp(other.Scale, amount)
             };
         }
 
@@ -332,7 +321,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         {
             if (obj is TransformSnapshot s)
             {
-                return Pos == s.Pos && Rot == s.Rot && Scale == s.Scale;
+                return Pos == s.Pos && Rot == s.Rot ;
             }
             else return false;
 
@@ -349,7 +338,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode(), Scale.GetHashCode());
+            return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode());
         }
 
         public int CompareTo(TransformSnapshot other)

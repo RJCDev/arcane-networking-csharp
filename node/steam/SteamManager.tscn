@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0ckwwsnho7ia"]
+
+[ext_resource type="Script" uid="uid://brqok6qy1ibr5" path="res://addons/arcane-networking/node/steam/SteamManager.cs" id="1_nxcpr"]
+
+[node name="SteamManager" type="Node"]
+script = ExtResource("1_nxcpr")

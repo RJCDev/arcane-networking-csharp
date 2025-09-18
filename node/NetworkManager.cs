@@ -65,7 +65,6 @@ public partial class NetworkManager : Node
     public void StartServer(bool headless = false)
     {
         Server.Start(headless);
-        if (!headless) Client.Connect("127.0.0.1");
     }
     public void Connect(string host) => Client.Connect(host);
 

@@ -21,10 +21,10 @@ namespace ArcaneNetworking
         public static MessageLayer Active;
     
         /// <summary>Called when this client connection has throws an error, provided with a message.</summary>
-        public Action<byte, string> OnClientError;
+        public Action<int, string> OnClientError;
         
         /// <summary>Called when a connection has throws an error, provided with a message.</summary>
-        public Action<int, byte, string> OnServerError;
+        public Action<int, int, string> OnServerError;
         /// ON CLIENT ->
         /// <summary>Called by client MessageLayer when the client is connected to the server.</summary>
         public Action OnClientConnect;

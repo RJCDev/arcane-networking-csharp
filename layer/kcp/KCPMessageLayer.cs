@@ -10,6 +10,7 @@ using kcp2k;
 
 namespace ArcaneNetworking
 {
+    [GlobalClass]
     public partial class KCPMessageLayer : MessageLayer
     {
         [Export] KcpConfig KCPConfig = new();
@@ -95,7 +96,7 @@ namespace ArcaneNetworking
             }
 
         }
-        
+
         KcpChannel ToKCPChannel(Channels channel)
         {
             return channel switch

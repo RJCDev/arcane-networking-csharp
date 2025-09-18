@@ -1,16 +1,11 @@
 using Godot;
-using MessagePack;
-using MessagePack.Formatters;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
-using System.Text.Json;
 
 namespace ArcaneNetworking;
 
-public partial class Server : Node
+public class Server
 {
     // Packet Handling
     static readonly Dictionary<int, Action<Packet, int>> PacketInvokes = [];
@@ -19,7 +14,7 @@ public partial class Server : Node
     static uint CurrentNodeID = 0;
 
     // Connections to clients that are connected to this server
-    public static Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
+    public static readonly Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
 
     /// Dictionary of lists of Networked nodes. Keys are NetworkConnection IDs of clients
@@ -106,14 +101,12 @@ public partial class Server : Node
         foreach (var client in Connections)
             Send(packet, client.Value, channel, instant);
     }
-    
     public static void SendAllExcept<T>(T packet, Channels channel = Channels.Reliable, bool instant = false, params int[] ignore) where T : Packet
     {
         foreach (var client in Connections)
             if (!ignore.Contains(client.Key))
                 Send(packet, client.Value, channel, instant);
     }
-
     static void OnServerClientConnect(NetworkConnection connection)
     {
         GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
@@ -154,7 +147,6 @@ public partial class Server : Node
         
         NetworkPool.Recycle(reader);
     }
-
     static bool Unpack(NetworkReader reader, int connID)
     {
         if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
@@ -247,6 +239,9 @@ public partial class Server : Node
         if (isHeadless) WorldManager.LoadOnlineWorld();
 
         GD.Print("[Server] Server Has Started!");
+
+        if (!isHeadless) // Connect our local client
+            Client.Connect("127.0.0.1");
     }
     public static void Stop()
     {
@@ -264,6 +259,12 @@ public partial class Server : Node
         GD.Print("[Server] Server Has Stopped..");
     }
 
+    public static void Disconnect(NetworkConnection conn)
+    {
+        MessageLayer.Active.ServerDisconnect(conn);
+
+        RemoveClient(conn, NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
+    }
     public static void Process()
     {
 
@@ -398,16 +399,16 @@ public partial class Server : Node
     /// <summary>
     /// Modifies the state of a Node on the server
     /// </summary>
-    public static void Modify(NetworkedNode netNode, bool enabled = true, bool destroy = false)
+    public static void Modify(NetworkedNode netNode, bool visible = true, bool destroy = false)
     {
         // This means its visibility can be changed
         if (netNode.Node.HasMethod("show"))
-            netNode.Node.Set("visible", enabled);
+            netNode.Node.Set("visible", visible);
 
         ModifyNodePacket packet = new()
         {
             netID = netNode.NetID,
-            enabled = enabled,
+            enabled = visible,
             destroy = destroy,
             newOwner = netNode.OwnerID,
         };
@@ -428,18 +429,12 @@ public partial class Server : Node
         }
     }
 
-    public static void Disconnect(NetworkConnection conn)
-    {
-        MessageLayer.Active.ServerDisconnect(conn);
-
-        RemoveClient(conn, NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
-    }
 
     /// <summary>
     /// Physically adds a client to the server based on a valid NetworkConnection based on the player prefab,
     /// Sends them all active nodes that need to be spawned
     /// </summary>
-    public static void AddClient(NetworkConnection connection)
+    static void AddClient(NetworkConnection connection)
     {
         foreach (var netNode in NetworkedNodes)
         {
@@ -469,7 +464,7 @@ public partial class Server : Node
 
     }
 
-    public static void RemoveClient(NetworkConnection connection, bool destroyObjects)
+    static void RemoveClient(NetworkConnection connection, bool destroyObjects)
     {
         Connections.Remove(connection.GetRemoteID());
 

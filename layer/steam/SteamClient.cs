@@ -66,12 +66,20 @@ public class SteamClient
                     MessageLayer.Active.OnClientConnect?.Invoke();
                 }
                 break;
-            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
-            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
-                GD.PrintErr("Connection closed remote..." + info.m_info.m_identityRemote.GetSteamID());
-                SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
+            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer: // No errors, they just disconnected us
+                OnCloseConnection(info); 
+                break;
+
+            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally: // THere was a problem, throw an error
+                MessageLayer.Active.OnClientError?.Invoke(info.m_info.m_eEndReason, info.m_info.m_szEndDebug);
+                OnCloseConnection(info);
                 break;
         }
+    }
+    void OnCloseConnection(SteamNetConnectionStatusChangedCallback_t info)
+    {
+        GD.PrintErr("Connection closed remote..." + info.m_info.m_identityRemote.GetSteamID());
+        SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
     }
 
     public void PollMessages(SteamMessageLayer layer)
@@ -82,10 +90,10 @@ public class SteamClient
         {
             SteamNetworkingMessage_t netMessage =
                 Marshal.PtrToStructure<SteamNetworkingMessage_t>(ReceivePointers[i]);
-                
+
             try
             {
-               
+
                 byte[] buffer = ArrayPool<byte>.Shared.Rent(netMessage.m_cbSize);
                 Marshal.Copy(netMessage.m_pData, buffer, 0, netMessage.m_cbSize);
                 var segment = new ArraySegment<byte>(buffer, 0, netMessage.m_cbSize); // Create segment from message pointer

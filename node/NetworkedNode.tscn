@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://b4xq204767j1o"]
-
-[ext_resource type="Script" uid="uid://bhwvc7ds8wbq0" path="res://addons/arcane-networking/node/NetworkedNode.cs" id="1_dg7qt"]
-
-[node name="NetworkedNode" type="Node"]
-script = ExtResource("1_dg7qt")

@@ -1,11 +1,8 @@
 using ArcaneNetworking;
 using Godot;
-using MessagePack;
 using Steamworks;
 using System;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 
 namespace ArcaneNetworkingSteam;
 
@@ -14,6 +11,7 @@ namespace ArcaneNetworkingSteam;
 /// Attempts to parse a URI's host as a steam ID,
 /// Sends messages over the steam NAT relay 
 /// </summary>
+[GlobalClass]
 public partial class SteamMessageLayer : MessageLayer
 {
     public SteamClient SteamClient = new();
