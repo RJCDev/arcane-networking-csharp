@@ -41,7 +41,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     TransformSnapshot? Previous, Current;
 
     SortedSet<TransformSnapshot> Snapshots = new();
-    public override void _EnterTree()
+    public override void _Ready()
     {
         if (NetworkedNode == null || NetworkedNode.Node is not Node3D)
         {
