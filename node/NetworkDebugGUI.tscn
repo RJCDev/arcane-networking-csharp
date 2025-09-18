@@ -4,7 +4,7 @@
 
 [node name="NetworkingDebugGUI" type="CanvasLayer"]
 
-[node name="DebugGUI" type="Control" parent="." node_paths=PackedStringArray("Endpoint", "ServerTick", "FPS", "RTTLabel", "kbps", "rwBuffers", "AmIClientLabel", "AmIServerLabel", "IsAuthenticatedLabel")]
+[node name="DebugGUI" type="Control" parent="." node_paths=PackedStringArray("Endpoint", "ServerTick", "FPS", "RTTLabel", "kbps", "rwBuffers", "AmIClientLabel", "AmIServerLabel", "IsAuthenticatedLabel", "ButtonsBox")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -22,6 +22,7 @@ rwBuffers = NodePath("NetworkingGUIBox/Buffers")
 AmIClientLabel = NodePath("NetworkingGUIBox/AmIClient")
 AmIServerLabel = NodePath("NetworkingGUIBox/AmIServer")
 IsAuthenticatedLabel = NodePath("NetworkingGUIBox/IsAuthenticated")
+ButtonsBox = NodePath("NetworkingGUIBox/ButtonsBox")
 
 [node name="NetworkingGUIBox" type="VBoxContainer" parent="DebugGUI"]
 layout_mode = 1
@@ -88,9 +89,6 @@ text = "127.0.0.1"
 placeholder_text = "Endpoint"
 scroll_fit_content_height = true
 
-[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ServerAndClient" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
 [connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ServerAndClient" to="DebugGUI" method="StartServer" binds= [false]]
-[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/Headless" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]
 [connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/Headless" to="DebugGUI" method="StartServer" binds= [true]]
 [connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder/Client" to="DebugGUI" method="StartClient"]
-[connection signal="pressed" from="DebugGUI/NetworkingGUIBox/ButtonsBox/ClientHolder/Client" to="DebugGUI/NetworkingGUIBox/ButtonsBox" method="hide"]

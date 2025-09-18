@@ -6,12 +6,14 @@ using System.Collections;
 [GlobalClass]
 [Icon("res://addons/arcane-networking/icon/network_debug.svg")]
 public partial class NetworkDebug : Control
-{
-    [Export] TextEdit Endpoint;
-    [Export] public Label ServerTick, FPS, RTTLabel, kbps, rwBuffers;
-    [Export] public Label AmIClientLabel;
-    [Export] public Label AmIServerLabel;
-    [Export] public Label IsAuthenticatedLabel;
+{    [Export] TextEdit Endpoint;
+    [Export] Label ServerTick, FPS, RTTLabel, kbps, rwBuffers;
+    [Export] Label AmIClientLabel;
+    [Export] Label AmIServerLabel;
+    [Export] Label IsAuthenticatedLabel;
+
+    [Export] VBoxContainer ButtonsBox;
+
 
 
     static readonly Queue bytesDownCounter = new();
@@ -37,7 +39,12 @@ public partial class NetworkDebug : Control
         MessageLayer.Active.OnServerSend += OnServerPacketOut;
         MessageLayer.Active.OnServerReceive += OnServerPacketIn;
 
+        MessageLayer.Active.OnClientConnect += OnClientConnect;
+        MessageLayer.Active.OnClientDisconnect += OnClientDisconnect;
     }
+
+    void OnClientConnect() => ButtonsBox.Hide();
+    void OnClientDisconnect() => ButtonsBox.Show();
 
     void StartServer(bool headless) => NetworkManager.manager.StartServer(headless);
     void StartClient() => NetworkManager.manager.Connect(Endpoint.Text);

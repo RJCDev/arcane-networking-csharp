@@ -109,6 +109,8 @@ public partial class Client
     {
         GD.Print("[Client] Client Has Disconnected..");
         serverConnection = null;
+
+        WorldManager.UnloadOnlineWorld();
     }
     
     /// <summary>
