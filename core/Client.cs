@@ -307,7 +307,7 @@ public partial class Client
         Time.AddSample(t0, t1, t2, t3);
 
         
-        GD.Print("Current Time:" + TickMS);
+        //GD.Print("Current Time:" + TickMS);
 
 
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);

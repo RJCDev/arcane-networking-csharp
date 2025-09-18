@@ -19,7 +19,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     [ExportCategory("Interpolation And Corrections")]
     InterpolationMode interpMode = InterpolationMode.Process;
-    [Export] InterpolationMode LinearInterpolation
+    [Export]
+    InterpolationMode LinearInterpolation
     {
         get
         {
@@ -64,13 +65,13 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     public override void _NetworkReady()
     {
-        if (NetworkManager.AmIClient && TransformNode is RigidBody3D rb) rb.Freeze = true; 
+        if (NetworkManager.AmIClient && TransformNode is RigidBody3D rb) rb.Freeze = true;
     }
     public override void _PhysicsProcess(double delta)
     {
         if (SendTiming == SendTime.Physics)
-            HandleWrite();       
-           
+            HandleWrite();
+
     }
     public override void _Process(double delta)
     {
@@ -111,7 +112,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 if (Local.Rot.Z != TransformNode.Quaternion.Z) { changes |= Changed.RotZ; valuesChanged.Add(TransformNode.Quaternion.Z); }
                 if (Local.Rot.W != TransformNode.Quaternion.W) { changes |= Changed.RotW; valuesChanged.Add(TransformNode.Quaternion.W); }
             }
-  
+
             // Send RPC if changes occured
             if (changes != Changed.None)
             {
@@ -151,9 +152,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // Find bracketing snapshots
         foreach (var snap in Snapshots)
         {
-           
+
             if (snap.SnaphotTime <= bufferSliderMs)
             {
+
                 prev = snap;
             }
             else
@@ -165,19 +167,22 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         if (!prev.HasValue || !curr.HasValue)
             return; // can't interpolate without both
-            
+
         Previous = prev;
         Current = curr;
 
+
         // Step 1: Interpolate at buffer time
+        // Make sure we normalize using the current ms, this is required to make sure the numbers don't get too large when we do float math
         float lerpState = Mathf.Clamp(
             Mathf.InverseLerp(
-                Previous.Value.SnaphotTime,
-                Current.Value.SnaphotTime,
-                bufferSliderMs
+                Client.TickMS - Previous.Value.SnaphotTime, 
+                Client.TickMS - Current.Value.SnaphotTime,
+                Client.TickMS -bufferSliderMs
             ),
             0f, 1f
         );
+        //GD.Print(Previous.Value.SnaphotTime + " " + bufferSliderMs + " " + Current.Value.SnaphotTime + " " + lerpState);
 
         TransformSnapshot interpolated = Previous.Value.InterpWith(Current.Value, lerpState);
 
@@ -198,7 +203,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         //GD.Print($"{Previous.Value.SnaphotTime} | (Buffer) {bufferSliderMs} | {Current.Value.SnaphotTime} | Lerp={lerpState} | Extrap={extrapolateSec:F3}s");
         //GD.Print(Snapshots.Count);
-        
+
     }
 
     [Command(Channels.Unreliable)]
@@ -245,7 +250,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         ? Snapshots.Max // most recent one
         : null;
 
-        TransformSnapshot snap = last.HasValue ? last.Value : new(); // Latest snap
+        TransformSnapshot snap = last ?? new(); // Latest snap
 
         int readIndex = 0;
 
@@ -263,7 +268,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : snap.Rot.Z,
             W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : snap.Rot.W,
         };
-    
+
         snap.SnaphotTime = tickMS;
         return snap;
     }
@@ -294,7 +299,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     }
 
     // A transform snapshot
-    public struct TransformSnapshot: IComparable<TransformSnapshot>
+    public struct TransformSnapshot : IComparable<TransformSnapshot>
     {
         public Vector3 Pos;
         public Quaternion Rot;
@@ -313,11 +318,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
         /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
         public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
         {
+
             return new()
             {
                 SnaphotTime = SnaphotTime,
                 Pos = Pos.Lerp(other.Pos, amount),
-                Rot = Rot.Slerp(other.Rot.Normalized(), amount).Normalized(),
+                Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
                 Scale = Scale.Lerp(other.Scale, amount)
             };
         }
@@ -351,6 +357,5 @@ public partial class NetworkedTransform3D : NetworkedComponent
             return SnaphotTime == other.SnaphotTime ? 0 : (SnaphotTime < other.SnaphotTime ? -1 : 1);
         }
     }
-
 }
 
