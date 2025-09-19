@@ -25,8 +25,6 @@ public class Server
     public static Action<NetworkConnection> OnServerDisconnect;
     public static Action<NetworkedNode> OnServerSpawn;
 
-    public static long TickMS => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
     public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
 
     public static int GetConnectionCount() => Connections.Count;
@@ -300,13 +298,10 @@ public class Server
         {
             // TODO // ENCRYPTED AUTHENTICATION // TODO //   
         }
-
-        conn.isAuthenticated = true;
-        AddClient(conn); // We are authenticated, add them to the game
-
-        OnServerAuthenticate?.Invoke(conn);
-
         conn.SendHandshake(fromConnection);
+        conn.isAuthenticated = true;
+        
+        AddClient(conn); // We are authenticated, add them to the game
 
         GD.Print("[Server] Client Authenticated!");
 
@@ -320,7 +315,7 @@ public class Server
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
-        Connections[fromConnection].lastRTT = TickMS - packet.pongSendTick;
+        Connections[fromConnection].lastRTT = NetworkTime.TickMS - packet.pongSendTick;
 
         NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);
     

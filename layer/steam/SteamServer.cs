@@ -79,10 +79,7 @@ public class SteamServer
     {
 
         uint steam32 = (uint)info.m_info.m_identityRemote.GetSteamID().m_SteamID; // Get 32 bit SteamID for connection ID
-
-        // Accept the client
-       
-        
+     
         switch (info.m_info.m_eState)
         {
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting:
@@ -103,25 +100,33 @@ public class SteamServer
                     GD.Print("[Steam Server] Accepted a Networking Session with a remote Client: " + info.m_info.m_identityRemote.GetSteamID());
 
                     MessageLayer.Active.OnServerConnect?.Invoke(incoming); // Invoke to the High-Level API that this Connection in the MessageLayer is connected
-
                 }
 
                 break;
 
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
-            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
 
-                GD.PrintErr("Connection closed..." + info.m_info.m_identityRemote.GetSteamID());
+                OnCloseConnection(info, (int)steam32);
+                break;
 
-                SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, HSteamNetPollGroup.Invalid);
-                SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
-
-                MessageLayer.Active.OnServerDisconnect?.Invoke((int)steam32);
-
-                ClientsConnected.Remove((int)steam32);
-
+            case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally: // Send error
+                
+                OnCloseConnection(info, (int)steam32);
+                MessageLayer.Active.OnServerError?.Invoke((int)steam32, info.m_info.m_eEndReason, info.m_info.m_szEndDebug);
+               
                 break;
         }
+    }
+    void OnCloseConnection(SteamNetConnectionStatusChangedCallback_t info, int conn)
+    {
+        GD.PrintErr("[Steam Server] Connection closed remote..." + info.m_info.m_identityRemote.GetSteamID());
+
+        SteamNetworkingSockets.SetConnectionPollGroup(info.m_hConn, HSteamNetPollGroup.Invalid);
+        SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
+
+        MessageLayer.Active.OnServerDisconnect?.Invoke(conn);
+
+        ClientsConnected.Remove(conn);
     }
 
 
@@ -156,8 +161,8 @@ public class SteamServer
                 SteamNetworkingMessage_t.Release(ReceivePointers[i]); // Tell Steam to free the buffer
             }
         }
-    
-        
+
+
     }
 
 }

@@ -59,26 +59,29 @@ public class SteamClient
         {
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
 
-                if (info.m_info.m_identityRemote.GetSteamID() == RemoteIdentity.GetSteamID())
+                if (info.m_info.m_identityRemote.GetSteamID() == RemoteIdentity.GetSteamID()) // Locally connected
                 {
                     GD.PushWarning("[Steam Client] Connected To Remote Host: " + info.m_info.m_identityRemote.GetSteamID());
 
                     MessageLayer.Active.OnClientConnect?.Invoke();
                 }
                 break;
+
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer: // No errors, they just disconnected us
+
                 OnCloseConnection(info); 
                 break;
 
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally: // THere was a problem, throw an error
-                MessageLayer.Active.OnClientError?.Invoke(info.m_info.m_eEndReason, info.m_info.m_szEndDebug);
+
                 OnCloseConnection(info);
+                MessageLayer.Active.OnClientError?.Invoke(info.m_info.m_eEndReason, info.m_info.m_szEndDebug);
                 break;
         }
     }
     void OnCloseConnection(SteamNetConnectionStatusChangedCallback_t info)
     {
-        GD.PrintErr("Connection closed remote..." + info.m_info.m_identityRemote.GetSteamID());
+        GD.PrintErr("[Steam Client] Connection closed remote..." + info.m_info.m_identityRemote.GetSteamID());
         SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
     }
 

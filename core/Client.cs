@@ -18,10 +18,6 @@ public class Client
     public static Action OnClientAuthenticated;
     public static Action<NetworkedNode> OnClientSpawn;
 
-    static readonly ServerTime Time = new();
-
-    public static long TickMS => Time.NowMs;
-
     /// <summary>
     /// Registers a function to handle a packet of type T.
     /// </summary>
@@ -95,9 +91,10 @@ public class Client
     static void OnClientDisconnect()
     {
         GD.Print("[Client] Client Has Disconnected..");
-        serverConnection = null;
-
         WorldManager.UnloadOnlineWorld();
+        
+        NetworkManager.AmIClient = false;
+        serverConnection = null;
     }
     
     /// <summary>
@@ -226,13 +223,10 @@ public class Client
     public static void Disconnect()
     {
         MessageLayer.Active.StopClient();
-        NetworkManager.AmIClient = false;
-        serverConnection = null;
     }
 
     public static void Process()
     {
-        
         foreach (var batcher in serverConnection.Batchers)
         {
             try
@@ -289,11 +283,11 @@ public class Client
 
         long t2 = packet.pongSendTick; // server send (Utc)
 
-        long t3 = ServerTime.LocalTimeMs(); // client receive (monotonic)
+        long t3 = NetworkTime.LocalTimeMs(); // client receive (monotonic)
 
         serverConnection.lastRTT = t3 - t0;
 
-        Time.AddSample(t0, t1, t2, t3);
+        NetworkTime.AddSample(t0, t1, t2, t3);
         
         //GD.Print("Current Time:" + TickMS);
 

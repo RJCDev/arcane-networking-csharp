@@ -18,6 +18,7 @@ namespace ArcaneNetworking
     {
         [Export] public ushort Port;
 
+        /// <summary> The current MessageLayer that is being used to send and receive data</summary>
         public static MessageLayer Active;
     
         /// <summary>Called when this client connection has throws an error, provided with a message.</summary>
@@ -25,10 +26,10 @@ namespace ArcaneNetworking
         
         /// <summary>Called when a connection has throws an error, provided with a message.</summary>
         public Action<int, int, string> OnServerError;
+
         /// ON CLIENT ->
         /// <summary>Called by client MessageLayer when the client is connected to the server.</summary>
         public Action OnClientConnect;
-
 
         /// <summary>Called by client MessageLayer when the client connected to the server.</summary>
         public Action OnClientDisconnect;
@@ -52,10 +53,9 @@ namespace ArcaneNetworking
         /// <summary>Called by MessageLayer when the server receieves from a client.</summary>
         public Action<ArraySegment<byte>, int> OnServerReceive;
 
-        public override void _Process(double delta) => NetworkTime.Process();
+        public override void _Process(double delta) => NetworkLoop.Process();
 
         public abstract void StartServer(bool isHeadless);
-
         public abstract void StopServer();
 
         public abstract void PollClient();

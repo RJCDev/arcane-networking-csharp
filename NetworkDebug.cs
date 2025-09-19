@@ -81,7 +81,7 @@ public partial class NetworkDebug : Control
 
     public override void _PhysicsProcess(double delta)
     {
-        ServerTick.Text = "Server Tick " + (NetworkManager.AmIClient ? Client.TickMS.ToString() : Server.TickMS.ToString());
+        ServerTick.Text = "Server Tick " + (NetworkManager.AmIClient ? NetworkTime.TickMS.ToString() : NetworkTime.TickMS.ToString());
         FPS.Text = "FPS: " + ((int)Engine.GetFramesPerSecond()).ToString();
         rwBuffers.Text = "RdBfr: " + NetworkPool.GetReaderPoolSize() + "b |" + "WrtBfr: " + NetworkPool.GetWriterPoolSize() + "b";
 
