@@ -6,7 +6,8 @@ using System.Collections;
 [GlobalClass]
 [Icon("res://addons/arcane-networking/icon/network_debug.svg")]
 public partial class NetworkDebug : Control
-{    [Export] TextEdit Endpoint;
+{
+    [Export] TextEdit Endpoint;
     [Export] Label ServerTick, FPS, RTTLabel, kbps, rwBuffers;
     [Export] Label AmIClientLabel;
     [Export] Label AmIServerLabel;
@@ -86,18 +87,30 @@ public partial class NetworkDebug : Control
         rwBuffers.Text = "RdBfr: " + NetworkPool.GetReaderPoolSize() + "b |" + "WrtBfr: " + NetworkPool.GetWriterPoolSize() + "b";
 
         kbps.Text = "Up: " + Math.Round(KbpsUp, 4) + "kbps | Down: " + Math.Round(KbpsDwn, 4) + "kbps";
-        
+
         AmIClientLabel.Text = "Client? " + NetworkManager.AmIClient.ToString();
         AmIServerLabel.Text = "Server? " + NetworkManager.AmIServer.ToString();
-
+        RTTLabel.Text = (NetworkTime.GetSmoothedRTT() / 2).ToString() + " MS";
+        
         if (Client.serverConnection != null && Client.serverConnection.isAuthenticated)
         {
-            RTTLabel.Text = Client.serverConnection.lastRTT.ToString() + " MS";
+
             IsAuthenticatedLabel.Text = "Authenticated? " + Client.serverConnection.isAuthenticated.ToString();
-        } 
+        }
 
         timeCounter += delta;
         ClcltPckSz();
+    }
+    public override void _Process(double delta)
+    {
+        if (Input.IsActionJustPressed("ui_down"))
+        {
+            Engine.MaxFps -= 20;
+        }
+        else if (Input.IsActionJustPressed("ui_up"))
+        {
+            Engine.MaxFps += 20;
+        }
     }
 }
 

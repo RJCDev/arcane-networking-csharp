@@ -8,35 +8,51 @@ namespace ArcaneNetworking;
 public class NetworkLoop
 {
     // Message processing timing
-    static ulong lastPingPongTime;
-    
-    // Process loop
-    public static void Process()
+    static double updateTimer;
+    static double pingPongTimer;
+
+    public static void Poll()
     {
-       if (NetworkManager.AmIClient)
-        {
+        if (NetworkManager.AmIClient)
             MessageLayer.Active.PollClient();
-            Client.Process();
-        }
-        if (NetworkManager.AmIServer)
-        {
-            MessageLayer.Active.PollServer();
-            Server.Process();
-        }
         
+        if (NetworkManager.AmIServer)
+            MessageLayer.Active.PollServer();        
+    }
+    // Process loop
+    public static void Process(double delta)
+    {
+        Poll();
+
+        updateTimer += delta;
+        double step = 1.0d / NetworkManager.manager.NetworkRate;
+
+        while (updateTimer >= step)
+        {
+            updateTimer -= step;
+
+            if (NetworkManager.AmIClient)
+                Client.Process();
+
+            if (NetworkManager.AmIServer)
+                Server.Process();
+
+        }
         // Process our ping pong events
-        PingPongs();
+        PingPongs(delta);
     }
 
-    public static void PingPongs()
+    public static void PingPongs(double delta)
     {
         // At the interval set, attempt to check for packets, and also flush any packets in the queue
-        double msElapsedPing = Time.GetTicksMsec() - lastPingPongTime;
+        pingPongTimer += delta;
+
+        double step = NetworkManager.manager.PingFrequency / 1000.0d;
 
         // Queue Ping Pong Packets
-        if (msElapsedPing > NetworkManager.manager.PingFrequency)
+        if (pingPongTimer >= step)
         {
-            lastPingPongTime = Time.GetTicksMsec();
+            pingPongTimer = 0;
 
             if (NetworkManager.AmIClient)
             {

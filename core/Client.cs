@@ -281,15 +281,13 @@ public class Client
         
         long t1 = packet.pongSendTick; // server receive (Utc)
 
-        long t2 = packet.pongSendTick; // server send (Utc)
+        long t2 = packet.pongSendTick; // server send (Utc) We have to assume here as the server can't tell us after it sent the packet
 
         long t3 = NetworkTime.LocalTimeMs(); // client receive (monotonic)
 
         serverConnection.lastRTT = t3 - t0;
 
-        NetworkTime.AddSample(t0, t1, t2, t3);
-        
-        //GD.Print("Current Time:" + TickMS);
+        NetworkTime.AddTimeSample(t0, t1, t2, t3);
 
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
     

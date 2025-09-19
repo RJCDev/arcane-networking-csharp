@@ -34,7 +34,7 @@ public partial class NetworkManager : Node
     [Export] public int NetworkRate = 60;
 
     /// <summary> The rate at which the server and clients will Ping Pong eachother, 0 would be same as NetworkRate</summary>
-    [Export(PropertyHint.Range, "600, 3200, 1")] public int PingFrequency;
+    [Export(PropertyHint.Range, "600, 3200, 1")] public int PingFrequency = 600;
 
     /// <summary> TThe maximum amount of client connections our server can have at one time</summary>
     [Export] public int MaxConnections = 4;
@@ -60,6 +60,7 @@ public partial class NetworkManager : Node
     {
         manager ??= this;
     }
+    public override void _Process(double delta) => NetworkLoop.Process((float)delta);
 
     // Helper methods
     public void StartServer(bool headless = false)

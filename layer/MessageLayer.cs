@@ -53,8 +53,6 @@ namespace ArcaneNetworking
         /// <summary>Called by MessageLayer when the server receieves from a client.</summary>
         public Action<ArraySegment<byte>, int> OnServerReceive;
 
-        public override void _Process(double delta) => NetworkLoop.Process();
-
         public abstract void StartServer(bool isHeadless);
         public abstract void StopServer();
 

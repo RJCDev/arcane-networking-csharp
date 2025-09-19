@@ -30,12 +30,13 @@ public partial class NetworkedTransform3D : NetworkedComponent
             interpMode = value;
         }
     }
-    [Export(PropertyHint.Range, "2, 50, 0.05")] int maxBufferSize;
+    [Export(PropertyHint.Range, "2, 50, 0.05")] int minBufferMs;
 
     [ExportCategory("Debug")]
     [Export] bool DebugEnabled;
     [Export] MeshInstance3D ServerDebugMesh;
-    float interpStateMs = 0;
+    float interpT = 0;
+    float currentBufferMs = 0;
 
     TransformSnapshot Local;
 
@@ -68,7 +69,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             }
             if (NetworkManager.AmIClient)
             {
-                 if (NetworkManager.AmIClient && AuthorityMode == AuthorityMode.Client)
+                 if (AuthorityMode == AuthorityMode.Client)
                     rb.Freeze = false;
                 else
                     rb.Freeze = true;
@@ -86,23 +87,34 @@ public partial class NetworkedTransform3D : NetworkedComponent
         if (SendTiming == SendTime.Physics)
             HandleWrite();
 
-        if (ServerDebugMesh != null)
+        if (interpMode == InterpolationMode.Physics)
         {
-            ServerDebugMesh.TopLevel = true;
-            ServerDebugMesh.Visible = DebugEnabled;
+            HandleLerp((float)delta);
         }
-            
     }
     public override void _Process(double delta)
     {
         if (SendTiming == SendTime.Process)
             HandleWrite();
-        
+
         if (interpMode == InterpolationMode.Process)
         {
             HandleLerp((float)delta);
         }
-            
+
+        // Debug
+        if (ServerDebugMesh != null)
+        {
+            ServerDebugMesh.TopLevel = true;
+            ServerDebugMesh.Visible = DebugEnabled;
+
+            if (Snapshots.Count > 0)
+            {
+                ServerDebugMesh.GlobalPosition = Snapshots.Max.Pos;
+                ServerDebugMesh.Quaternion = Snapshots.Max.Rot;
+            }
+        }
+        
     }
 
     void Reset()
@@ -138,8 +150,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // Set our local to be this so we can backtest it again above
         Local.Pos = TransformNode.GlobalPosition;
         Local.Rot = TransformNode.Quaternion;
+        
 
-        return (changes, [..valuesChanged]);
+        return (changes, [.. valuesChanged]);
     }
 
     void HandleWrite()
@@ -187,102 +200,89 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     void HandleLerp(float delta)
     {
-        
         if (NetworkedNode.AmIOwner || NetworkManager.AmIServer)
             return;
 
         if (Snapshots.Count < 2)
             return; // Need at least two for interpolation
 
-        // ms per snapshot interval
-        long expectedDiffMs = (long)NetworkTime.GetRTTAvg(); // Calculate latency to make sure we have enough buffer space before processing
-        long interpMs = NetworkTime.TickMS - (expectedDiffMs * maxBufferSize); // Slide "Time" back based on the max buffer size and our latency
+        // Slide Time back based on the max buffer size and our latency
+        long targetBuffer = minBufferMs + (long)(NetworkTime.GetSmoothedRTT() * 2);
+        long renderTime = NetworkTime.TickMS - targetBuffer;
 
-        var (prev, curr) = GetSurroundingSnaps(interpMs); // Grab 2 snaps surrounding this buffer time
+        var (prev, curr) = GetSurroundingSnaps(renderTime); // Grab 2 snaps surrounding this buffer time
 
         if (!prev.HasValue || !curr.HasValue)
             return;
-
+        
         Current = curr;
         Previous = prev;
-
-        long actualDiffMs = Current.Value.SnaphotTime - Previous.Value.SnaphotTime;
-        long offsetSec = Math.Abs(expectedDiffMs - actualDiffMs);
 
         //GD.Print((NetworkTime.TickMS - Current.Value.SnaphotTime) + " " + (NetworkTime.TickMS - bufferSliderMs) + " " +  (NetworkTime.TickMS - Previous.Value.SnaphotTime));
         // Step 1: Interpolate at buffer time
         // Make sure we normalize using the current ms, this is required to make sure the numbers don't get too large when we do float math
 
-        interpStateMs = Mathf.InverseLerp(
+        interpT = Mathf.SmoothStep(
             NetworkTime.TickMS - Current.Value.SnaphotTime,
             NetworkTime.TickMS - Previous.Value.SnaphotTime,
-            NetworkTime.TickMS - interpMs + offsetSec
-        ); 
-        
-        
-        // We need to lerp
-        TransformSnapshot interpolated = Previous.Value.InterpWith(Current.Value, interpStateMs);
+            NetworkTime.TickMS - renderTime
+        );
 
-        // Step 2: Extrapolate forward from buffer time to "now"
-        double extrapolateSec = 1.0f + (NetworkTime.TickMS - interpMs) / 1000.0;
-        
-        Local = interpolated.InterpWith(Current.Value, (float)extrapolateSec);
+        // We need to lerp
+        TransformSnapshot interpolated = Previous.Value.InterpWith(Current.Value, interpT);
+
+        // Extrapolate forward from buffer time to "now"
+        float extrapolateSec = 1.0f + (targetBuffer / 1000.0f);
+
+        Local = interpolated.InterpWith(Current.Value, extrapolateSec);
 
         // Apply transform
         TransformNode.GlobalPosition = Local.Pos;
         TransformNode.Quaternion = Local.Rot;
-      
+
         // Clean Buffer
         while (Snapshots.Count > 0 && Snapshots.Min.SnaphotTime < Previous.Value.SnaphotTime)
         {
             Snapshots.Remove(Snapshots.Min);
         }
 
-        //GD.Print($"{Previous.Value.SnaphotTime} | (Buffer) {bufferSliderMs} | {Current.Value.SnaphotTime} | Lerp={lerpState} | Extrap={extrapolateSec:F3}s");
-        //GD.Print(Snapshots.Count);
-
     }
 
-
-
-    [Command(Channels.Unreliable)]
+    [Command(Channels.Reliable)]
     public void SendChanged(Changed changed, float[] valuesChanged, long tickMS)
     {
         // Only set on server if we as the server don't own this
         if (!NetworkedNode.AmIOwner && NetworkManager.AmIHeadless)
         {
-            ReadSnapshot(changed, valuesChanged, tickMS); // Read it into snapshots list
-            SetLocal(changed, valuesChanged, tickMS);
+            SetNoLerp(changed, valuesChanged, tickMS);
         }
-            
 
         // Tell the clients their new info
         RelayChanged(changed, valuesChanged, tickMS);
 
     }
 
-    [Relay(Channels.Unreliable)]
+    [Relay(Channels.Reliable)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickMS)
     {
         if (NetworkedNode.AmIOwner) return;
 
-        var newSnap = ReadSnapshot(changed, valuesChanged, tickMS);
-
-        if (LinearInterpolation == InterpolationMode.None)
-            SetLocal(changed, valuesChanged, tickMS);
-
-        else // Debug for interp
+        if (LinearInterpolation != InterpolationMode.None)
         {
-            ServerDebugMesh.GlobalPosition = newSnap.Pos;
-            ServerDebugMesh.Quaternion = newSnap.Rot;
+            ReadSnapshot(changed, valuesChanged, tickMS);
+        }
+        else
+        {
+            SetNoLerp(changed, valuesChanged, tickMS);
         }
 
+    }
 
-    }              
-
-    void SetLocal(Changed changed, float[] valuesChanged, long tickMS)
+    void SetNoLerp(Changed changed, float[] valuesChanged, long tickMS)
     {
         Local = ReadSnapshot(changed, valuesChanged, tickMS);
+
+        // Apply transform
         TransformNode.GlobalPosition = Local.Pos;
         TransformNode.Quaternion = Local.Rot;
     }
@@ -329,6 +329,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         None,
         Process,
+        Physics,
 
     }
     // A byte describing what part of the transform was changed
