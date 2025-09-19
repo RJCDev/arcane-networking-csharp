@@ -227,22 +227,20 @@ public partial class NetworkedTransform3D : NetworkedComponent
         float t = (float)(renderTime - Previous.Value.SnaphotTime) /
           (float)(Current.Value.SnaphotTime - Previous.Value.SnaphotTime);
 
-        interpT = Mathf.SmoothStep(0f, 1f, t
-        );
+        interpT = Mathf.SmoothStep(0f, 1f, t);
 
         // We need to lerp
         TransformSnapshot interpolated = Previous.Value.InterpWith(Current.Value, interpT);
 
         // Extrapolate forward from buffer time to "now"
-        // Step 1: time difference between previous and current
+        // Get Time difference between previous and current
         long dt = Current.Value.SnaphotTime - Previous.Value.SnaphotTime;
         if (dt <= 0) dt = 1; // prevent divide by zero
 
-        // Step 2: fraction from current snapshot
+        // Fraction from current snapshot
         float extrapT = (float)(NetworkTime.TickMS - Current.Value.SnaphotTime) / dt;
 
-        // Step 3: optional clamp to limit overshoot
-        extrapT = Mathf.Clamp(extrapT, 0f, 0.1f); // e.g. 0.1..0.2
+        extrapT = Mathf.Clamp(extrapT, 0f, 0.2f); // e.g. 0.1..0.2
 
         Local = interpolated.InterpWith(Current.Value, extrapT);
 

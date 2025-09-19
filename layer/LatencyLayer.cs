@@ -35,6 +35,9 @@ public partial class LatencyLayer : MessageLayer
     List<SimPacket> clientQueue = [];
     List<SimPacket> serverQueue = [];
 
+    void SetClientDelay(float delay) => ClientMaxSendDelaySeconds = delay;
+    void SetClientDropRate(float rate) => ClientDropRate = rate;
+
     // Link to underlying layer
     void HookEvents()
     {
