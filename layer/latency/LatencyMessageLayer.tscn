@@ -1,0 +1,59 @@
+[gd_scene load_steps=2 format=3 uid="uid://q7h7iejsra6j"]
+
+[ext_resource type="Script" uid="uid://dghpfxvdx8718" path="res://addons/arcane-networking/layer/LatencyLayer.cs" id="1_etj4p"]
+
+[node name="LatencyMessageLayer" type="Node"]
+script = ExtResource("1_etj4p")
+Port = 26751
+
+[node name="Debug" type="CanvasLayer" parent="."]
+
+[node name="Control" type="HBoxContainer" parent="Debug"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -106.0
+offset_bottom = 141.0
+grow_horizontal = 0
+size_flags_vertical = 3
+
+[node name="Client Delay" type="VBoxContainer" parent="Debug/Control"]
+custom_minimum_size = Vector2(46.39, 0)
+layout_mode = 2
+
+[node name="VSlider" type="VSlider" parent="Debug/Control/Client Delay"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+size_flags_horizontal = 1
+max_value = 10.0
+step = 0.1
+
+[node name="Text" type="Label" parent="Debug/Control/Client Delay"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Client Delay"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="Client Drop" type="VBoxContainer" parent="Debug/Control"]
+custom_minimum_size = Vector2(46.39, 0)
+layout_mode = 2
+
+[node name="VSlider" type="VSlider" parent="Debug/Control/Client Drop"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+size_flags_horizontal = 1
+max_value = 1.0
+step = 0.01
+
+[node name="Text" type="Label" parent="Debug/Control/Client Drop"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Client Droprate"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[connection signal="value_changed" from="Debug/Control/Client Delay/VSlider" to="." method="SetClientDelay"]
+[connection signal="value_changed" from="Debug/Control/Client Drop/VSlider" to="." method="SetClientDropRate"]
