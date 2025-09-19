@@ -11,12 +11,13 @@ using System.Linq;
 
 public class NetworkTime
 {
+    // Client 
     private const int MaxSamples = 32;
     private static readonly List<Sample> samples = new List<Sample>(MaxSamples);
     private static double chosenOffsetMs = 0.0; // double for fractional ms during calc
     static double chosenOffsetAcc = 0;
     private static bool hasOffset = false;
-    private static readonly double smoothingAlpha = 0.1; // 0..1, small = slow smoothing
+    private static readonly double smoothingAlpha = 0.05; // 0..1, small = slow smoothing
     private static double smoothedRTT = 0;
     const long MaxJumpMs = 50;   
 
@@ -81,6 +82,7 @@ public class NetworkTime
         chosenOffsetMs = (long)Math.Round(chosenOffsetAcc);
     }
 
+
     /// <summary>
     /// Returns current estimate of server Unix ms
     /// </summary>
@@ -88,18 +90,12 @@ public class NetworkTime
     {
         get
         {
-            if (NetworkManager.AmIServer)
-            {
-                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            }
-            else
-            {
-                if (!hasOffset)
-                    return 0;
+            if (!hasOffset && !NetworkManager.AmIServer)
+                return 0;
 
-                double local = LocalTimeMs();
-                return (long)Math.Round(local + chosenOffsetMs);
-            }
+            double local = LocalTimeMs();
+            return (long)Math.Round(local + chosenOffsetMs);
+            
         }
     }
 

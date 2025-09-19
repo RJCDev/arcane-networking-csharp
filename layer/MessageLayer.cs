@@ -68,7 +68,6 @@ namespace ArcaneNetworking
         /// <summary>
         /// Disconnects from another connection if they are valid
         /// </summary>
-        /// <returns>Valid URI MessageLayer?</returns>
         public abstract void StopClient();
 
         /// <summary>

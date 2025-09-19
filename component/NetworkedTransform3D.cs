@@ -36,7 +36,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [Export] bool DebugEnabled;
     [Export] MeshInstance3D ServerDebugMesh;
     float interpT = 0;
-    float currentBufferMs = 0;
+    long currentBufferMs = 0;
 
     TransformSnapshot Local;
 
@@ -207,7 +207,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
             return; // Need at least two for interpolation
 
         // Slide Time back based on the max buffer size and our latency
-        long targetBuffer = minBufferMs + (long)(NetworkTime.GetSmoothedRTT() * 2);
+
+        long snapshotIntervalMs = (long)(1000.0f / NetworkManager.manager.NetworkRate);
+        long targetBuffer = minBufferMs + snapshotIntervalMs + (long)NetworkTime.GetSmoothedRTT();
         long renderTime = NetworkTime.TickMS - targetBuffer;
 
         var (prev, curr) = GetSurroundingSnaps(renderTime); // Grab 2 snaps surrounding this buffer time
@@ -221,20 +223,28 @@ public partial class NetworkedTransform3D : NetworkedComponent
         //GD.Print((NetworkTime.TickMS - Current.Value.SnaphotTime) + " " + (NetworkTime.TickMS - bufferSliderMs) + " " +  (NetworkTime.TickMS - Previous.Value.SnaphotTime));
         // Step 1: Interpolate at buffer time
         // Make sure we normalize using the current ms, this is required to make sure the numbers don't get too large when we do float math
+        
+        float t = (float)(renderTime - Previous.Value.SnaphotTime) /
+          (float)(Current.Value.SnaphotTime - Previous.Value.SnaphotTime);
 
-        interpT = Mathf.SmoothStep(
-            NetworkTime.TickMS - Current.Value.SnaphotTime,
-            NetworkTime.TickMS - Previous.Value.SnaphotTime,
-            NetworkTime.TickMS - renderTime
+        interpT = Mathf.SmoothStep(0f, 1f, t
         );
 
         // We need to lerp
         TransformSnapshot interpolated = Previous.Value.InterpWith(Current.Value, interpT);
 
         // Extrapolate forward from buffer time to "now"
-        float extrapolateSec = 1.0f + (targetBuffer / 1000.0f);
+        // Step 1: time difference between previous and current
+        long dt = Current.Value.SnaphotTime - Previous.Value.SnaphotTime;
+        if (dt <= 0) dt = 1; // prevent divide by zero
 
-        Local = interpolated.InterpWith(Current.Value, extrapolateSec);
+        // Step 2: fraction from current snapshot
+        float extrapT = (float)(NetworkTime.TickMS - Current.Value.SnaphotTime) / dt;
+
+        // Step 3: optional clamp to limit overshoot
+        extrapT = Mathf.Clamp(extrapT, 0f, 0.1f); // e.g. 0.1..0.2
+
+        Local = interpolated.InterpWith(Current.Value, extrapT);
 
         // Apply transform
         TransformNode.GlobalPosition = Local.Pos;

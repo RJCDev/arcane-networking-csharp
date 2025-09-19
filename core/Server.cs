@@ -237,6 +237,7 @@ public class Server
 
         GD.Print("[Server] Server Has Started!");
 
+
         if (!isHeadless) // Connect our local client
             Client.Connect("127.0.0.1");
     }

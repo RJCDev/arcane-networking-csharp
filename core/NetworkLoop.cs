@@ -14,10 +14,16 @@ public class NetworkLoop
     public static void Poll()
     {
         if (NetworkManager.AmIClient)
+        {
             MessageLayer.Active.PollClient();
-        
+        }
+
+
         if (NetworkManager.AmIServer)
-            MessageLayer.Active.PollServer();        
+        {
+            MessageLayer.Active.PollServer();
+        }
+            
     }
     // Process loop
     public static void Process(double delta)
@@ -35,14 +41,17 @@ public class NetworkLoop
                 Client.Process();
 
             if (NetworkManager.AmIServer)
+            {
                 Server.Process();
+            }
+                
 
         }
         // Process our ping pong events
         PingPongs(delta);
     }
 
-    public static void PingPongs(double delta)
+    static void PingPongs(double delta)
     {
         // At the interval set, attempt to check for packets, and also flush any packets in the queue
         pingPongTimer += delta;

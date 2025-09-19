@@ -136,7 +136,7 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
 
             NetworkPacker.Pack(new PongPacket()
             {
-                pongSendTick = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                pongSendTick = NetworkTime.LocalTimeMs(),
                 pingSendTick = pingTime
 
             }, writer); // Pack pingpong
