@@ -227,6 +227,9 @@ public class Client
 
     public static void Process()
     {
+        foreach (var netNode in NetworkedNodes)
+            netNode.Value._NetworkUpdate();
+
         foreach (var batcher in serverConnection.Batchers)
         {
             try
@@ -247,6 +250,7 @@ public class Client
             }
 
         }
+
     }
 
     ////////////////////////// Internal Packet Callbacks
@@ -261,7 +265,7 @@ public class Client
         GD.Print("[Client] Client Authenticated! ");
 
         serverConnection.isAuthenticated = true;
-        serverConnection.localID = packet.netID;
+        serverConnection.localID = packet.yourConnID;
 
         // Instantiate world, we are now authenticated so we can safely do this.
         WorldManager.LoadOnlineWorld();

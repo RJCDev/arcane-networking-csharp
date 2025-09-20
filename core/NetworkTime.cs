@@ -1,25 +1,29 @@
 using System;
 using System.Diagnostics;
-using Godot;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ArcaneNetworking;
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-
 public class NetworkTime
 {
+    struct Sample
+    {
+        public long T0, T1, T2, T3;
+        public long Offset;
+        public long Delay;
+    }
+
     // Client 
-    private const int MaxSamples = 32;
-    private static readonly List<Sample> samples = new List<Sample>(MaxSamples);
+    private const int MaxSamples = 32; // Max RTT Samples
+    private static readonly List<Sample> samples = new(MaxSamples);
     private static double chosenOffsetMs = 0.0; // double for fractional ms during calc
     static double chosenOffsetAcc = 0;
     private static bool hasOffset = false;
-    private static readonly double smoothingAlpha = 0.05; // 0..1, small = slow smoothing
+    private static readonly double smoothingAlpha = 0.5; // 0..1, small = slow smoothing
     private static double smoothedRTT = 0;
-    const long MaxJumpMs = 50;   
+
+    const long MaxJumpMs = 50;
 
     public static void AddRTTSample(ulong sample)
     {
@@ -31,15 +35,9 @@ public class NetworkTime
     }
     public static ulong GetSmoothedRTT() { return (ulong)smoothedRTT; }
 
-    public static long LocalTimeMs() =>
+    public static long LocalTimeMs() => // Monotonic Clock
         (Stopwatch.GetTimestamp() * 1000L) / Stopwatch.Frequency;
 
-    private class Sample
-    {
-       public long T0, T1, T2, T3;
-        public long Offset;
-        public long Delay;
-    }
 
     /// <summary>
     /// Add a new sync sample (t0 client send, t1 server receive, t2 server send, t3 client receive)
@@ -49,7 +47,7 @@ public class NetworkTime
     {
         // Compute offset and delay
         long offset = ((t1 - t0) + (t2 - t3)) / 2;
-        long delay  = (t3 - t0) - (t2 - t1);
+        long delay = (t3 - t0) - (t2 - t1);
 
         // Add sample to rolling buffer
         samples.Add(new Sample { T0 = t0, T1 = t1, T2 = t2, T3 = t3, Offset = offset, Delay = delay });
@@ -82,7 +80,6 @@ public class NetworkTime
         chosenOffsetMs = (long)Math.Round(chosenOffsetAcc);
     }
 
-
     /// <summary>
     /// Returns current estimate of server Unix ms
     /// </summary>
@@ -95,7 +92,7 @@ public class NetworkTime
 
             double local = LocalTimeMs();
             return (long)Math.Round(local + chosenOffsetMs);
-            
+
         }
     }
 

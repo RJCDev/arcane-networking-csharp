@@ -265,7 +265,9 @@ public class Server
     }
     public static void Process()
     {
-
+        foreach (var netNode in NetworkedNodes)
+            netNode.Value._NetworkUpdate();
+            
         foreach (var conn in Connections)
         {
             foreach (var batcher in conn.Value.Batchers)
@@ -299,6 +301,7 @@ public class Server
         {
             // TODO // ENCRYPTED AUTHENTICATION // TODO //   
         }
+
         conn.SendHandshake(fromConnection);
         conn.isAuthenticated = true;
         

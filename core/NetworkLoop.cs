@@ -41,10 +41,7 @@ public class NetworkLoop
                 Client.Process();
 
             if (NetworkManager.AmIServer)
-            {
-                Server.Process();
-            }
-                
+                Server.Process();                
 
         }
         // Process our ping pong events

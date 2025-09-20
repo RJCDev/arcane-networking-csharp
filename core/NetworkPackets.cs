@@ -27,7 +27,7 @@ namespace ArcaneNetworking
     public struct HandshakePacket : Packet
     {
         [Key(0)] // Your Local ID
-        public int netID;
+        public int yourConnID;
 
         [Key(1)]
         public long sendTime;
