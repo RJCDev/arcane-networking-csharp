@@ -11,6 +11,7 @@ namespace ArcaneNetworking;
 public interface INetworkLogger
 {
     public void _AuthoritySet();
+
     /// <summary>
     /// Called right after node is spawned on the server
     /// </summary>
@@ -28,7 +29,7 @@ public interface INetworkLogger
 /// </summary>
 [GlobalClass]
 [Icon("res://addons/arcane-networking/icon/networked_node.svg")]
-public partial class NetworkedNode : Node, INetworkLogger
+public sealed partial class NetworkedNode : Node, INetworkLogger
 {
     [ExportGroup("Network Identity")]
 
@@ -85,8 +86,6 @@ public partial class NetworkedNode : Node, INetworkLogger
 
     public uint NetID;
 
-    public uint PrefabID; // Keep track of this so we can duplicate it easier / send it easier
-
     // Networked Components
     public Array<NetworkedComponent> NetworkedComponents = [];
 
@@ -120,7 +119,17 @@ public partial class NetworkedNode : Node, INetworkLogger
     // Actions
     public Action<int, int> OnOwnerChanged;
 
-    public void _AuthoritySet() { }
+    public override void _Ready() => _NetworkReady();
+
+    public void _AuthoritySet()
+    {
+        if (Node is INetworkLogger node) node._AuthoritySet();
+
+        foreach (NetworkedComponent comp in NetworkedComponents)
+        {
+            comp._AuthoritySet();
+        }
+    }
 
     public void _NetworkReady()
     {
@@ -145,12 +154,45 @@ public partial class NetworkedNode : Node, INetworkLogger
     // Find all Networked Components
     public override void _EnterTree()
     {
+        // If the NetID is 0 when it enters the tree, it was put in the scene by the user, and not by Server.Spawn()
+        // We need to register it
+        if (NetID == 0)
+        {
+            NetID = (uint)ExtensionMethods.StableHash(GetPath().ToString());
+
+            int collisionCount = 0;
+
+            if (NetworkManager.AmIServer)
+            {
+                while (!Server.NetworkedNodes.TryAdd(NetID, this)) // If there happens to be a collision
+                {
+                    NetID = (uint)ExtensionMethods.StableHash(collisionCount + GetPath().ToString());
+                    collisionCount++;
+                }
+            }
+            
+            if (NetworkManager.AmIClient)
+            {
+                while (!Client.NetworkedNodes.TryAdd(NetID, this)) // If there happens to be a collision
+                {
+                    NetID = (uint)ExtensionMethods.StableHash(collisionCount + GetPath().ToString());
+                    collisionCount++;
+                }
+            }
+        }
+
         ChildEnteredTree += OnChildAdded;
+
     }
 
     // Destroy all Networked Components
     public override void _ExitTree()
     {
+        if (NetworkManager.AmIServer)
+            Server.NetworkedNodes.Remove(NetID);
+
+        if (NetworkManager.AmIClient)
+            Client.NetworkedNodes.Remove(NetID);
         ChildEnteredTree -= OnChildAdded;
     }
 

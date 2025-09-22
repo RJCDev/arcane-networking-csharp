@@ -11,7 +11,7 @@ public class Server
     static readonly Dictionary<int, Action<Packet, int>> PacketInvokes = [];
 
     // Used to make sure ids are unique, incremented whenever a network object is registered, never reduces in value
-    static uint CurrentNodeID = 0;
+    static uint CurrentNodeID = 1;
 
     // Connections to clients that are connected to this server
     public static readonly Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
@@ -343,7 +343,6 @@ public class Server
 
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
-        netNode.PrefabID = prefabID;
         int netOwner = owner != null ? owner.GetRemoteID() : 0;
         netNode.OwnerID = netOwner;
 
@@ -365,7 +364,6 @@ public class Server
                 (spawnedObject as Node3D).GlobalBasis = basis;
             }
 
-            netNode._NetworkReady();
         }
         
         NetworkedNodes.Add(netNode.NetID, netNode);
@@ -438,7 +436,6 @@ public class Server
             SpawnNodePacket packet = new()
             {
                 netID = netNode.Value.NetID,
-                prefabID = netNode.Value.PrefabID,
                 position = node3D != null ? [node3D.GlobalPosition.X, node3D.GlobalPosition.Y, node3D.GlobalPosition.Z] : [0, 0, 0],
                 rotation = node3D != null ? [node3D.Quaternion.X, node3D.Quaternion.Y, node3D.Quaternion.Z, node3D.Quaternion.W] : [0, 0, 0, 1],
                 scale = node3D != null ? [node3D.Scale.X, node3D.Scale.Y, node3D.Scale.Z] : [0, 0, 0],

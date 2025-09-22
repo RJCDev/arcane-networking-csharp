@@ -18,7 +18,6 @@ public static class ExtensionMethods
         return BitConverter.ToInt32(hash, 0);
     }
 
-
     public static Guid GenerateGUID(this string hashData)
     {
         using (MD5 md5 = MD5.Create())

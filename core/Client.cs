@@ -315,7 +315,6 @@ public class Client
                 netNode = spawnedObject.FindChild<NetworkedNode>();
 
                 // Occupy Data (it will be occupied already if we are a client and server)
-                netNode.PrefabID = packet.prefabID;
                 netNode.NetID = packet.netID;
                 netNode.OwnerID = packet.ownerID;
 
@@ -348,6 +347,7 @@ public class Client
 
             NetworkedNodes.Add(packet.netID, netNode);
         }
+
         netNode.Enabled = true; // Set Process enabled
 
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
@@ -359,8 +359,6 @@ public class Client
         //GD.Print("[Client] Spawned Networked Node: " + netNode.NetID);
 
         OnClientSpawn?.Invoke(netNode);
-
-        netNode._NetworkReady();
 
     }
 
