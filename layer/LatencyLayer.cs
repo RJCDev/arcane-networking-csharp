@@ -107,6 +107,7 @@ public partial class LatencyLayer : MessageLayer
         // Sending as client
         if (NetworkManager.AmIClient && conn == Client.serverConnection)
         {
+            //GD.Print(rand.Randf() + " " + ClientDropRate + " " + channel);
             if (rand.Randf() < ClientDropRate && channel == Channels.Unreliable)
             {
                 GD.PrintErr("[Client Simulation] Dropping Packet!");

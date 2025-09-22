@@ -26,6 +26,7 @@ public abstract partial class NetworkedComponent : Node, INetworkLogger
     public virtual void _NetworkReady() {}
     public virtual void _NetworkDestroy() {}
     public virtual void _AuthoritySet() {}
+    public virtual void _NetworkUpdate() {}
 
     public NetworkedNode NetworkedNode;
 

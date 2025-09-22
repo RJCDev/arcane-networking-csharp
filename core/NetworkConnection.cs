@@ -57,14 +57,14 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
         Batchers[channel].Push(writer);
     }
 
-    public void SendHandshake(int netID = 0)
+    public void SendHandshake(int connID = 0)
     {
         // if (!isAuthenticated) return; // Bypass
         NetworkWriter writer = NetworkPool.GetWriter();
 
         try
         {
-            NetworkPacker.Pack(new HandshakePacket() { netID = netID }, writer);
+            NetworkPacker.Pack(new HandshakePacket() { yourConnID = connID }, writer);
 
             MessageLayer.Active.SendTo(writer.ToArraySegment(), Channels.Reliable, this); // Send
         }

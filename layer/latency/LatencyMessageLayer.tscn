@@ -27,6 +27,7 @@ layout_mode = 2
 size_flags_horizontal = 1
 max_value = 10.0
 step = 0.1
+ticks_position = 3
 
 [node name="Text" type="Label" parent="Debug/Control/Client Delay"]
 layout_mode = 2

@@ -18,6 +18,11 @@ public interface INetworkLogger
     public void _NetworkReady();
 
     /// <summary>
+    /// Called just before a network update is sent
+    /// </summary>
+    public void _NetworkUpdate();
+
+    /// <summary>
     /// Called just before node is destroyed on the server
     /// </summary>
     public void _NetworkDestroy();
@@ -148,6 +153,16 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
             comp._NetworkDestroy();
+        } 
+    }
+
+    public void _NetworkUpdate()
+    {
+        if (Node is INetworkLogger node) node._NetworkUpdate();
+
+        foreach (NetworkedComponent comp in NetworkedComponents)
+        {
+            comp._NetworkUpdate();
         } 
     }
 
