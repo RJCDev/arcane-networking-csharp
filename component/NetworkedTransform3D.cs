@@ -72,12 +72,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
             }
             if (NetworkManager.AmIClient)
             {
-                 if (AuthorityMode == AuthorityMode.Client)
+                if (AuthorityMode == AuthorityMode.Client)
                     rb.Freeze = false;
                 else
                     rb.Freeze = true;
             }
-        
+
         }
        
     }

@@ -90,6 +90,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
     }
 
     public uint NetID;
+    public uint PrefabID;
 
     // Networked Components
     public Array<NetworkedComponent> NetworkedComponents = [];
@@ -185,7 +186,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
                     collisionCount++;
                 }
             }
-            
+
             if (NetworkManager.AmIClient)
             {
                 while (!Client.NetworkedNodes.TryAdd(NetID, this)) // If there happens to be a collision
@@ -208,6 +209,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
 
         if (NetworkManager.AmIClient)
             Client.NetworkedNodes.Remove(NetID);
+
         ChildEnteredTree -= OnChildAdded;
     }
 

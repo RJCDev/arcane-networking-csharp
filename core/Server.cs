@@ -347,6 +347,7 @@ public class Server
         // Occupy Data
         netNode.NetID = CurrentNodeID++;
         int netOwner = owner != null ? owner.GetRemoteID() : 0;
+        netNode.PrefabID = prefabID;
         netNode.OwnerID = netOwner;
 
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
@@ -382,6 +383,7 @@ public class Server
 
         };
 
+
         //GD.Print("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
@@ -413,8 +415,6 @@ public class Server
 
         if (destroy)
         {
-            NetworkedNodes.Remove(netNode.NetID);
-
             // Only if we are headless, if not then we will destroy when we get to the client
             if (NetworkManager.AmIHeadless)
             {
@@ -439,11 +439,11 @@ public class Server
             SpawnNodePacket packet = new()
             {
                 netID = netNode.Value.NetID,
+                prefabID = netNode.Value.PrefabID,
                 position = node3D != null ? [node3D.GlobalPosition.X, node3D.GlobalPosition.Y, node3D.GlobalPosition.Z] : [0, 0, 0],
                 rotation = node3D != null ? [node3D.Quaternion.X, node3D.Quaternion.Y, node3D.Quaternion.Z, node3D.Quaternion.W] : [0, 0, 0, 1],
                 scale = node3D != null ? [node3D.Scale.X, node3D.Scale.Y, node3D.Scale.Z] : [0, 0, 0],
                 ownerID = netNode.Value.OwnerID
-
             };
 
             Send(packet, connection, Channels.Reliable);

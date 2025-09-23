@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 namespace ArcaneNetworking;
 
 public delegate void RPCUnpackDelegate(NetworkReader reader, NetworkedComponent target);
+
 /// <summary>
 /// Storage singleton that takes data from the weaver and produces resources that can be
 /// persistantly stored during runtime

@@ -76,7 +76,6 @@ public class Client
         //GD.Print("[Client] Send: " + packet.GetType());
 
         serverConnection.Send(packet, channel, instant);
-
     }
 
     static void OnClientConnect()
@@ -300,10 +299,10 @@ public class Client
     {
         Node spawnedObject = null;
         NetworkedNode netNode = null;
-
+        
         if (NetworkedNodes.ContainsKey(packet.netID))
         {
-            GD.Print("[Client] We Already Have Networked Node: " + packet.netID);
+            GD.Print("[Client] We Already Have Networked Node Or It was In The Scene Tree On The Client: " + packet.netID);
             return; // Check if we already got this packet
         }
         else
@@ -311,6 +310,7 @@ public class Client
             // We are a client only, just spawn it normally
             if (NetworkManager.AmIClientOnly)
             {
+
                 spawnedObject = NetworkManager.manager.NetworkNodeScenes[(int)packet.prefabID].Instantiate<Node>();
 
                 //GD.Print("[Client] Spawning Networked Node: " + packet.netID + " | Prefab ID: " + (int)packet.prefabID);
@@ -320,6 +320,7 @@ public class Client
 
                 // Occupy Data (it will be occupied already if we are a client and server)
                 netNode.NetID = packet.netID;
+                netNode.PrefabID = packet.prefabID;
                 netNode.OwnerID = packet.ownerID;
 
                 if (netNode == null)
@@ -382,9 +383,7 @@ public class Client
 
             if (packet.destroy)
             {
-                 // Check if we should send logger functions
-                if (netObject.Node is INetworkLogger logger)
-                    logger._NetworkDestroy();
+                netObject._NetworkDestroy();
 
                 // Remove from tree if we want to remove this NetworkedObject (keep reference in list though)
                 netObject.Node.QueueFree();
