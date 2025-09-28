@@ -16,6 +16,7 @@ public class Client
 
     public static Action OnClientConnected;
     public static Action OnClientAuthenticated;
+    
     public static Action<NetworkedNode> OnClientSpawn;
 
     /// <summary>

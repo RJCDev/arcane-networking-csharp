@@ -11,6 +11,7 @@ using ArcaneNetworking;
 [Icon("res://addons/arcane-networking/icon/steam_manager.svg")]
 public partial class SteamManager : Node
 {
+    public static CSteamID MySteamID;
     public static SteamManager manager = null;
     public SteamManager() => manager ??= this;
 
@@ -23,7 +24,6 @@ public partial class SteamManager : Node
     {
         SteamAPI.RunCallbacks();
     }
-
 
     public override void _EnterTree()
     {
@@ -65,6 +65,8 @@ public partial class SteamManager : Node
             GD.PrintErr("Steam Err: " + e.Message);
             return;
         }
+
+        MySteamID = SteamUser.GetSteamID();
     }
 
     public override void _Notification(int what)
