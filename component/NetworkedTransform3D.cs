@@ -48,9 +48,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
     SortedSet<TransformSnapshot> Snapshots = new();
     public override void _Ready()
     {
-        if (NetworkedNode == null || NetworkedNode.Node is not Node3D)
+        if (TransformNode == null)
         {
-            GD.PushError("(Network Transform) Networked Node's Parent is NOT a Node3D!");
+            GD.PushError("(Network Transform) Networked Node is NULL!");
         }
         else
         {
