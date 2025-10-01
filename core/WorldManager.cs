@@ -11,7 +11,7 @@ public class WorldManager
 
     public static void LoadOnlineWorld()
     {
-        if (ServerWorld != null) return; // If we already have a server world, just return
+        if (ServerWorld != null || NetworkManager.manager.OnlineScene == null) return; // If we already have a server world, just return
 
         ServerWorld = NetworkManager.manager.OnlineScene.Instantiate();
         NetworkManager.manager.GetTree().Root.AddChild(ServerWorld);
