@@ -61,6 +61,21 @@ public static class ExtensionMethods
         return result as T;
 
     }
+
+    public static List<T> GetAllChildrenRecursive<T>(this Node Parent) where T : Node
+    {
+        List<T> result = [];
+        foreach (Node child in Parent.GetChildren())
+        {
+            if (child is T)
+            {
+                result.Add(child as T);
+            }
+            result.AddRange(GetAllChildrenRecursive<T>(child));
+        }
+
+        return result;
+    }
     public static T FindChild<T>(this Node Parent) where T : Node
     {
         Node result = null;
