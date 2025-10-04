@@ -5,9 +5,9 @@ namespace ArcaneNetworking;
 
 public partial class NetworkedAnimationPlayer : NetworkedComponent
 {
-    [Export] AnimationPlayer AnimationPlayer;
+    [Export] public AnimationPlayer LocalPlayer;
 
-    public bool IsPlaying(string anim = "") => anim == "" ? AnimationPlayer.IsPlaying() : AnimationPlayer.IsPlaying() && AnimationPlayer.CurrentAnimation == anim;
+    public bool IsPlaying(string anim = "") => anim == "" ? LocalPlayer.IsPlaying() : LocalPlayer.CurrentAnimation == anim;
 
     // Play
     [Command(Channels.Reliable)]
@@ -15,10 +15,10 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     [Relay(Channels.Reliable)]
     void PlayRelay(string animationName, bool backwards = false)
     {
-        if (AnimationPlayer.CurrentAnimation != animationName)
+        if (LocalPlayer.CurrentAnimation != animationName)
         {
-            if (!backwards) AnimationPlayer.Play(animationName);
-            else AnimationPlayer.PlayBackwards(animationName);
+            if (!backwards) LocalPlayer.Play(animationName);
+            else LocalPlayer.PlayBackwards(animationName);
         }
     }
 
@@ -27,8 +27,8 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     public void Seek(double seconds, bool freezeSeek = false) => SeekRelay(seconds, freezeSeek);
     void SeekRelay(double seconds, bool freezeSeek = false)
     {
-        AnimationPlayer.SpeedScale = freezeSeek ? 0 : 1;
-        AnimationPlayer.Seek(seconds);
+        LocalPlayer.SpeedScale = freezeSeek ? 0 : 1;
+        LocalPlayer.Seek(seconds);
     }
 
     // Set Speed
@@ -36,17 +36,17 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
     public void SetSpeed(float timeScale) => SetSpeedRelay(timeScale);
 
     [Relay(Channels.Reliable)]
-    void SetSpeedRelay(float timeScale) => AnimationPlayer.SpeedScale = timeScale;
+    void SetSpeedRelay(float timeScale) => LocalPlayer.SpeedScale = timeScale;
 
     // Stop
     [Command(Channels.Reliable)]
     public void Stop(bool reset = false)
     {
-        if (reset) AnimationPlayer.Play("RESET");
+        if (reset) LocalPlayer.Play("RESET");
         StopRelay();
     }
 
     [Relay(Channels.Reliable)]
-    public void StopRelay() => AnimationPlayer.Stop();
+    public void StopRelay() => LocalPlayer.Stop();
 
 }
