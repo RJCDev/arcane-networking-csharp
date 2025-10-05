@@ -257,6 +257,7 @@ public class Server
 
         Connections.Clear();
         NetworkedNodes.Clear();
+        CurrentNodeID = 1;
 
         MessageLayer.Active.StopServer();
 
