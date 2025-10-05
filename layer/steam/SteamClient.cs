@@ -70,11 +70,13 @@ public class SteamClient
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer: // No errors, they just disconnected us
 
                 OnCloseConnection(info); 
+                MessageLayer.Active.OnClientDisconnect?.Invoke();
                 break;
 
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally: // THere was a problem, throw an error
 
                 OnCloseConnection(info);
+                MessageLayer.Active.OnClientDisconnect?.Invoke();
                 MessageLayer.Active.OnClientError?.Invoke(info.m_info.m_eEndReason, info.m_info.m_szEndDebug);
                 break;
         }
