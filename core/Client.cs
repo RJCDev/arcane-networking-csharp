@@ -90,6 +90,8 @@ public class Client
 
     static void OnClientDisconnect()
     {
+        NetworkedNodes.Clear();
+        
         GD.Print("[Client] Client Has Disconnected..");
         WorldManager.UnloadOnlineWorld();
         
@@ -222,7 +224,6 @@ public class Client
 
     public static void Disconnect()
     {
-        NetworkedNodes.Clear();
         MessageLayer.Active.StopClient();
     }
 
