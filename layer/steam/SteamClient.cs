@@ -45,7 +45,7 @@ public class SteamClient
 
     public void StopClient()
     {
-        OnCloseConnection(new SteamNetConnectionStatusChangedCallback_t() { m_hConn = ConnectionToServer });
+        OnCloseConnection(new SteamNetConnectionStatusChangedCallback_t() { m_hConn = ConnectionToServer, m_info = { m_identityRemote = RemoteIdentity }});
     }
 
     /// <summary>
@@ -85,6 +85,8 @@ public class SteamClient
         ConnectionToServer = default;
 
         MessageLayer.Active.OnClientDisconnect?.Invoke();
+
+        ConnectionCallback.Dispose();
     }
 
     public void PollMessages(SteamMessageLayer layer)
