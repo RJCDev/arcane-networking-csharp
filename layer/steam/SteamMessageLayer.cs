@@ -88,7 +88,7 @@ public partial class SteamMessageLayer : MessageLayer
 
             // get pointer to the offset inside the pinned array
             IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(bytes.Array, bytes.Offset);
-            
+
             EResult result = SteamNetworkingSockets.SendMessageToConnection(steamConnectionToSend, // Send Message Over SteamNetworkingSockets
                 ptr,
                 (uint)bytes.Count,

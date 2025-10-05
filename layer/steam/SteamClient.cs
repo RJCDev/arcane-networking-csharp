@@ -45,9 +45,7 @@ public class SteamClient
 
     public void StopClient()
     {
-        SteamNetworkingSockets.CloseConnection(ConnectionToServer, 0, null, false);
-        MessageLayer.Active.OnClientDisconnect?.Invoke();
-        ConnectionToServer = default;
+        OnCloseConnection(new SteamNetConnectionStatusChangedCallback_t() { m_hConn = ConnectionToServer });
     }
 
     /// <summary>
@@ -71,21 +69,22 @@ public class SteamClient
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer: // No errors, they just disconnected us
 
                 OnCloseConnection(info); 
-                MessageLayer.Active.OnClientDisconnect?.Invoke();
                 break;
 
             case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally: // THere was a problem, throw an error
 
                 OnCloseConnection(info);
-                MessageLayer.Active.OnClientDisconnect?.Invoke();
                 MessageLayer.Active.OnClientError?.Invoke(info.m_info.m_eEndReason, info.m_info.m_szEndDebug);
                 break;
         }
     }
     void OnCloseConnection(SteamNetConnectionStatusChangedCallback_t info)
     {
-        GD.PrintErr("[Steam Client] Connection closed remote..." + info.m_info.m_identityRemote.GetSteamID());
+        GD.PrintErr("[Steam Client] Connection closed..." + info.m_info.m_identityRemote.GetSteamID());
         SteamNetworkingSockets.CloseConnection(info.m_hConn, 0, null, false);
+        ConnectionToServer = default;
+
+        MessageLayer.Active.OnClientDisconnect?.Invoke();
     }
 
     public void PollMessages(SteamMessageLayer layer)
