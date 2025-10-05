@@ -25,7 +25,7 @@ public class WorldManager
         if (ServerWorld == null) return; // If we have no server world, just return
 
         ServerWorld.QueueFree();
-        
+        ServerWorld = null;
     }
 
 }

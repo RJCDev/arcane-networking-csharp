@@ -45,7 +45,8 @@ public class SteamClient
 
     public void StopClient()
     {
-        SteamNetworkingSockets.CloseConnection(ConnectionToServer, 0, "", true);
+        SteamNetworkingSockets.CloseConnection(ConnectionToServer, 0, null, false);
+        MessageLayer.Active.OnClientDisconnect?.Invoke();
         ConnectionToServer = default;
     }
 

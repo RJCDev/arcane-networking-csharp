@@ -249,6 +249,7 @@ public class Server
         }
 
         Connections.Clear();
+        NetworkedNodes.Clear();
 
         MessageLayer.Active.StopServer();
 

@@ -42,6 +42,8 @@ public class SteamServer
     public void StopServer()
     {
         SteamNetworkingSockets.CloseListenSocket(ServerListenSocket);
+        SteamNetworkingSockets.DestroyPollGroup(ClientPollGroup);
+        ClientsConnected.Clear();
 
         ConnectionCallback.Dispose();
     }

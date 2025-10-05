@@ -222,6 +222,7 @@ public class Client
 
     public static void Disconnect()
     {
+        NetworkedNodes.Clear();
         MessageLayer.Active.StopClient();
     }
 
