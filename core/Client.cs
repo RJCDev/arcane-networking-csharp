@@ -54,13 +54,18 @@ public class Client
         }
     }
 
-    internal static void RegisterInternalHandlers()
+    internal static void RegisterInvokes()
     {
         // Invokes
         MessageLayer.Active.OnClientConnect += OnClientConnect; // Client is authenticated
         MessageLayer.Active.OnClientDisconnect += OnClientDisconnect; // Client has disconnected
         MessageLayer.Active.OnClientReceive += OnClientReceive; // Client received bytes
 
+        GD.Print("[Client] Internal Invokes Registered");
+    }
+
+    internal static void RegisterInternalHandlers()
+    {
         // Packet Handlers
         RegisterPacketHandler<HandshakePacket>(OnHandshake);
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
@@ -68,7 +73,7 @@ public class Client
         RegisterPacketHandler<PingPacket>(OnPing);
         RegisterPacketHandler<PongPacket>(OnPong);
 
-        GD.Print("[Client] Internal Handlers Registered");
+        GD.Print("[Client] Internal Packet Handlers Registered");
     }
 
     /// <summary>
@@ -92,6 +97,7 @@ public class Client
 
     static void OnClientDisconnect()
     {
+        PacketInvokes.Clear();
         NetworkedNodes.Clear();
         
         GD.Print("[Client] Client Has Disconnected..");
@@ -211,6 +217,8 @@ public class Client
             return;
         }
 
+        RegisterInternalHandlers();
+        
         // Create Connection and store it (even if it isn't valid yet, we will store data about its authentication state)
         serverConnection = new(host, MessageLayer.Active.Port, 0);
 

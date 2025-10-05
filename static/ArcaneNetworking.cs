@@ -41,8 +41,8 @@ public static class ArcaneNetworking
     {
 
         //GD.Print("[Arcane Networking] Arcane Networking Initialized!");
-        Client.RegisterInternalHandlers();
-        Server.RegisterInternalHandlers();
+        Client.RegisterInvokes();
+        Server.RegisterInvokes();
     }
 
 

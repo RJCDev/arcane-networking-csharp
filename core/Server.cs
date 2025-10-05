@@ -68,19 +68,23 @@ public class Server
             return false;
         }
     }
-    internal static void RegisterInternalHandlers()
+    internal static void RegisterInvokes()
     {
         // Invokes
         MessageLayer.Active.OnServerConnect += OnServerClientConnect;
         MessageLayer.Active.OnServerDisconnect += OnServerClientDisconnect;
         MessageLayer.Active.OnServerReceive += OnServerReceive;
 
+        GD.Print("[Server] Internal Invokes Registered");
+    }
+    internal static void RegisterInternalHandlers()
+    {
         // Packet Handlers
         RegisterPacketHandler<HandshakePacket>(OnHandshake);
         RegisterPacketHandler<PingPacket>(OnPing);
         RegisterPacketHandler<PongPacket>(OnPong);
 
-        GD.Print("[Server] Internal Handlers Registered");
+        GD.Print("[Server] Internal Packet Handlers Registered");
     }
 
     /// <summary>
@@ -235,6 +239,9 @@ public class Server
             GD.PrintErr("[Server] Cannot start another server!! Server is currently Active!");
             return;
         }
+        
+        RegisterInternalHandlers();
+
         MessageLayer.Active.StartServer(isHeadless);
 
         NetworkManager.AmIServer = true;
@@ -243,7 +250,6 @@ public class Server
         if (isHeadless) WorldManager.LoadOnlineWorld();
 
         GD.Print("[Server] Server Has Started!");
-
 
         if (!isHeadless) // Connect our local client
             Client.Connect("127.0.0.1");
@@ -257,6 +263,7 @@ public class Server
 
         Connections.Clear();
         NetworkedNodes.Clear();
+        PacketInvokes.Clear();
         CurrentNodeID = 1;
 
         MessageLayer.Active.StopServer();
@@ -340,9 +347,10 @@ public class Server
     /// <returns>Node that was spawned</returns>
     public static Node Spawn(uint prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
     {
+        
         Node spawnedObject = NetworkManager.manager.NetworkNodeScenes[(int)prefabID].Instantiate();
         NetworkedNode netNode;
-  
+
         // Finds its networked node, it should be a child of this spawned object
         netNode = spawnedObject.FindChild<NetworkedNode>();
 
@@ -392,7 +400,6 @@ public class Server
 
         };
 
-
         //GD.Print("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
@@ -441,6 +448,7 @@ public class Server
     /// </summary>
     static void AddClient(NetworkConnection connection)
     {
+
         foreach (var netNode in NetworkedNodes)
         {
             Node3D node3D = netNode.Value.Node is Node3D ? netNode.Value.Node as Node3D : null;
@@ -456,6 +464,8 @@ public class Server
             };
 
             Send(packet, connection, Channels.Reliable);
+            
+            GD.Print(netNode.Value.Node.Name);
         }
 
 
@@ -465,7 +475,6 @@ public class Server
             connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, new Vector3(0f, 5f, 0f), Basis.Identity, Vector3.One, connection);
             connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
         }
-
     }
 
     static void RemoveClient(NetworkConnection connection, bool destroyObjects)
