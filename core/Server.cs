@@ -39,7 +39,12 @@ public class Server
         // Wrap the handler so it can fit into Action<Packet>
         Type packetType = typeof(T);
         int packetHash = ExtensionMethods.StableHash(packetType.FullName);
+
+        if (PacketInvokes.ContainsKey(packetHash)) return;
+
         PacketInvokes[packetHash] = (packet, connID) => handler((T)packet, connID);
+
+        GD.Print("[Server] Packet Handler Registered: " + packetHash + " " + packetType.FullName);
     }
     /// <summary>
     /// Internal invoke handler to run the unpack method for a packet registered with RegisterPacketHandler<T>()
@@ -106,8 +111,6 @@ public class Server
     }
     static void OnServerClientConnect(NetworkConnection connection)
     {
-        GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
-
         // Filter local connection
         if (connection.isLocalConnection) LocalConnection = connection;
 
@@ -115,9 +118,15 @@ public class Server
 
         OnServerConnect?.Invoke(connection);
 
+        GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
+
+
     }
     static void OnServerClientDisconnect(int connID)
     {
+        // Filter local connection
+        if (Connections[connID].isLocalConnection) LocalConnection = null;
+
         OnServerDisconnect?.Invoke(Connections[connID]);
                 
         RemoveClient(Connections[connID], NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);

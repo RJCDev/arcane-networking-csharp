@@ -23,10 +23,14 @@ public class Client
     /// Registers a function to handle a packet of type T.
     /// </summary>
     public static void RegisterPacketHandler<T>(Action<T> handler) where T : Packet
-    {
+    {   
+        
         // Wrap the handler so it can fit into Action<Packet>
         Type packetType = typeof(T);
         int packetHash = ExtensionMethods.StableHash(packetType.FullName);
+
+        if (PacketInvokes.ContainsKey(packetHash)) return;
+
         PacketInvokes[packetHash] = (packet) => handler((T)packet);
 
         GD.Print("[Client] Packet Handler Registered: " + packetHash + " " + packetType.FullName);
