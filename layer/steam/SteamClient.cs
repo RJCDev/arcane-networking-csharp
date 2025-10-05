@@ -86,7 +86,7 @@ public class SteamClient
 
         MessageLayer.Active.OnClientDisconnect?.Invoke();
 
-        ConnectionCallback = null;
+        ConnectionCallback?.Dispose();
     }
 
     public void PollMessages(SteamMessageLayer layer)
