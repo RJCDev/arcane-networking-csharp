@@ -40,8 +40,6 @@ public class Server
         Type packetType = typeof(T);
         int packetHash = ExtensionMethods.StableHash(packetType.FullName);
 
-        if (PacketInvokes.ContainsKey(packetHash)) return;
-
         PacketInvokes[packetHash] = (packet, connID) => handler((T)packet, connID);
 
         GD.Print("[Server] Packet Handler Registered: " + packetHash + " " + packetType.FullName);

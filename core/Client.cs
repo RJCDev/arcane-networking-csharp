@@ -29,8 +29,6 @@ public class Client
         Type packetType = typeof(T);
         int packetHash = ExtensionMethods.StableHash(packetType.FullName);
 
-        if (PacketInvokes.ContainsKey(packetHash)) return;
-
         PacketInvokes[packetHash] = (packet) => handler((T)packet);
 
         GD.Print("[Client] Packet Handler Registered: " + packetHash + " " + packetType.FullName);
