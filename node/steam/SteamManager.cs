@@ -42,7 +42,7 @@ public partial class SteamManager : Node
                 GetTree().Quit(3);
             }
 
-            if (SteamAPI.RestartAppIfNecessary((AppId_t)3122440))
+            if (SteamAPI.RestartAppIfNecessary((AppId_t)480))
             {
                 GetTree().Quit(2);
                 GD.PrintErr("APPLICATION RESTARTING DUE TO STEAM ERROR...");
