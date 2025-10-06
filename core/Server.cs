@@ -464,8 +464,6 @@ public class Server
             };
 
             Send(packet, connection, Channels.Reliable);
-            
-            GD.Print(netNode.Value.Node.Name);
         }
 
 

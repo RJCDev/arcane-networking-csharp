@@ -1,30 +1,17 @@
 using Godot;
 using System;
 using Steamworks;
-using System.Threading;
-using System.Collections.Generic;
-using MessagePack;
-using static Godot.Projection;
-using ArcaneNetworking;
 
 [GlobalClass]
 [Icon("res://addons/arcane-networking/icon/steam_manager.svg")]
 public partial class SteamManager : Node
 {
+    [Export] uint AppID = 480;
     public static CSteamID MySteamID;
     public static SteamManager manager = null;
     public SteamManager() => manager ??= this;
 
-
-    /// <summary>
-    /// We are running the callbacks on physics process to make sure we get a consistent
-    /// Call, physics process always runs at a specified tickrate
-    /// </summary>
-    public override void _PhysicsProcess(double delta)
-    {
-        SteamAPI.RunCallbacks();
-    }
-
+    public override void _Process(double delta) => SteamAPI.RunCallbacks();
     public override void _EnterTree()
     {
         GD.Print("Starting Steam Manager..");
@@ -42,33 +29,33 @@ public partial class SteamManager : Node
                 GetTree().Quit(3);
             }
 
-            if (SteamAPI.RestartAppIfNecessary((AppId_t)480))
+            if (SteamAPI.RestartAppIfNecessary((AppId_t)AppID))
             {
                 GetTree().Quit(2);
-                GD.PrintErr("APPLICATION RESTARTING DUE TO STEAM ERROR...");
+                GD.PrintErr("[Steamworks.NET] APPLICATION RESTARTING DUE TO STEAM ERROR...");
                 return;
             }
 
             if (!SteamAPI.Init())
             {
                 GetTree().Quit(1);
-                GD.PrintErr("Steam API Init Failed..");
+                GD.PrintErr("[Steamworks.NET] Steam API Init Failed.. Please Open Steam");
                 return;
             }
+
             SteamNetworkingUtils.InitRelayNetworkAccess();
 
-            GD.Print("Steam Is Connected! " + SteamFriends.GetPersonaName());
+            GD.Print("[Steamworks.NET] Steam Is Connected! " + SteamFriends.GetPersonaName());
         }
         catch (Exception e)
         {
             GetTree().Quit(1);
-            GD.PrintErr("Steam Err: " + e.Message);
+            GD.PrintErr("[Steamworks.NET] Steam Err: " + e.Message);
             return;
         }
 
         MySteamID = SteamUser.GetSteamID();
     }
-
     public override void _Notification(int what)
     {
         base._Notification(what);
@@ -76,8 +63,6 @@ public partial class SteamManager : Node
         if (what == MainLoop.NotificationCrash || what == NotificationWMCloseRequest)
         {
             SteamAPI.Shutdown();
-
-            GetTree().Quit();
         }
     }
 
