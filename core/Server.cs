@@ -166,7 +166,7 @@ public class Server
                 case 0: // Regular Packet
 
                     //GD.Print("[Server] Regular Packet ");
-
+   
                     if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                     {
                         //GD.Print("[Server] Packet Valid! " + hash);

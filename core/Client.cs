@@ -99,10 +99,10 @@ public class Client
     {
         PacketInvokes.Clear();
         NetworkedNodes.Clear();
-        
+
         GD.Print("[Client] Client Has Disconnected..");
         WorldManager.UnloadOnlineWorld();
-        
+
         NetworkManager.AmIClient = false;
         serverConnection = null;
     }

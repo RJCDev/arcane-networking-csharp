@@ -12,6 +12,7 @@ namespace ArcaneNetworking;
 
 public static class ExtensionMethods
 {
+    
     public static int StableHash(string hashString)
     {
         var hash = MD5.HashData(System.Text.Encoding.UTF8.GetBytes(hashString));
@@ -27,6 +28,15 @@ public static class ExtensionMethods
 
             return result;
         }
+    }
+
+    public static void Modulate(this ref Color color, float delta)
+    {
+        color.H += delta;
+
+        if (color.H >= 1)
+            color.H = 0;
+        
     }
 
     /// <summary>
