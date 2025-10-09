@@ -174,7 +174,7 @@ public class Client
                             }
                             catch (Exception e)
                             {
-                                GD.PrintErr("[Client] RPC Failed to Execute! " + e.Message);
+                                GD.PrintErr("[Client] RPC  " + unpack.Method.ToString() + " Failed to Execute! " + e.Message);
                                 return false;
                             }
                             
