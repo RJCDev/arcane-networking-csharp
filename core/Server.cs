@@ -328,12 +328,14 @@ public class Server
 
     static void OnPing(PingPacket packet, int fromConnection)
     {
-        Connections[fromConnection].Pong(packet.sendTick); // Send Pong if it was a Ping
+        Connections[fromConnection].lastPingTime = NetworkTime.TickMS; // Server was pinged, record the time
+        Connections[fromConnection].Pong(packet.sendTick); // Send Pong to client
     }
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
-        Connections[fromConnection].lastRTT = NetworkTime.TickMS - packet.pongSendTick;
+        // Utilize last time server was pinged to determine RTT when client sent back pong
+        Connections[fromConnection].lastRTT = NetworkTime.TickMS - Connections[fromConnection].lastPingTime; 
     }
 
     /// <summary>
