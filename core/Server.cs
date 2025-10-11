@@ -333,7 +333,6 @@ public class Server
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
-        
         Connections[fromConnection].lastRTT = NetworkTime.TickMS - packet.pongSendTick;
 
         NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);    

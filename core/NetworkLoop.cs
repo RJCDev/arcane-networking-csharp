@@ -68,6 +68,14 @@ public class NetworkLoop
                 }
                     
             }
+            else if (NetworkManager.AmIClient)
+            {
+                //GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
+
+                Client.serverConnection.Ping();
+
+            }
+           
         }
     }
 }
