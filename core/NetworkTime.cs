@@ -38,7 +38,6 @@ public class NetworkTime
     public static long LocalTimeMs() => // Monotonic Clock
         (Stopwatch.GetTimestamp() * 1000L) / Stopwatch.Frequency;
 
-
     /// <summary>
     /// Add a new sync sample (t0 client send, t1 server receive, t2 server send, t3 client receive)
     /// All t* are in milliseconds. t0, t3 must be LocalTimeMs(); t1,t2 are server Unix ms.
@@ -87,12 +86,11 @@ public class NetworkTime
     {
         get
         {
-            if (!hasOffset)
-                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();                
+            if (!hasOffset || NetworkManager.AmIServer)
+               return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             double local = LocalTimeMs();
             return (long)Math.Round(local + chosenOffsetMs);
-
         }
     }
 

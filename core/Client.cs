@@ -297,10 +297,10 @@ public class Client
         serverConnection.lastRTT = t3 - t0;
 
         NetworkTime.AddTimeSample(t0, t1, t2, t3);
-
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
 
-        serverConnection.Pong(packet.pingSendTick); // Pong the server with the send tick
+        
+        serverConnection.Pong(packet.pongSendTick); // Pong the server with the send tick
     
     }
     static void OnSpawn(SpawnNodePacket packet)
