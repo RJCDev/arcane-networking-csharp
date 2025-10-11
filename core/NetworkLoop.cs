@@ -67,6 +67,11 @@ public class NetworkLoop
                 Client.serverConnection.Ping();
 
             }
+            if (NetworkManager.AmIServer)
+            {
+                foreach (var connection in Server.Connections)
+                    connection.Value.Ping();
+            }
         }
     }
 }
