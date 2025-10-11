@@ -253,7 +253,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     void HandleLerp()
     {
-        if (NetworkedNode.AmIOwner || NetworkManager.AmIServer)
+        if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless)
             return;
 
         // Slide Time back based on the max buffer size and our latency
