@@ -60,15 +60,7 @@ public class NetworkLoop
         {
             pingPongTimer = 0;
 
-            if (NetworkManager.AmIServer)
-            {
-                foreach (var connection in Server.Connections)
-                {
-                    connection.Value.Ping();
-                }
-                    
-            }
-            else if (NetworkManager.AmIClient)
+            if (NetworkManager.AmIClient)
             {
                 //GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
 

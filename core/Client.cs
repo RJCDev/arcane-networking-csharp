@@ -70,7 +70,6 @@ public class Client
         RegisterPacketHandler<HandshakePacket>(OnHandshake);
         RegisterPacketHandler<SpawnNodePacket>(OnSpawn);
         RegisterPacketHandler<ModifyNodePacket>(OnModify);
-        RegisterPacketHandler<PingPacket>(OnPing);
         RegisterPacketHandler<PongPacket>(OnPong);
 
         GD.Print("[Client] Internal Packet Handlers Registered");
@@ -284,16 +283,11 @@ public class Client
         OnClientAuthenticated?.Invoke();
 
     }
-    static void OnPing(PingPacket packet)
-    {
-        serverConnection.Pong(packet.sendTick); // Send Pong if it was a Ping
-    }
-    
+
     static void OnPong(PongPacket packet)
     {
-        
         long t0 = packet.pingSendTick; // client send (monotonic)
-        
+
         long t1 = packet.pongSendTick; // server receive (Utc)
 
         long t2 = packet.pongSendTick; // server send (Utc) We have to assume here as the server can't tell us after it sent the packet
@@ -305,6 +299,8 @@ public class Client
         NetworkTime.AddTimeSample(t0, t1, t2, t3);
 
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
+
+        serverConnection.Pong(packet.pingSendTick); // Pong the server with the send tick
     
     }
     static void OnSpawn(SpawnNodePacket packet)

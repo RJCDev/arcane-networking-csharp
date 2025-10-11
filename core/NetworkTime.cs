@@ -87,8 +87,8 @@ public class NetworkTime
     {
         get
         {
-            if (!hasOffset && !NetworkManager.AmIServer)
-                return 0;
+            if (!hasOffset)
+                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();                
 
             double local = LocalTimeMs();
             return (long)Math.Round(local + chosenOffsetMs);

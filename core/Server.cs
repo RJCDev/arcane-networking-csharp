@@ -333,9 +333,9 @@ public class Server
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
+        if (fromConnection != LocalConnection.GetRemoteID())
+            GD.Print(NetworkTime.TickMS + " " + packet.pongSendTick);
         Connections[fromConnection].lastRTT = NetworkTime.TickMS - packet.pongSendTick;
-
-        NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);    
     }
 
     /// <summary>
