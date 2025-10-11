@@ -14,16 +14,18 @@ public class NetworkTime
         public long Delay;
     }
 
-    // Client 
+    // Client Connection to server
     private const int MaxSamples = 32; // Max RTT Samples
     private static readonly List<Sample> samples = new(MaxSamples);
-    private static double chosenOffsetMs = 0.0; // double for fractional ms during calc
-    static double chosenOffsetAcc = 0;
+    private static double bestOffsetMs = 0.0; // double for fractional ms during calc
+    static double bestOffsetAcc = 0;
     private static bool hasOffset = false;
     private static readonly double smoothingAlpha = 0.5; // 0..1, small = slow smoothing
     private static double smoothedRTT = 0;
 
     const long MaxJumpMs = 50;
+
+    public static void Reset() { smoothedRTT = 0; hasOffset = false; samples.Clear(); }
 
     public static void AddRTTSample(ulong sample)
     {
@@ -34,6 +36,7 @@ public class NetworkTime
 
     }
     public static ulong GetSmoothedRTT() { return (ulong)smoothedRTT; }
+
 
     public static long LocalTimeMs() => // Monotonic Clock
         (Stopwatch.GetTimestamp() * 1000L) / Stopwatch.Frequency;
@@ -63,20 +66,20 @@ public class NetworkTime
         // Initialize offset if first time
         if (!hasOffset)
         {
-            chosenOffsetAcc = best.Offset;
-            chosenOffsetMs = best.Offset;
+            bestOffsetAcc = best.Offset;
+            bestOffsetMs = best.Offset;
             hasOffset = true;
             return;
         }
 
         // Clamp sudden jumps
-        long diff = (long)(best.Offset - chosenOffsetMs);
+        long diff = (long)(best.Offset - bestOffsetMs);
         if (Math.Abs(diff) > MaxJumpMs)
-            best.Offset = (long)(chosenOffsetMs + Math.Sign(diff) * MaxJumpMs);
+            best.Offset = (long)(bestOffsetMs + Math.Sign(diff) * MaxJumpMs);
 
         // Smooth toward the best-offset
-        chosenOffsetAcc = chosenOffsetAcc * (1.0 - smoothingAlpha) + best.Offset * smoothingAlpha;
-        chosenOffsetMs = (long)Math.Round(chosenOffsetAcc);
+        bestOffsetAcc = bestOffsetAcc * (1.0 - smoothingAlpha) + best.Offset * smoothingAlpha;
+        bestOffsetMs = (long)Math.Round(bestOffsetAcc);
     }
 
     /// <summary>
@@ -90,7 +93,7 @@ public class NetworkTime
                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             double local = LocalTimeMs();
-            return (long)Math.Round(local + chosenOffsetMs);
+            return (long)Math.Round(local + bestOffsetMs);
         }
     }
 

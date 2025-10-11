@@ -99,6 +99,7 @@ public class Client
         NetworkedNodes.Clear();
 
         GD.Print("[Client] Client Has Disconnected..");
+        NetworkTime.Reset();
         WorldManager.UnloadOnlineWorld();
 
         NetworkManager.AmIClient = false;
@@ -298,7 +299,6 @@ public class Client
 
         NetworkTime.AddTimeSample(t0, t1, t2, t3);
         NetworkTime.AddRTTSample((ulong)serverConnection.lastRTT);
-
         
         serverConnection.Pong(packet.pongSendTick); // Pong the server with the send tick
     

@@ -42,7 +42,7 @@ public partial class LatencyLayer : MessageLayer
     void HookEvents()
     {
         if (!_eventsHooked)
-         _eventsHooked = true;
+            _eventsHooked = true;
         
         // Client
         _underlying.OnClientConnect    = OnClientConnect;
