@@ -263,7 +263,6 @@ public class Server
 
         Connections.Clear();
         NetworkedNodes.Clear();
-        PacketInvokes.Clear();
         CurrentNodeID = 1;
 
         MessageLayer.Active.StopServer();
@@ -335,10 +334,10 @@ public class Server
     
     static void OnPong(PongPacket packet, int fromConnection)
     {
+        
         Connections[fromConnection].lastRTT = NetworkTime.TickMS - packet.pongSendTick;
 
-        NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);
-    
+        NetworkTime.AddRTTSample((ulong)Connections[fromConnection].lastRTT);    
     }
 
     /// <summary>

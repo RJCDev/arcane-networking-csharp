@@ -97,7 +97,6 @@ public class Client
 
     static void OnClientDisconnect()
     {
-        PacketInvokes.Clear();
         NetworkedNodes.Clear();
 
         GD.Print("[Client] Client Has Disconnected..");
@@ -287,7 +286,6 @@ public class Client
     }
     static void OnPing(PingPacket packet)
     {
-        //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
         serverConnection.Pong(packet.sendTick); // Send Pong if it was a Ping
     }
     
