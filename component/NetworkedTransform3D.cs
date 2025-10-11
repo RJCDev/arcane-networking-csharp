@@ -368,6 +368,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
         : null;
 
         TransformSnapshot snap = last ?? new(); // Latest snap
+        snap.Pos = TransformNode.GlobalPosition;
+        snap.Rot = TransformNode.Quaternion;
 
         int readIndex = 0;
 
