@@ -328,7 +328,6 @@ public class Server
 
     static void OnPing(PingPacket packet, int fromConnection)
     {
-        //GD.Print("[Client] Sending Pong! " + Time.GetTicksMsec());
         Connections[fromConnection].Pong(packet.sendTick); // Send Pong if it was a Ping
     }
     
