@@ -258,7 +258,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         // Slide Time back based on the max buffer size and our latency
         long snapshotIntervalMs = (long)(1000.0f / NetworkManager.manager.NetworkRate);
-        long targetBuffer = minBufferMs + (snapshotIntervalMs * 2);
+        long targetBuffer = minBufferMs + snapshotIntervalMs;
         long renderTime = NetworkTime.TickMS - targetBuffer;
 
         var (prev, curr) = GetSurroundingSnaps(renderTime); // Grab 2 snaps surrounding this buffer time
@@ -269,7 +269,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         Current = curr;
         Previous = prev;
 
-        // GD.Print((NetworkTime.TickMS - Current.Value.SnaphotTime) + " " + (NetworkTime.TickMS - bufferSliderMs) + " " +  (NetworkTime.TickMS - Previous.Value.SnaphotTime));
         // Get the normalized value
         float t = (float)(renderTime - Previous.Value.SnaphotTime) /
             (Current.Value.SnaphotTime - Previous.Value.SnaphotTime);
@@ -286,7 +285,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         // We need to lerp
         Local = Previous.Value.InterpWith(Current.Value, interpT + extrapT);
-
 
         // Apply transforms
         ApplyFromLocal();
@@ -369,24 +367,22 @@ public partial class NetworkedTransform3D : NetworkedComponent
         : null;
 
         TransformSnapshot snap = last ?? new(); // Latest snap
-        snap.Pos = TransformNode.GlobalPosition;
-        snap.Rot = TransformNode.Quaternion;
 
         int readIndex = 0;
 
         snap.Pos = new()
         {
-            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : snap.Pos.X,
-            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : snap.Pos.Y,
-            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : snap.Pos.Z,
+            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.X,
+            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Y,
+            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Z,
         };
 
         snap.Rot = new()
         {
-            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : snap.Rot.X,
-            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : snap.Rot.Y,
-            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : snap.Rot.Z,
-            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : snap.Rot.W,
+            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.X,
+            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.Y,
+            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.Z,
+            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.W,
         };
 
         snap.SnaphotTime = tickMS;
