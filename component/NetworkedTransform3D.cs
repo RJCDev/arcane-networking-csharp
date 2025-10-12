@@ -222,7 +222,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                     RelayChanged(changed, changedValues, NetworkTime.TickMS);
 
                 else if (NetworkManager.AmIClient && AuthorityMode == AuthorityMode.Client)
-                    SendChanged(changed, changedValues);
+                    SendChanged(changed, changedValues, NetworkTime.TickMS);
 
             }
         }
@@ -258,7 +258,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         // Slide Time back based on the max buffer size and our latency
         long snapshotIntervalMs = (long)(1000.0f / NetworkManager.manager.NetworkRate);
-        long targetBuffer = minBufferMs + snapshotIntervalMs + (long)NetworkTime.GetSmoothedRTT();
+        long targetBuffer = minBufferMs + (snapshotIntervalMs * 2);
         long renderTime = NetworkTime.TickMS - targetBuffer;
 
         var (prev, curr) = GetSurroundingSnaps(renderTime); // Grab 2 snaps surrounding this buffer time
@@ -300,32 +300,32 @@ public partial class NetworkedTransform3D : NetworkedComponent
     }
 
     [Command(Channels.Unreliable)]
-    public void SendChanged(Changed changed, float[] valuesChanged)
+    public void SendChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
         // Only set on server if we as the server don't own this
         if (!NetworkedNode.AmIOwner && NetworkManager.AmIHeadless)
         {
-            Local = ReadSnapshot(changed, valuesChanged, NetworkTime.TickMS);
+            Local = ReadSnapshot(changed, valuesChanged, tickSent);
             ApplyFromLocal();
         }
 
         // Tell the clients their new info
-        RelayChanged(changed, valuesChanged, NetworkTime.TickMS);
+        RelayChanged(changed, valuesChanged, tickSent);
 
     }
 
     [Relay(Channels.Unreliable)]
-    public void RelayChanged(Changed changed, float[] valuesChanged, long tickMS)
+    public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
         if (NetworkedNode.AmIOwner) return;
 
         if (LinearInterpolation != InterpolationMode.None)
         {
-            ReadSnapshot(changed, valuesChanged, tickMS);
+            ReadSnapshot(changed, valuesChanged, tickSent);
         }
         else
         {
-            Local = ReadSnapshot(changed, valuesChanged, tickMS);
+            Local = ReadSnapshot(changed, valuesChanged, tickSent);
             ApplyFromLocal();
         }
 
