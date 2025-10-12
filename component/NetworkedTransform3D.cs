@@ -9,7 +9,8 @@ namespace ArcaneNetworking;
 public partial class NetworkedTransform3D : NetworkedComponent
 {
     [Export] protected Node3D TransformNode = null;
-    [Export] protected SendTime SendTiming = SendTime.Process;
+    [Export] protected long SendRate = 60;
+    long SendRateMS => (long)(1.0f / SendRate);
 
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition = true;
@@ -19,31 +20,30 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public bool UseLocal;
 
     [ExportCategory("Interpolation And Corrections")]
-    InterpolationMode interpMode = InterpolationMode.Process;
+    bool linearInterpolation = true;
     [Export]
-    InterpolationMode LinearInterpolation
+    bool LinearInterpolation
     {
         get
         {
-            return interpMode;
+            return linearInterpolation;
         }
         set
         {
             if (TransformNode != null) Reset();
-            interpMode = value;
+            linearInterpolation = value;
         }
     }
-    [Export(PropertyHint.Range, "2, 50, 0.05")] int minBufferMs;
 
     [ExportCategory("Debug")]
     [Export] bool DebugEnabled;
     [Export] MeshInstance3D ServerDebugMesh;
-    float interpT = 0;
-    long currentBufferMs = 0;
+    float interp = 0;
+    long lastWriteTime = 0;
 
     TransformSnapshot Local;
 
-    TransformSnapshot? Previous, Current;
+    TransformSnapshot Earliest, Current;
 
     SortedSet<TransformSnapshot> Snapshots = new();
     public override void _Ready()
@@ -85,20 +85,15 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         _AuthoritySet();
     }
-    public override void _NetworkUpdate()
-    {
-        if (SendTiming == SendTime.Update)
-            HandleWrite();
-        
-    }
+
     public override void _Process(double delta)
     {
-        if (SendTiming == SendTime.Process)
+        if (NetworkTime.TickMS - lastWriteTime >= (1000.0f / SendRate))
             HandleWrite();
 
-        if (interpMode == InterpolationMode.Process)
-            HandleLerp();
-        
+        if (linearInterpolation)
+            HandleLerp((float)delta);
+
         // Debug
         if (ServerDebugMesh != null)
         {
@@ -116,7 +111,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                         ServerDebugMesh.Position = Vector3.Zero;
                         ServerDebugMesh.GlobalPosition = Snapshots.Max.Pos;
                     }
-                        
+
                 }
                 if (SyncRotation)
                 {
@@ -127,28 +122,20 @@ public partial class NetworkedTransform3D : NetworkedComponent
                         ServerDebugMesh.Basis = Basis.Identity;
                         ServerDebugMesh.GlobalBasis = new Basis(Snapshots.Max.Rot);
                     }
-                        
+
                 }
             }
         }
-        
     }
-    public override void _PhysicsProcess(double delta)
-    {
-        if (SendTiming == SendTime.Physics)
-            HandleWrite();
-
-        if (interpMode == InterpolationMode.Physics)
-            HandleLerp();
     
-    }
+    
     void Reset()
     {
         Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
 
         Snapshots.Clear();
     }
-
+    
     (Changed changed, float[] changedValues) GetChanged()
     {
         Changed changes = Changed.None;
@@ -174,7 +161,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 Local.Pos = TransformNode.GlobalPosition;
             }
 
-            
+
         }
 
         // Rot
@@ -201,13 +188,13 @@ public partial class NetworkedTransform3D : NetworkedComponent
                 Local.Rot = GlobalRot;
             }
 
-            
 
-        }        
+
+        }
 
         return (changes, [.. valuesChanged]);
     }
-
+    
     void HandleWrite()
     {
         // Update Position
@@ -230,70 +217,34 @@ public partial class NetworkedTransform3D : NetworkedComponent
         
     }
 
-    (TransformSnapshot? prev, TransformSnapshot? curr) GetSurroundingSnaps(long bufferTime)
+    void HandleLerp(float delta)
     {
-        TransformSnapshot? prev = null;
-        TransformSnapshot? curr = null;
-
-        // Find bracketing snapshots
-        foreach (var snap in Snapshots)
-        {
-            if (snap.SnaphotTime <= bufferTime)
-            {
-                prev = snap;
-            }
-            else
-            {
-                curr = snap;
-                break;
-            }
-        }
-        return (prev, curr);
-    }
-
-    void HandleLerp()
-    {
-        if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless)
+        // Make sure we have at least 2 snapshots
+        if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless || Snapshots.Count < 2)
             return;
 
-        // Slide Time back based on the max buffer size and our latency
-        long snapshotIntervalMs = (long)(1000.0f / NetworkManager.manager.NetworkRate);
-        long targetBuffer = minBufferMs + snapshotIntervalMs;
-        long renderTime = NetworkTime.TickMS - targetBuffer;
+        Earliest = Snapshots.Min;
+        Current = Snapshots.Max;
 
-        var (prev, curr) = GetSurroundingSnaps(renderTime); // Grab 2 snaps surrounding this buffer time
 
-        if (!prev.HasValue || !curr.HasValue)
-            return;
-        
-        Current = curr;
-        Previous = prev;
+        long distMs = Current.SnaphotTime - Earliest.SnaphotTime;
+        GD.Print(SendRateMS - distMs);
 
-        // Get the normalized value
-        float t = (float)(renderTime - Previous.Value.SnaphotTime) /
-            (Current.Value.SnaphotTime - Previous.Value.SnaphotTime);
-
-        interpT = Mathf.SmoothStep(0f, 1f, t);
-
-        // Extrapolate forward from buffer time to "now"
-        // Get Time difference between previous and current
-        long dt = Current.Value.SnaphotTime - Previous.Value.SnaphotTime;
-        if (dt == 0) dt = 1; // prevent divide by zero
-
-        // Fraction from current snapshot
-        float extrapT = (float)(((float)NetworkTime.TickMS - Current.Value.SnaphotTime) / dt) / 1000.0f;
-
-        // We need to lerp
-        Local = Previous.Value.InterpWith(Current.Value, interpT + extrapT);
+        // Slide up the buffer via the delta from the earliest snapshot
+        interp += delta;
+ 
+        Local = Earliest.InterpWith(Current, interp);
 
         // Apply transforms
         ApplyFromLocal();
 
-        // Clean Buffer
-        while (Snapshots.Count > 0 && Snapshots.Min.SnaphotTime < Previous.Value.SnaphotTime)
+        float rateSec = SendRateMS;
+        if (interp >= rateSec) // If we have interpolated passed the networkrate, then move on to the next snapshot if we have one
         {
-            Snapshots.Remove(Snapshots.Min);
+            Snapshots.Remove(Earliest);
+            interp -= rateSec;
         }
+        
 
     }
 
@@ -317,11 +268,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         if (NetworkedNode.AmIOwner) return;
 
-        if (LinearInterpolation != InterpolationMode.None)
+        if (linearInterpolation) // Buffer for interpolation
         {
             ReadSnapshot(changed, valuesChanged, tickSent);
         }
-        else
+        else // Set instantly
         {
             Local = ReadSnapshot(changed, valuesChanged, tickSent);
             ApplyFromLocal();
@@ -362,27 +313,25 @@ public partial class NetworkedTransform3D : NetworkedComponent
     /// </summary>
     TransformSnapshot ReadSnapshot(Changed changed, float[] valuesChanged, long tickMS)
     {
-        TransformSnapshot? last = Snapshots.Count > 0
+        TransformSnapshot snap = Snapshots.Count > 0
         ? Snapshots.Max // most recent one
-        : null;
-
-        TransformSnapshot snap = last ?? new(); // Latest snap
+        : new();
 
         int readIndex = 0;
 
         snap.Pos = new()
         {
-            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.X,
-            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Y,
-            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : TransformNode.GlobalPosition.Z,
+            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : snap.Pos.X,
+            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : snap.Pos.Y,
+            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : snap.Pos.Z,
         };
 
         snap.Rot = new()
         {
-            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.X,
-            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.Y,
-            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.Z,
-            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : TransformNode.Quaternion.W,
+            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : snap.Rot.X,
+            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : snap.Rot.Y,
+            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : snap.Rot.Z,
+            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : snap.Rot.W,
         };
 
         snap.SnaphotTime = tickMS;
@@ -392,9 +341,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     public enum SendTime
     {
-        Process,
-        Physics,
-        Update
+        Update,
+        Manual,
     }
     public enum InterpolationMode
     {
