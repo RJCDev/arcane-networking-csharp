@@ -10,7 +10,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
 {
     [Export] protected Node3D TransformNode = null;
     [Export] protected long SendRate = 60;
-    long SendRateMS => (long)(1.0f / SendRate);
+    double SendsPerMs => 1000.0d / SendRate;
+    float SendsPerSec => 1.0f / SendRate;
 
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition = true;
@@ -34,16 +35,14 @@ public partial class NetworkedTransform3D : NetworkedComponent
             linearInterpolation = value;
         }
     }
+    [Export(PropertyHint.Range, "5, 500, 1")] long BufferDelay = 50;
 
     [ExportCategory("Debug")]
     [Export] bool DebugEnabled;
     [Export] MeshInstance3D ServerDebugMesh;
-    float interp = 0;
     long lastWriteTime = 0;
 
     TransformSnapshot Local;
-
-    TransformSnapshot Earliest, Current;
 
     SortedSet<TransformSnapshot> Snapshots = new();
     public override void _Ready()
@@ -88,7 +87,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     public override void _Process(double delta)
     {
-        if (NetworkTime.TickMS - lastWriteTime >= (1000.0f / SendRate))
+        if (NetworkTime.TickMS - lastWriteTime >= SendsPerMs)
         {
             lastWriteTime = NetworkTime.TickMS;
             HandleWrite();
@@ -96,7 +95,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
 
         if (linearInterpolation)
-            HandleLerp((float)delta);
+            HandleLerp();
 
         // Debug
         if (ServerDebugMesh != null)
@@ -198,7 +197,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
         return (changes, [.. valuesChanged]);
     }
-    
+
     void HandleWrite()
     {
         // Update Position
@@ -218,37 +217,59 @@ public partial class NetworkedTransform3D : NetworkedComponent
             }
         }
 
-        
+
     }
 
-    void HandleLerp(float delta)
+    // Timestamps may come in late, but will have client sided timestamps. This means that if we have a set delay, 
+    // it will ALWAYS have something to lerp between EVENTUALLY
+    
+    (TransformSnapshot? last, TransformSnapshot? curr) GetSnapshotPair(long renderTime)
+    {
+        TransformSnapshot? Last = null, Curr = null;
+
+        foreach (TransformSnapshot snap in Snapshots)
+        {
+            if (snap.SnaphotTime < renderTime)
+            {
+                Last = snap;
+            }
+            if (snap.SnaphotTime >= renderTime)
+            {
+                Curr = snap;
+                break;
+            }
+        }
+        
+        return (Last, Curr);
+    }
+
+    void HandleLerp()
     {
         // Make sure we have at least 2 snapshots
-        if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless || Snapshots.Count < 2)
+        if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless)
             return;
 
-        Earliest = Snapshots.Min;
-        Current = Snapshots.Max;
+        long renderTime = NetworkTime.TickMS - BufferDelay; // The timestamp at which we are currently rendering
 
+        (TransformSnapshot? last, TransformSnapshot? curr) = GetSnapshotPair(renderTime);
 
-        long distMs = Current.SnaphotTime - Earliest.SnaphotTime;
-        GD.Print(SendRateMS - distMs);
+        if (!last.HasValue || !curr.HasValue)
+            return;
+        
+        float interpT = NetworkTime.InverseLerp(last.Value.SnaphotTime, curr.Value.SnaphotTime, renderTime);
 
-        // Slide up the buffer via the delta from the earliest snapshot
-        interp += delta;
- 
-        Local = Earliest.InterpWith(Current, interp);
+        Local = last.Value.InterpWith(curr.Value, interpT);
+
+        GD.Print(interpT);
+        GD.Print(last.Value.SnaphotTime + " " + renderTime + " " + curr.Value.SnaphotTime);
 
         // Apply transforms
         ApplyFromLocal();
 
-        float rateSec = SendRateMS;
-        if (interp >= rateSec) // If we have interpolated passed the networkrate, then move on to the next snapshot if we have one
+        while (Snapshots.Min.SnaphotTime < NetworkTime.TickMS - (BufferDelay * 2))
         {
-            Snapshots.Remove(Earliest);
-            interp -= rateSec;
+            Snapshots.Remove(Snapshots.Min);
         }
-        
 
     }
 

@@ -21,12 +21,13 @@ public class NetworkTime
     private static double bestOffsetMs = 0.0; // double for fractional ms during calc
     static double bestOffsetAcc = 0;
     private static bool hasOffset = false;
-    private static readonly double smoothingAlpha = 0.05; // 0..1, small = slow smoothing
+    private static readonly double smoothingAlpha = 0.1f; // 0..1, small = slow smoothing
     private static double smoothedRTT = 0;
 
     const long MaxJumpMs = 50;
 
     public static void Reset() { smoothedRTT = 0; hasOffset = false; samples.Clear(); }
+
 
     public static void AddRTTSample(ulong sample)
     {
@@ -34,9 +35,9 @@ public class NetworkTime
             smoothedRTT = sample; // first sample
         else
             smoothedRTT = smoothedRTT * (1 - smoothingAlpha) + sample * smoothingAlpha;
-
     }
-    public static ulong GetSmoothedRTT() { return (ulong)smoothedRTT; }
+
+    public static ulong SmoothedRTT => (ulong)Math.Round(smoothedRTT);
 
 
     public static long LocalTimeMs() => // Monotonic Clock
@@ -46,41 +47,60 @@ public class NetworkTime
     /// Add a new sync sample (t0 client send, t1 server receive, t2 server send, t3 client receive)
     /// All t* are in milliseconds. t0, t3 must be LocalTimeMs(); t1,t2 are server Unix ms.
     /// </summary>
-    public static void AddTimeSample(long t0, long t1, long t2, long t3)
+   public static void AddTimeSample(long t0, long t1, long t2, long t3)
     {
         // Compute offset and delay
         long offset = ((t1 - t0) + (t2 - t3)) / 2;
-        long delay = (t3 - t0) - (t2 - t1);
+        long delay  = (t3 - t0) - (t2 - t1);
 
         // Add sample to rolling buffer
-        samples.Add(new Sample { T0 = t0, T1 = t1, T2 = t2, T3 = t3, Offset = offset, Delay = delay });
-        if (samples.Count > MaxSamples) samples.RemoveAt(0);
+        samples.Add(new Sample { Offset = offset, Delay = delay });
+        if (samples.Count > MaxSamples)
+            samples.RemoveAt(0);
 
-        // Find sample with minimum delay
-        Sample best = samples[0];
-        for (int i = 1; i < samples.Count; i++)
-        {
-            if (samples[i].Delay < best.Delay)
-                best = samples[i];
-        }
+        // Sort by delay and pick the lowest 20%
+        var lowDelay = samples.OrderBy(s => s.Delay)
+                            .Take(Math.Max(1, samples.Count / 5))
+                            .ToList();
 
-        // Initialize offset if first time
+        // Median offset of those low-delay samples
+        long median = lowDelay.OrderBy(s => s.Offset)
+                            .ElementAt(lowDelay.Count / 2)
+                            .Offset;
+
+        // Initialize on first sync
         if (!hasOffset)
         {
-            bestOffsetAcc = best.Offset;
-            bestOffsetMs = best.Offset;
-            hasOffset = true;
+            bestOffsetAcc = median;
+            bestOffsetMs  = median;
+            hasOffset     = true;
             return;
         }
 
-        // Clamp sudden jumps
-        long diff = (long)(best.Offset - bestOffsetMs);
-        if (Math.Abs(diff) > MaxJumpMs)
-            best.Offset = (long)(bestOffsetMs + Math.Sign(diff) * MaxJumpMs);
+        // Ignore tiny fluctuations (less than ~1 ms)
+        if (Math.Abs(median - bestOffsetMs) < 1.0)
+            return;
 
-        // Smooth toward the best-offset
-        bestOffsetAcc = bestOffsetAcc * (1.0 - smoothingAlpha) + best.Offset * smoothingAlpha;
-        bestOffsetMs = (long)Math.Round(bestOffsetAcc);
+        // Smooth toward the median offset
+        bestOffsetAcc = bestOffsetAcc * (1.0 - smoothingAlpha) + median * smoothingAlpha;
+        bestOffsetMs  = bestOffsetAcc;
+
+        // Optional: clamp huge jumps (e.g. if a bad sample sneaks in)
+        double diff = bestOffsetMs - bestOffsetAcc;
+        if (Math.Abs(diff) > MaxJumpMs)
+            bestOffsetMs = bestOffsetAcc + Math.Sign(diff) * MaxJumpMs;
+
+    }
+
+
+
+
+    public static float InverseLerp(long from, long to, long value)
+    {
+        if (from == to)
+            return 0f; // Avoid division by zero
+
+        return Math.Clamp((float)(value - from) / (to - from), 0f, 1f);
     }
 
     /// <summary>
@@ -91,7 +111,7 @@ public class NetworkTime
         get
         {
             if (!hasOffset || NetworkManager.AmIServer)
-               return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             double local = LocalTimeMs();
             return (long)Math.Round(local + bestOffsetMs);

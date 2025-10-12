@@ -90,7 +90,7 @@ public partial class NetworkDebug : Control
 
         AmIClientLabel.Text = "Client? " + NetworkManager.AmIClient.ToString();
         AmIServerLabel.Text = "Server? " + NetworkManager.AmIServer.ToString();
-        RTTLabel.Text = (NetworkTime.GetSmoothedRTT() / 2).ToString() + " MS";
+        RTTLabel.Text = (NetworkTime.SmoothedRTT / 2).ToString() + " MS";
         
         if (Client.serverConnection != null && Client.serverConnection.isAuthenticated)
         {
