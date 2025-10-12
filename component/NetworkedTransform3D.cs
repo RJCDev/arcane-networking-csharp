@@ -89,7 +89,11 @@ public partial class NetworkedTransform3D : NetworkedComponent
     public override void _Process(double delta)
     {
         if (NetworkTime.TickMS - lastWriteTime >= (1000.0f / SendRate))
+        {
+            lastWriteTime = NetworkTime.TickMS;
             HandleWrite();
+
+        }
 
         if (linearInterpolation)
             HandleLerp((float)delta);
