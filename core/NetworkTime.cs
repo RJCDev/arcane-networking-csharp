@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 
 namespace ArcaneNetworking;
 
@@ -20,7 +21,7 @@ public class NetworkTime
     private static double bestOffsetMs = 0.0; // double for fractional ms during calc
     static double bestOffsetAcc = 0;
     private static bool hasOffset = false;
-    private static readonly double smoothingAlpha = 0.5; // 0..1, small = slow smoothing
+    private static readonly double smoothingAlpha = 0.05; // 0..1, small = slow smoothing
     private static double smoothedRTT = 0;
 
     const long MaxJumpMs = 50;

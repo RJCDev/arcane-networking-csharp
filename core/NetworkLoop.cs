@@ -60,7 +60,7 @@ public class NetworkLoop
         {
             pingPongTimer = 0;
 
-            if (NetworkManager.AmIClient)
+            if (NetworkManager.AmIClient && Client.serverConnection.isAuthenticated)
             {
                 //GD.Print("[Client] Pinging At:" + Time.GetTicksMsec());
 

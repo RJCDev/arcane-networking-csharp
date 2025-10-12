@@ -287,6 +287,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         // We need to lerp
         Local = Previous.Value.InterpWith(Current.Value, interpT + extrapT);
 
+
         // Apply transforms
         ApplyFromLocal();
 
