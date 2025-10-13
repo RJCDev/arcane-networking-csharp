@@ -10,7 +10,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 {
     [Export] protected Node3D TransformNode = null;
     [Export] protected long SendRate = 60;
-    double SendsPerMs => 1000.0d / SendRate;
+    double SendRateMs => 1000.0d / SendRate;
     float SendsPerSec => 1.0f / SendRate;
 
     [ExportCategory("What To Sync")]
@@ -43,8 +43,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
     long lastWriteTime = 0;
 
     TransformSnapshot Local;
-
     SortedSet<TransformSnapshot> Snapshots = new();
+    MovingAverage DelayAverage;
+
     public override void _Ready()
     {
         if (TransformNode == null)
@@ -56,6 +57,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
             TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults
             Reset();
         }
+
+        DelayAverage = new(BufferDelay, 0.1f);
 
     }
     public override void _AuthoritySet()
@@ -87,7 +90,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
 
     public override void _Process(double delta)
     {
-        if (NetworkTime.TickMS - lastWriteTime >= SendsPerMs)
+        if (NetworkTime.TickMS - lastWriteTime >= SendRateMs)
         {
             lastWriteTime = NetworkTime.TickMS;
             HandleWrite();
@@ -130,8 +133,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             }
         }
     }
-    
-    
+      
     void Reset()
     {
         Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
@@ -249,24 +251,20 @@ public partial class NetworkedTransform3D : NetworkedComponent
         if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless)
             return;
 
-        long renderTime = NetworkTime.TickMS - BufferDelay; // The timestamp at which we are currently rendering
-
+        long renderTime = NetworkTime.TickMS - (DelayAverage.Value + (long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
+ 
         (TransformSnapshot? last, TransformSnapshot? curr) = GetSnapshotPair(renderTime);
 
         if (!last.HasValue || !curr.HasValue)
             return;
-        
+
         float interpT = NetworkTime.InverseLerp(last.Value.SnaphotTime, curr.Value.SnaphotTime, renderTime);
-
         Local = last.Value.InterpWith(curr.Value, interpT);
-
-        GD.Print(interpT);
-        GD.Print(last.Value.SnaphotTime + " " + renderTime + " " + curr.Value.SnaphotTime);
 
         // Apply transforms
         ApplyFromLocal();
 
-        while (Snapshots.Min.SnaphotTime < NetworkTime.TickMS - (BufferDelay * 2))
+        while (Snapshots.Min.SnaphotTime < last.Value.SnaphotTime) // De-Buffer up to last
         {
             Snapshots.Remove(Snapshots.Min);
         }
@@ -296,6 +294,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
         if (linearInterpolation) // Buffer for interpolation
         {
             ReadSnapshot(changed, valuesChanged, tickSent);
+            DelayAverage.AddSample(NetworkTime.TickMS - Snapshots.Max.SnaphotTime); // Add a sample for the most recent delay
         }
         else // Set instantly
         {

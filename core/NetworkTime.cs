@@ -21,23 +21,11 @@ public class NetworkTime
     private static double bestOffsetMs = 0.0; // double for fractional ms during calc
     static double bestOffsetAcc = 0;
     private static bool hasOffset = false;
-    private static readonly double smoothingAlpha = 0.1f; // 0..1, small = slow smoothing
-    private static double smoothedRTT = 0;
-
+    public static MovingAverage RTT = new();
+   
     const long MaxJumpMs = 50;
 
-    public static void Reset() { smoothedRTT = 0; hasOffset = false; samples.Clear(); }
-
-
-    public static void AddRTTSample(ulong sample)
-    {
-        if (smoothedRTT == 0)
-            smoothedRTT = sample; // first sample
-        else
-            smoothedRTT = smoothedRTT * (1 - smoothingAlpha) + sample * smoothingAlpha;
-    }
-
-    public static ulong SmoothedRTT => (ulong)Math.Round(smoothedRTT);
+    public static void Reset() { RTT = new(); hasOffset = false; samples.Clear(); }
 
 
     public static long LocalTimeMs() => // Monotonic Clock
@@ -82,7 +70,7 @@ public class NetworkTime
             return;
 
         // Smooth toward the median offset
-        bestOffsetAcc = bestOffsetAcc * (1.0 - smoothingAlpha) + median * smoothingAlpha;
+        bestOffsetAcc = bestOffsetAcc * (1.0 - RTT.Smoothing) + median * RTT.Smoothing;
         bestOffsetMs  = bestOffsetAcc;
 
         // Optional: clamp huge jumps (e.g. if a bad sample sneaks in)
