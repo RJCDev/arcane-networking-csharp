@@ -236,10 +236,10 @@ public class Client
         MessageLayer.Active.StopClient();
     }
 
-    public static void Process()
+    public static void Process(double delta)
     {
         foreach (var netNode in NetworkedNodes)
-            netNode.Value._NetworkUpdate();
+            netNode.Value._NetworkUpdate(delta);
 
         foreach (var batcher in serverConnection.Batchers)
         {

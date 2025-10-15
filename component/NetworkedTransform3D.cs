@@ -13,12 +13,12 @@ public partial class NetworkedTransform3D : NetworkedComponent
     double SendRateMs => 1000.0d / SendRate;
     float SendsPerSec => 1.0f / SendRate;
 
+
     [ExportCategory("What To Sync")]
     [Export] public bool SyncPosition = true;
     [Export] public bool SyncRotation = true;
 
-    [Export]
-    public bool UseLocal;
+    [Export] public bool UseLocal;
 
     [ExportCategory("Interpolation And Corrections")]
     bool linearInterpolation = true;
@@ -36,15 +36,19 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
     }
     [Export(PropertyHint.Range, "5, 500, 1")] long BufferDelay = 50;
+    readonly SortedSet<TransformSnapshot> Snapshots = [];
+    TransformSnapshot Local;
+    MovingAverage DelayAverage;
+
 
     [ExportCategory("Debug")]
     [Export] bool DebugEnabled;
-    [Export] MeshInstance3D ServerDebugMesh;
-    long lastWriteTime = 0;
+    [Export] Node3D ServerDebugMesh;
 
-    TransformSnapshot Local;
-    SortedSet<TransformSnapshot> Snapshots = new();
-    MovingAverage DelayAverage;
+    long lastWriteTime = 0;
+    long renderTime;
+
+    public long RenderTime => renderTime;
 
     public override void _Ready()
     {
@@ -248,10 +252,10 @@ public partial class NetworkedTransform3D : NetworkedComponent
     void HandleLerp()
     {
         // Make sure we have at least 2 snapshots
-        if (NetworkedNode.AmIOwner || NetworkManager.AmIHeadless)
+        if (NetworkManager.AmIHeadless)
             return;
 
-        long renderTime = NetworkTime.TickMS - (DelayAverage.Value + (long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
+        renderTime = NetworkTime.TickMS - (DelayAverage.Value + (long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
  
         (TransformSnapshot? last, TransformSnapshot? curr) = GetSnapshotPair(renderTime);
 
@@ -259,6 +263,7 @@ public partial class NetworkedTransform3D : NetworkedComponent
             return;
 
         float interpT = NetworkTime.InverseLerp(last.Value.SnaphotTime, curr.Value.SnaphotTime, renderTime);
+       
         Local = last.Value.InterpWith(curr.Value, interpT);
 
         // Apply transforms
@@ -289,8 +294,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
     [Relay(Channels.Unreliable)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
-        if (NetworkedNode.AmIOwner) return;
-
         if (linearInterpolation) // Buffer for interpolation
         {
             ReadSnapshot(changed, valuesChanged, tickSent);
@@ -387,61 +390,61 @@ public partial class NetworkedTransform3D : NetworkedComponent
         RotW = 1 << 7,
     }
 
-    // A transform snapshot
-    public struct TransformSnapshot : IComparable<TransformSnapshot>
-    {
-        public Vector3 Pos;
-        public Quaternion Rot;
-
-        public long SnaphotTime;
-        public TransformSnapshot()
-        {
-            Pos = Vector3.Zero;
-            Rot = Quaternion.Identity;
-        }
-        /// <summary>
-        /// TO Extrapolate, use a value larger than 1 for amount
-        /// </summary>
-        /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
-        public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
-        {
-
-            return new()
-            {
-                SnaphotTime = SnaphotTime,
-                Pos = Pos.Lerp(other.Pos, amount),
-                Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
-            };
-        }
-
-        public override bool Equals([NotNullWhen(true)] object obj)
-        {
-            if (obj is TransformSnapshot s)
-            {
-                return Pos == s.Pos && Rot == s.Rot ;
-            }
-            else return false;
-
-        }
-        public static bool operator ==(TransformSnapshot left, TransformSnapshot right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(TransformSnapshot left, TransformSnapshot right)
-        {
-            return !(left == right);
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode());
-        }
-
-        public int CompareTo(TransformSnapshot other)
-        {
-            return SnaphotTime == other.SnaphotTime ? 0 : (SnaphotTime < other.SnaphotTime ? -1 : 1);
-        }
-    }
+    
 }
 
+// A transform snapshot
+public struct TransformSnapshot : IComparable<TransformSnapshot>
+{
+    public Vector3 Pos;
+    public Quaternion Rot;
+
+    public long SnaphotTime;
+    public TransformSnapshot()
+    {
+        Pos = Vector3.Zero;
+        Rot = Quaternion.Identity;
+    }
+    /// <summary>
+    /// TO Extrapolate, use a value larger than 1 for amount
+    /// </summary>
+    /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
+    public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
+    {
+
+        return new()
+        {
+            SnaphotTime = SnaphotTime,
+            Pos = Pos.Lerp(other.Pos, amount),
+            Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
+        };
+    }
+
+    public int CompareTo(TransformSnapshot other)
+    {
+        return SnaphotTime == other.SnaphotTime ? 0 : (SnaphotTime < other.SnaphotTime ? -1 : 1);
+    }
+    public override bool Equals([NotNullWhen(true)] object obj)
+    {
+        if (obj is TransformSnapshot s)
+        {
+            return Pos == s.Pos && Rot == s.Rot ;
+        }
+        else return false;
+
+    }
+    public static bool operator ==(TransformSnapshot left, TransformSnapshot right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(TransformSnapshot left, TransformSnapshot right)
+    {
+        return !(left == right);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode());
+    }
+}
