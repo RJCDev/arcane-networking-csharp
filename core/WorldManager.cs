@@ -5,6 +5,8 @@ namespace ArcaneNetworking;
 
 public class WorldManager
 {
+    int spawnIndex;
+
     public static Node ServerWorld = null;
 
     public static Action OnWorldLoaded;
@@ -27,5 +29,6 @@ public class WorldManager
         ServerWorld.QueueFree();
         ServerWorld = null;
     }
+    
 
 }

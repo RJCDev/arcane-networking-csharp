@@ -64,6 +64,7 @@ layout_mode = 2
 text = "Authenticated? _"
 
 [node name="ButtonsBox" type="VBoxContainer" parent="DebugGUI/NetworkingGUIBox"]
+visible = false
 layout_mode = 2
 
 [node name="ServerAndClient" type="Button" parent="DebugGUI/NetworkingGUIBox/ButtonsBox"]

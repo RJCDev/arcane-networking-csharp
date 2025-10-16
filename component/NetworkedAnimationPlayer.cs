@@ -3,6 +3,7 @@ using Godot;
 
 namespace ArcaneNetworking;
 
+[GlobalClass]
 public partial class NetworkedAnimationPlayer : NetworkedComponent
 {
     [Export] public AnimationPlayer LocalPlayer;

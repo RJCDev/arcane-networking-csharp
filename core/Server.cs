@@ -467,7 +467,7 @@ public class Server
         if (NetworkManager.manager.PlayerPrefabID != -1)
         {
             // Instantiate the player prefab if not -1
-            connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, new Vector3(0f, 5f, 0f), Basis.Identity, Vector3.One, connection);
+            connection.playerObject = Spawn((uint)NetworkManager.manager.PlayerPrefabID, new Vector3(0f, 0f, 0f), Basis.Identity, Vector3.One, connection);
             connection.playerObject.Name = " [Conn ID: " + connection.GetRemoteID() + "]";
         }
     }

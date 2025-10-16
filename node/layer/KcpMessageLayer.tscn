@@ -5,18 +5,9 @@
 
 [sub_resource type="Resource" id="Resource_02tn6"]
 script = ExtResource("2_bjcx6")
-DualMode = true
 RecvBufferSize = 7340032
-SendBufferSize = 9216
 Mtu = 1400
-NoDelay = true
 Interval = 10
-FastResend = 0
-CongestionWindow = false
-SendWindowSize = 32
-ReceiveWindowSize = 128
-Timeout = 10000
-MaxRetransmits = 20
 metadata/_custom_type_script = "uid://ba0q2a00cnsro"
 
 [node name="KcpMessageLayer" type="Node"]
