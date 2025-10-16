@@ -113,6 +113,12 @@ public class Server
     }
     static void OnServerClientConnect(NetworkConnection connection)
     {
+        if (Connections.Count + 1 > NetworkManager.manager.MaxConnections)
+        {
+            Disconnect(connection); // Disconnect connection if we have reach the connection limit
+            return;
+        }
+           
         // Filter local connection
         if (connection.isLocalConnection) LocalConnection = connection;
 
@@ -278,10 +284,10 @@ public class Server
 
         RemoveClient(conn, NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
     }
-    public static void Process()
+    public static void Process(double delta)
     {
         foreach (var netNode in NetworkedNodes)
-            netNode.Value._NetworkUpdate();
+            netNode.Value._NetworkUpdate(delta);
             
         foreach (var conn in Connections)
         {

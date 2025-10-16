@@ -34,15 +34,14 @@ public class NetworkLoop
         double step = 1.0d / NetworkManager.manager.NetworkRate;
 
         while (updateTimer >= step)
-        {
-            updateTimer -= step;
-
+        {            
             if (NetworkManager.AmIClient)
-                Client.Process();
+                Client.Process(step);
 
             if (NetworkManager.AmIServer)
-                Server.Process();                
+                Server.Process(step); 
 
+            updateTimer -= step;
         }
         // Process our ping pong events
         PingPongs(delta);

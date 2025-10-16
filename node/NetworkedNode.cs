@@ -20,7 +20,7 @@ public interface INetworkLogger
     /// <summary>
     /// Called just before a network update is sent
     /// </summary>
-    public void _NetworkUpdate();
+    public void _NetworkUpdate(double delta);
 
     /// <summary>
     /// Called just before node is destroyed on the server
@@ -157,13 +157,13 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
         } 
     }
 
-    public void _NetworkUpdate()
+    public void _NetworkUpdate(double delta)
     {
-        if (Node is INetworkLogger node) node._NetworkUpdate();
+        if (Node is INetworkLogger node) node._NetworkUpdate(delta);
 
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
-            comp._NetworkUpdate();
+            comp._NetworkUpdate(delta);
         } 
     }
 
