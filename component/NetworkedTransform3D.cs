@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 namespace ArcaneNetworking;
 
@@ -69,16 +70,16 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         if (TransformNode is RigidBody3D rb)
         {
-            if (NetworkManager.AmIServer)
+            if (NetworkManager.AmIHeadless)
             {
                 if (AuthorityMode == AuthorityMode.Server)
                     rb.Freeze = false;
                 else
                     rb.Freeze = true;
             }
-            if (NetworkManager.AmIClient)
+            else if (NetworkManager.AmIClient)
             {
-                if (AuthorityMode == AuthorityMode.Client)
+                if (AuthorityMode == AuthorityMode.Client && NetworkManager.AmIServer)
                     rb.Freeze = false;
                 else
                     rb.Freeze = true;
@@ -98,7 +99,6 @@ public partial class NetworkedTransform3D : NetworkedComponent
         {
             lastWriteTime = NetworkTime.TickMS;
             HandleWrite();
-
         }
 
         if (linearInterpolation)
@@ -215,15 +215,17 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (changed != Changed.None)
             {
                 if (NetworkManager.AmIServer && AuthorityMode == AuthorityMode.Server)
-                    RelayChanged(changed, changedValues, NetworkTime.TickMS);
+                {
+                    var toSend = Server.GetAllConnections().Where(x => x.GetRemoteID() != NetworkedNode.OwnerID && x.localID != 0);
+                    RelayChanged(changed, changedValues, NetworkTime.TickMS, [..toSend]);
+                }
+                    
 
                 else if (NetworkManager.AmIClient && AuthorityMode == AuthorityMode.Client)
                     SendChanged(changed, changedValues, NetworkTime.TickMS);
 
             }
         }
-
-
     }
 
     // Timestamps may come in late, but will have client sided timestamps. This means that if we have a set delay, 
@@ -281,18 +283,20 @@ public partial class NetworkedTransform3D : NetworkedComponent
     {
         // Only set on server if we as the server don't own this
         if (!NetworkedNode.AmIOwner && NetworkManager.AmIHeadless)
-        {
+        { 
             Local = ReadSnapshot(changed, valuesChanged, tickSent);
             ApplyFromLocal();
         }
 
         // Tell the clients their new info
-        RelayChanged(changed, valuesChanged, tickSent);
+        var toSend = Server.GetAllConnections().Where(x => x.GetRemoteID() != NetworkedNode.OwnerID);
+         
+        RelayChanged(changed, valuesChanged, tickSent, [..toSend]);
 
     }
 
     [Relay(Channels.Unreliable)]
-    public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
+    public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent, params NetworkConnection[] conns)
     {
         if (linearInterpolation) // Buffer for interpolation
         {
