@@ -215,12 +215,8 @@ public partial class NetworkedTransform3D : NetworkedComponent
             if (changed != Changed.None)
             {
                 if (NetworkManager.AmIServer && AuthorityMode == AuthorityMode.Server)
-                {
-                    var toSend = Server.GetAllConnections().Where(x => x.GetRemoteID() != NetworkedNode.OwnerID && x.localID != 0);
-                    RelayChanged(changed, changedValues, NetworkTime.TickMS, [..toSend]);
-                }
-                    
-
+                    RelayChanged(changed, changedValues, NetworkTime.TickMS);
+            
                 else if (NetworkManager.AmIClient && AuthorityMode == AuthorityMode.Client)
                     SendChanged(changed, changedValues, NetworkTime.TickMS);
 
@@ -289,15 +285,15 @@ public partial class NetworkedTransform3D : NetworkedComponent
         }
 
         // Tell the clients their new info
-        var toSend = Server.GetAllConnections().Where(x => x.GetRemoteID() != NetworkedNode.OwnerID);
-         
-        RelayChanged(changed, valuesChanged, tickSent, [..toSend]);
-
+        RelayChanged(changed, valuesChanged, tickSent);
+        
     }
 
     [Relay(Channels.Unreliable)]
-    public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent, params NetworkConnection[] conns)
+    public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
+        if (NetworkedNode.AmIOwner) return;
+
         if (linearInterpolation) // Buffer for interpolation
         {
             ReadSnapshot(changed, valuesChanged, tickSent);
