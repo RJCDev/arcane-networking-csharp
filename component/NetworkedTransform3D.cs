@@ -289,11 +289,9 @@ public partial class NetworkedTransform3D : NetworkedComponent
         
     }
 
-    [Relay(Channels.Unreliable)]
+    [Relay(Channels.Unreliable, true)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
-        if (NetworkedNode.AmIOwner) return;
-
         if (linearInterpolation) // Buffer for interpolation
         {
             ReadSnapshot(changed, valuesChanged, tickSent);

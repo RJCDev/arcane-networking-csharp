@@ -204,7 +204,7 @@ public class Server
                             }
                             catch (Exception e)
                             {
-                                GD.PushError("[Server] RPC Failed to Execute! " + e.Message);
+                                GD.PushError("[Server] RPC Failed to Execute! " + e);
                                 return false;
                             }
                         }
