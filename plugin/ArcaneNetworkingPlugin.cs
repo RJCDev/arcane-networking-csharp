@@ -72,11 +72,11 @@ public partial class ArcaneNetworkingPlugin : EditorPlugin
 
         proc.WaitForExit();
 
-        // if (!string.IsNullOrEmpty(stdout))
-        //     GD.Print("[Arcane Networking] \n" + stdout);
+        if (!string.IsNullOrEmpty(stdout))
+            GD.Print("[Arcane Networking] \n" + stdout);
 
-        // if (!string.IsNullOrEmpty(stderr))
-        //     GD.PrintErr("[Arcane Networking] \n" + stderr);
+        if (!string.IsNullOrEmpty(stderr))
+            GD.PrintErr("[Arcane Networking] \n" + stderr);
 
         GD.Print($"[Arcane Networking] Weaver finished with code {proc.ExitCode}");
 

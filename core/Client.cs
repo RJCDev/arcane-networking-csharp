@@ -8,8 +8,8 @@ public class Client
 {
     internal static readonly Dictionary<int, Action<Packet>> PacketInvokes = [];
 
-    /// List of networked object nodes that have references to their object in them, guids are keys
-    internal static readonly Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
+    // Sorted list of Networked nodes. Keys are Net ID's of the nodes
+    internal static readonly SortedList<uint, NetworkedNode> NetworkedNodes = new SortedList<uint, NetworkedNode>();
 
     // Connection to the server
     public static NetworkConnection serverConnection = null;

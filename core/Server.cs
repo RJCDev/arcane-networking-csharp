@@ -17,8 +17,8 @@ public class Server
     public static readonly Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
 
-    /// Dictionary of lists of Networked nodes. Keys are NetworkConnection IDs of clients
-    public static Dictionary<uint, NetworkedNode> NetworkedNodes = new Dictionary<uint, NetworkedNode>();
+    // Sorted list of Networked nodes. Keys are Net ID's of the nodes
+    public static SortedList<uint, NetworkedNode> NetworkedNodes = new SortedList<uint, NetworkedNode>();
 
     public static Action<NetworkConnection> OnServerConnect;
     public static Action<NetworkConnection> OnServerAuthenticate;
@@ -26,7 +26,7 @@ public class Server
     public static Action<NetworkedNode> OnServerSpawn;
 
     public static NetworkConnection[] GetAllConnections() => [.. Connections.Values];
-
+    public static NetworkConnection[] GetAllConnectionsExcept(int exceptID) => [.. Connections.Values.Where(x => x.GetRemoteID() != exceptID)];
     public static int GetConnectionCount() => Connections.Count;
 
     public static bool AllConnectionsAuthenticated => Connections.All(x => x.Value.isAuthenticated == true);
@@ -451,8 +451,7 @@ public class Server
     /// </summary>
     static void AddClient(NetworkConnection connection)
     {
-
-        foreach (var netNode in NetworkedNodes)
+        foreach (var netNode in NetworkedNodes) // Spawn all nodes first so that order is correct
         {
             Node3D node3D = netNode.Value.Node is Node3D ? netNode.Value.Node as Node3D : null;
 
