@@ -140,32 +140,32 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
 
     public void _NetworkReady()
     {
-        if (Node is INetworkLogger node) node._NetworkReady();
-
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
             comp._NetworkReady();
         }
+        if (Node is INetworkLogger node) node._NetworkReady();
+
     }
 
     public void _NetworkDestroy()
     {
-        if (Node is INetworkLogger node) node._NetworkDestroy();
-
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
             comp._NetworkDestroy();
         } 
+        if (Node is INetworkLogger node) node._NetworkDestroy();
+
     }
 
     public void _NetworkUpdate(double delta)
     {
-        if (Node is INetworkLogger node) node._NetworkUpdate(delta);
-
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
             comp._NetworkUpdate(delta);
-        } 
+        }
+        if (Node is INetworkLogger node) node._NetworkUpdate(delta);
+
     }
 
     // Find all Networked Components
