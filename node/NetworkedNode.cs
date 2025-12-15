@@ -130,12 +130,12 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
 
     public void _AuthoritySet()
     {
-        if (Node is INetworkLogger node) node._AuthoritySet();
-
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
             comp._AuthoritySet();
         }
+        if (Node is INetworkLogger node) node._AuthoritySet();
+
     }
 
     public void _NetworkReady()
