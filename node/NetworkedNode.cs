@@ -216,14 +216,14 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
 
     void OnChildAdded(Node child)
     {
-        // Make SURE we insert it at the correct index
         if (child is NetworkedComponent netComponent)
         {
             if (NetworkedComponents.Contains(netComponent)) return; // Don't add twice!
 
             //GD.Print("[Networked Node] Networked Node: " + child.Name + " Was Registered In Networked Node: " + NetID);
             netComponent.NetworkedNode = this;
-            NetworkedComponents.Insert(child.GetIndex(), netComponent);
+           
+            NetworkedComponents.Add(netComponent);
         }
         else return;
     }
