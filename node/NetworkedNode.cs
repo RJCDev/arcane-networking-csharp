@@ -172,44 +172,29 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
     public override void _EnterTree()
     {
         // If the NetID is 0 when it enters the tree, it was put in the scene by the user, and not by Server.Spawn()
-        // We need to register it
+        // We need to register it hashed by its path instead of by a random ID
         if (NetID == 0)
         {
-            NetID = (uint)ExtensionMethods.StableHash(GetPath().ToString());
+            string path = GetPath().ToString();
+            NetID = (uint)ExtensionMethods.StableHash(path);
 
             int collisionCount = 0;
 
-            if (NetworkManager.AmIServer)
+            while (!WorldManager.NetworkedNodes.TryAdd(NetID, this)) // If there happens to be a collision
             {
-                while (!Server.NetworkedNodes.TryAdd(NetID, this)) // If there happens to be a collision
-                {
-                    NetID = (uint)ExtensionMethods.StableHash(collisionCount + GetPath().ToString());
-                    collisionCount++;
-                }
+                NetID = (uint)ExtensionMethods.StableHash(collisionCount + path);
+                collisionCount++;
             }
-
-            if (NetworkManager.AmIClient)
-            {
-                while (!Client.NetworkedNodes.TryAdd(NetID, this)) // If there happens to be a collision
-                {
-                    NetID = (uint)ExtensionMethods.StableHash(collisionCount + GetPath().ToString());
-                    collisionCount++;
-                }
-            }
+            GD.Print("[Networked Node] Networked Node: " + NetID + " Registered");
         }
 
         ChildEnteredTree += OnChildAdded;
-
     }
 
     // Destroy all Networked Components
     public override void _ExitTree()
     {
-        if (NetworkManager.AmIServer)
-            Server.NetworkedNodes.Remove(NetID);
-
-        if (NetworkManager.AmIClient)
-            Client.NetworkedNodes.Remove(NetID);
+        WorldManager.NetworkedNodes.Remove(NetID);
 
         ChildEnteredTree -= OnChildAdded;
     }
@@ -220,13 +205,11 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
         {
             if (NetworkedComponents.Contains(netComponent)) return; // Don't add twice!
 
-            //GD.Print("[Networked Node] Networked Node: " + child.Name + " Was Registered In Networked Node: " + NetID);
+            GD.Print("[Networked Node] Networked Component: " + child.Name + " Was Registered In Networked Node: " + NetID + " | " + Node.Name);
             netComponent.NetworkedNode = this;
            
             NetworkedComponents.Add(netComponent);
         }
         else return;
     }
-
-   
 }

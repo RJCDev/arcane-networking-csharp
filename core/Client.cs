@@ -8,8 +8,6 @@ public class Client
 {
     internal static readonly Dictionary<int, Action<Packet>> PacketInvokes = [];
 
-    // Sorted list of Networked nodes. Keys are Net ID's of the nodes
-    internal static readonly SortedList<uint, NetworkedNode> NetworkedNodes = new SortedList<uint, NetworkedNode>();
 
     // Connection to the server
     public static NetworkConnection serverConnection = null;
@@ -96,7 +94,7 @@ public class Client
 
     static void OnClientDisconnect()
     {
-        NetworkedNodes.Clear();
+        WorldManager.NetworkedNodes.Clear();
 
         GD.Print("[Client] Client Has Disconnected..");
         NetworkTime.Reset();
@@ -162,7 +160,7 @@ public class Client
                             // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
 
                             //GD.PrintErr("[Server] Unpacking RPC..");
-                            if (!NetworkedNodes.TryGetValue(callerNetID, out var netNode))
+                            if (!WorldManager.NetworkedNodes.TryGetValue(callerNetID, out var netNode))
                             { 
                                 // Silently return here, this can happen before we are authenticated
                                 return false;
@@ -238,7 +236,7 @@ public class Client
 
     public static void Process(double delta)
     {
-        foreach (var netNode in NetworkedNodes)
+        foreach (var netNode in WorldManager.NetworkedNodes)
             netNode.Value._NetworkUpdate(delta);
 
         foreach (var batcher in serverConnection.Batchers)
@@ -305,51 +303,32 @@ public class Client
     }
     static void OnSpawn(SpawnNodePacket packet)
     {
-        Node spawnedObject = null;
-        NetworkedNode netNode = null;
-        
-        if (NetworkedNodes.ContainsKey(packet.netID))
+ 
+        // Do we already have the node (packet was sent twice or the server is also our local server)
+        bool hasNode = WorldManager.NetworkedNodes.TryGetValue(packet.netID, out NetworkedNode netNode);
+
+        if (!hasNode)
         {
-            GD.Print("[Client] We Already Have Networked Node Or It was In The Scene Tree On The Client: " + packet.netID);
-            return; // Check if we already got this packet
-        }
-        else
-        {
-            // We are a client only, just spawn it normally
-            if (NetworkManager.AmIClientOnly)
+            // We don't have this node in our world, we need to spawn it
+            var spawned = NetworkManager.manager.NetworkNodeScenes[(int)packet.prefabID].Instantiate<Node>();
+
+            // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
+            netNode = spawned.FindChild<NetworkedNode>();
+
+            // Occupy Data (it will be occupied already if we are a client and server)
+            netNode.NetID = packet.netID;
+            netNode.PrefabID = packet.prefabID;
+            netNode.OwnerID = packet.ownerID;
+
+            if (netNode == null)
             {
-
-                spawnedObject = NetworkManager.manager.NetworkNodeScenes[(int)packet.prefabID].Instantiate<Node>();
-
-                //GD.Print("[Client] Spawning Networked Node: " + packet.netID + " | Prefab ID: " + (int)packet.prefabID);
-
-                // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
-                netNode = spawnedObject.FindChild<NetworkedNode>();
-
-                // Occupy Data (it will be occupied already if we are a client and server)
-                netNode.NetID = packet.netID;
-                netNode.PrefabID = packet.prefabID;
-                netNode.OwnerID = packet.ownerID;
-
-                if (netNode == null)
-                {
-                    GD.PrintErr("Networked Node: " + packet.netID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
-                    return;
-                }
-            }
-            // We are the server as well as a client, don't instantiate twice, we can just get the info locally from the server
-            else if (!NetworkManager.AmIHeadless)
-            {
-                // Grab net node from server class
-                netNode = Server.NetworkedNodes[packet.netID];
-                spawnedObject = netNode.Node;
+                GD.PrintErr("Networked Node: " + packet.netID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
+                spawned.QueueFree();
+                return;
             }
 
-            // Adds to the current loaded world
-            WorldManager.ServerWorld.AddChild(spawnedObject);
-
-            // Set Transform
-            if (spawnedObject is Node3D spawned3D)
+            // Set position if 3D
+            if (spawned is Node3D spawned3D)
             {
                 //GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
                 spawned3D.Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
@@ -357,15 +336,19 @@ public class Client
                 spawned3D.Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
             }
 
+            // Add to networked nodes list
+            WorldManager.NetworkedNodes.Add(packet.netID, netNode);
+            
+            // Add to world
+            WorldManager.ServerWorld.AddChild(spawned);
 
-            NetworkedNodes.Add(packet.netID, netNode);
         }
 
         netNode.Enabled = true; // Set Process enabled
 
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
         {
-            serverConnection.playerObject = spawnedObject; // Set your player object if its yours
+            serverConnection.playerObject = netNode.Node; // Set your player object if its yours
             serverConnection.playerObject.Name = " [Conn ID: " + serverConnection.localID + "]";
         }
 
@@ -401,7 +384,7 @@ public class Client
 
     public static bool FindNetworkedNode(uint netID, out NetworkedNode netObject)
     {
-        if (!NetworkedNodes.TryGetValue(netID, out NetworkedNode networkObject))
+        if (!WorldManager.NetworkedNodes.TryGetValue(netID, out NetworkedNode networkObject))
         {
             GD.PrintErr("Error retrieving CLIENT NetworkedObject:" + netID);
             netObject = null;

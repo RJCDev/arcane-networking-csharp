@@ -17,9 +17,6 @@ public class Server
     public static readonly Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
 
-    // Sorted list of Networked nodes. Keys are Net ID's of the nodes
-    public static SortedList<uint, NetworkedNode> NetworkedNodes = new SortedList<uint, NetworkedNode>();
-
     public static Action<NetworkConnection> OnServerConnect;
     public static Action<NetworkConnection> OnServerAuthenticate;
     public static Action<NetworkConnection> OnServerDisconnect;
@@ -193,9 +190,9 @@ public class Server
                             // Invoke Weaved Method, rest of the buffer is the arguments for the RPC, pass them to the delegate
 
                             //GD.PrintErr("[Server] Unpacking RPC..");
-                            if (!NetworkedNodes.TryGetValue(callerNetID, out var netNode))
+                            if (!WorldManager.NetworkedNodes.TryGetValue(callerNetID, out var netNode))
                             {
-                                GD.PushError("[Server] RPC pointed to invalid Networked Node! " + hash);
+                                GD.PushError("[Server] RPC pointed to invalid Networked Node! Hash: " + hash + " Caller ID: " + callerNetID);
                                 return false;
                             }
                             try
@@ -268,7 +265,7 @@ public class Server
         }
 
         Connections.Clear();
-        NetworkedNodes.Clear();
+        WorldManager.NetworkedNodes.Clear();
         CurrentNodeID = 1;
 
         MessageLayer.Active.StopServer();
@@ -286,7 +283,7 @@ public class Server
     }
     public static void Process(double delta)
     {
-        foreach (var netNode in NetworkedNodes)
+        foreach (var netNode in WorldManager.NetworkedNodes)
             netNode.Value._NetworkUpdate(delta);
             
         foreach (var conn in Connections)
@@ -350,7 +347,6 @@ public class Server
     /// <returns>Node that was spawned</returns>
     public static Node Spawn(uint prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
     {
-        
         Node spawnedObject = NetworkManager.manager.NetworkNodeScenes[(int)prefabID].Instantiate();
         NetworkedNode netNode;
 
@@ -374,23 +370,7 @@ public class Server
 
         var quat = basis.GetRotationQuaternion().Normalized();
 
-        if (NetworkManager.AmIHeadless) // Check if we are headless, if we are a server + local client don't spawn yet, client will to keep the flow
-        {
-            // Now we can safely add to scene tree after values are set
-            WorldManager.ServerWorld.AddChild(spawnedObject);
-
-            netNode.Enabled = true; // Set Process enabled
-
-            // Set Transform
-            if (spawnedObject is Node3D)
-            {
-                (spawnedObject as Node3D).Position = position;
-                (spawnedObject as Node3D).GlobalBasis = basis;
-            }
-
-        }
-        
-        NetworkedNodes.Add(netNode.NetID, netNode);
+        WorldManager.NetworkedNodes.Add(netNode.NetID, netNode);
 
         SpawnNodePacket packet = new()
         {
@@ -403,7 +383,18 @@ public class Server
 
         };
 
-        //GD.Print("[Server] Spawned Networked Node: " + netNode.NetID);
+        WorldManager.ServerWorld.AddChild(spawnedObject);
+
+        netNode.Enabled = true; // Set Process enabled
+
+        // Set Transform
+        if (spawnedObject is Node3D)
+        {
+            (spawnedObject as Node3D).Position = position;
+            (spawnedObject as Node3D).GlobalBasis = basis;
+        }
+
+        GD.PushWarning("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
         SendAll(packet, Channels.Reliable);
@@ -451,7 +442,7 @@ public class Server
     /// </summary>
     static void AddClient(NetworkConnection connection)
     {
-        foreach (var netNode in NetworkedNodes) // Spawn all nodes first so that order is correct
+        foreach (var netNode in WorldManager.NetworkedNodes) // Spawn all nodes first so that order is correct
         {
             Node3D node3D = netNode.Value.Node is Node3D ? netNode.Value.Node as Node3D : null;
 
@@ -481,7 +472,7 @@ public class Server
     {
         Connections.Remove(connection.GetRemoteID());
 
-        foreach (var netObject in NetworkedNodes)
+        foreach (var netObject in WorldManager.NetworkedNodes)
         {
             if (netObject.Value.OwnerID == connection.GetRemoteID()) // They own this object
                 Modify(netObject.Value, !destroyObjects, destroyObjects);
