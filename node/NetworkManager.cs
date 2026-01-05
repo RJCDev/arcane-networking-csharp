@@ -67,7 +67,7 @@ public partial class NetworkManager : Node
     {
         Server.Start(headless);
     }
-    public void Connect(string host) => Client.Connect(host);
+    public void StartClient(string host) => Client.Connect(host);
 
     public override void _EnterTree()
     {

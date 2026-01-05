@@ -48,7 +48,7 @@ public partial class NetworkDebug : Control
     void OnClientDisconnect() => ButtonsBox.Show();
 
     void StartServer(bool headless) => NetworkManager.manager.StartServer(headless);
-    void StartClient() => NetworkManager.manager.Connect(Endpoint.Text);
+    void StartClient() => NetworkManager.manager.StartClient(Endpoint.Text);
 
     public void ClcltPckSz()
     {
