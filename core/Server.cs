@@ -17,6 +17,7 @@ public class Server
     public static readonly Dictionary<int, NetworkConnection> Connections = new Dictionary<int, NetworkConnection>();
     public static NetworkConnection LocalConnection = null;
 
+    public static Action OnServerStarted;
     public static Action<NetworkConnection> OnServerConnect;
     public static Action<NetworkConnection> OnServerAuthenticate;
     public static Action<NetworkConnection> OnServerDisconnect;
@@ -256,6 +257,8 @@ public class Server
 
         if (!isHeadless) // Connect our local client
             Client.Connect("127.0.0.1");
+
+        OnServerStarted?.Invoke();
     }
     public static void Stop()
     {
