@@ -268,7 +268,7 @@ public class Client
     {
         if (serverConnection.Encryption != null)
         {
-            // TODO // ENCRYPTED AUTHENTICATION // TODO //   
+            // TODO // ENCRYPTED AUTHENTICATION // TODO //
         }
 
         GD.Print("[Client] Client Authenticated! ");
@@ -303,17 +303,17 @@ public class Client
     }
     static void OnSpawn(SpawnNodePacket packet)
     {
- 
+        Node node;
         // Do we already have the node (packet was sent twice or the server is also our local server)
         bool hasNode = WorldManager.NetworkedNodes.TryGetValue(packet.netID, out NetworkedNode netNode);
 
         if (!hasNode)
         {
             // We don't have this node in our world, we need to spawn it
-            var spawned = NetworkManager.manager.NetworkNodeScenes[(int)packet.prefabID].Instantiate<Node>();
+            node = NetworkManager.manager.NetworkNodeScenes[(int)packet.prefabID].Instantiate<Node>();
 
             // Finds its networked node, it should be a child of this spawned object (should be valid if the server told us)
-            netNode = spawned.FindChild<NetworkedNode>();
+            netNode = node.FindChild<NetworkedNode>();
 
             // Occupy Data (it will be occupied already if we are a client and server)
             netNode.NetID = packet.netID;
@@ -323,12 +323,12 @@ public class Client
             if (netNode == null)
             {
                 GD.PrintErr("Networked Node: " + packet.netID + " Prefab ID: " + packet.prefabID + " Is Missing A NetworkedNode!!");
-                spawned.QueueFree();
+                node.QueueFree();
                 return;
             }
 
             // Set position if 3D
-            if (spawned is Node3D spawned3D)
+            if (node is Node3D spawned3D)
             {
                 //GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
                 spawned3D.Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
@@ -338,11 +338,11 @@ public class Client
 
             // Add to networked nodes list
             WorldManager.NetworkedNodes.Add(packet.netID, netNode);
-            
-            // Add to world
-            WorldManager.ServerWorld.AddChild(spawned);
-
         }
+        else node = WorldManager.NetworkedNodes[packet.netID].Node;
+
+        // Add to world
+        WorldManager.ServerWorld.AddChild(node);
 
         netNode.Enabled = true; // Set Process enabled
 

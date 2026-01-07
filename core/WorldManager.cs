@@ -25,13 +25,16 @@ public class WorldManager
         }
         
         ServerWorld = NetworkManager.manager.OnlineScene.Instantiate();
-        NetworkManager.manager.GetTree().Root.AddChild(ServerWorld);
-
+        
         // Whenever the world is ready, invoke OnWorldLoaded
         ServerWorld.Ready += () =>
         {
             OnWorldLoaded?.Invoke();
         };
+
+        NetworkManager.manager.GetTree().Root.AddChild(ServerWorld);
+
+
 
     }
 

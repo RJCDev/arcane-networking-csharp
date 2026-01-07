@@ -185,8 +185,9 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
                 NetID = (uint)ExtensionMethods.StableHash(collisionCount + path);
                 collisionCount++;
             }
-            GD.Print("[Networked Node] Networked Node: " + NetID + " Registered");
         }
+
+        GD.Print("[Networked Node] Networked Node: " + Node.Name + " | " + NetID + " Registered");
 
         ChildEnteredTree += OnChildAdded;
     }

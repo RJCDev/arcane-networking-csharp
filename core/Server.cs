@@ -55,8 +55,9 @@ public class Server
                 handler(packet, fromConnection);
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                GD.PrintErr("[Server] Failed To Invoke Packet Handler! " + e);
                 return false;
             }
         }
@@ -103,17 +104,20 @@ public class Server
         foreach (var client in Connections)
             Send(packet, client.Value, channel, instant);
     }
+
     public static void SendAllExcept<T>(T packet, Channels channel = Channels.Reliable, bool instant = false, params int[] ignore) where T : Packet
     {
         foreach (var client in Connections)
             if (!ignore.Contains(client.Key))
                 Send(packet, client.Value, channel, instant);
     }
+
     static void OnServerClientConnect(NetworkConnection connection)
     {
         if (Connections.Count + 1 > NetworkManager.manager.MaxConnections)
         {
             Disconnect(connection); // Disconnect connection if we have reach the connection limit
+            GD.Print("[Server] Connections Count Excedes Limit!");
             return;
         }
            
@@ -125,9 +129,8 @@ public class Server
         OnServerConnect?.Invoke(connection);
 
         GD.Print("[Server] Client Has Connected! (" + connection.GetEndPoint() + ")");
-
-
     }
+
     static void OnServerClientDisconnect(int connID)
     {
         // Filter local connection
@@ -138,14 +141,13 @@ public class Server
         RemoveClient(Connections[connID], NetworkManager.manager.DisconnectBehavior == DisconectBehavior.Destroy);
 
         GD.Print("[Server] Client Has Disconnected..");
-
-
     }
+
     static void OnServerReceive(ArraySegment<byte> bytes, int connID)
     {
         var reader = NetworkPool.GetReader(bytes);
 
-        //GD.Print("[Server] Recieve Length: bytes " + + bytes.Count + " " + batchMsgCount);
+        //GD.Print("[Server] Recieve Length: bytes " + + bytes.Count);
 
         while (reader.RemainingBytes > 0) // Read until end
         {
@@ -159,6 +161,7 @@ public class Server
         
         NetworkPool.Recycle(reader);
     }
+    
     static bool Unpack(NetworkReader reader, int connID)
     {
         if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
@@ -251,7 +254,8 @@ public class Server
         NetworkManager.AmIServer = true;
 
         // Intiailize world ONLY if we are headless, we will intialize the world on the client if not
-        if (isHeadless) WorldManager.LoadOnlineWorld();
+        if (isHeadless) 
+            WorldManager.LoadOnlineWorld();
 
         GD.Print("[Server] Server Has Started!");
 
@@ -329,7 +333,6 @@ public class Server
         AddClient(conn); // We are authenticated, add them to the game
 
         GD.Print("[Server] Client Authenticated!");
-
     }
 
     static void OnPing(PingPacket packet, int fromConnection)
@@ -383,20 +386,24 @@ public class Server
             rotation = [quat.X, quat.Y, quat.Z, quat.W],
             scale = [scale.X, scale.Y, scale.Z],
             ownerID = owner != null ? owner.GetRemoteID() : 0
-
         };
 
-        WorldManager.ServerWorld.AddChild(spawnedObject);
-
-        netNode.Enabled = true; // Set Process enabled
-
-        // Set Transform
-        if (spawnedObject is Node3D)
+        // We only need to add the child here if we are a headless server, else wait for the client to
+        if (NetworkManager.AmIHeadless)
         {
-            (spawnedObject as Node3D).Position = position;
-            (spawnedObject as Node3D).GlobalBasis = basis;
-        }
+            netNode.Enabled = true; // Set Process enabled
 
+            // Set Transform
+            if (spawnedObject is Node3D)
+            {
+                (spawnedObject as Node3D).Position = position;
+                (spawnedObject as Node3D).GlobalBasis = basis;
+            }
+
+            WorldManager.ServerWorld.AddChild(spawnedObject);
+
+        }
+        
         GD.PushWarning("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
@@ -461,7 +468,6 @@ public class Server
 
             Send(packet, connection, Channels.Reliable);
         }
-
 
         if (NetworkManager.manager.PlayerPrefabID != -1)
         {
