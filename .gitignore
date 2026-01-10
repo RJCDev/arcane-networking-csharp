@@ -1,1 +1,7 @@
+# Godot Engine files
 *.import
+
+# Editor Files
+.vscode/
+.idea/
+
