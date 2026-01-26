@@ -23,8 +23,11 @@ public class WorldManager
             ServerWorld = new Node3D { Name = "OnlineNodes" };
             NetworkManager.manager.AddSibling(ServerWorld);
         }
+        else
+        {
+            ServerWorld = NetworkManager.manager.OnlineScene.Instantiate();
+        }
         
-        ServerWorld = NetworkManager.manager.OnlineScene.Instantiate();
         
         // Whenever the world is ready, invoke OnWorldLoaded
         ServerWorld.Ready += () =>
