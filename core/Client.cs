@@ -14,7 +14,8 @@ public class Client
 
     public static Action OnClientConnected;
     public static Action OnClientAuthenticated;
-    
+    public static Action OnClientDisconnected
+
     public static Action<NetworkedNode> OnClientSpawn;
 
     /// <summary>
@@ -102,6 +103,8 @@ public class Client
 
         NetworkManager.AmIClient = false;
         serverConnection = null;
+
+        OnClientDisconnected?.Invoke();
     }
     
     /// <summary>
