@@ -14,7 +14,7 @@ public class Client
 
     public static Action OnClientConnected;
     public static Action OnClientAuthenticated;
-    public static Action OnClientDisconnected
+    public static Action OnClientDisconnected;
 
     public static Action<NetworkedNode> OnClientSpawn;
 
