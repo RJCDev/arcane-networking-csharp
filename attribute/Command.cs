@@ -12,10 +12,13 @@ public class CommandAttribute : Attribute
     // Debug inspection
     public Channels Channel { get; }
     public bool RequireAuthority { get; }
+
+    public bool Instant { get; }  
     
-    public CommandAttribute(Channels channel = Channels.Reliable, bool requireAuthority = false)
+    public CommandAttribute(Channels channel = Channels.Reliable, bool instant = false, bool requireAuthority = false)
     {
         Channel = channel;
         RequireAuthority = requireAuthority;
+        Instant = instant;
     }
 }

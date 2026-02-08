@@ -49,13 +49,14 @@ public partial class NetworkConnection(string endpoint, ushort port, int id, Net
     public string GetEndPoint() => connectionEndPoint;
     public T GetEndpointAs<T>() => (T)Convert.ChangeType(connectionEndPoint, typeof(T));
 
-    public void SendRaw(NetworkWriter writer, Channels channel)
+    public void SendRaw(NetworkWriter writer, Channels channel, bool instant = false)
     {
         if (!isAuthenticated) return;
 
         bool isEncrypted = Encryption != null; // check if we need to encrypt this packet
 
-        Batchers[channel].Push(writer);
+        if (!instant) Batchers[channel].Push(writer);
+        else MessageLayer.Active.SendTo(writer.ToArraySegment(), channel, this);
     }
 
     public void SendHandshake(int connID = 0)

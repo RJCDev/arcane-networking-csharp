@@ -12,9 +12,11 @@ public class RelayAttribute : Attribute
     // Debug inspection
     public Channels Channel { get; }
     public bool ExcludeOwner { get; }    
-    public RelayAttribute(Channels channel = Channels.Reliable, bool excludeOwner = false)
+    public bool Instant { get; }   
+    public RelayAttribute(Channels channel = Channels.Reliable, bool instant = false, bool excludeOwner = false)
     {
         ExcludeOwner = excludeOwner;
         Channel = channel;
+        Instant = instant;
     }
 }
