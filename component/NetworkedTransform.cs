@@ -202,7 +202,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         }
     }
 
-    [Command(Channels.Unreliable)]
+    [Command(Channels.Unreliable, true)]
     public void SendChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
         // Only set on server if we as the server don't own this
@@ -217,7 +217,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         
     }
 
-    [Relay(Channels.Unreliable, true)]
+    [Relay(Channels.Unreliable, true, true)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
         if (NetworkedNode.AmIOwner) return;
