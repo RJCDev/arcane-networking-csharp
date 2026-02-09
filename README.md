@@ -1,6 +1,6 @@
 🌐 arcane-networking
 
-Zero-allocation networking for Godot, designed to offer functionality and usability similar to Mirror Networking from Unity.
+Zero-allocation networking for Godot Mono, designed to offer functionality and usability similar to Mirror Networking from Unity.
 
 ⚙️ Project Setup
 __________________
@@ -9,27 +9,27 @@ Arcane Networking needs the following nodes in your project to function properly
 
 🧠 NetworkManager
 
-Must persist for the entire lifetime of the game.
-
-To add it as a global manager:
-
-Go to Project → Project Settings → Globals.
-
-Add your NetworkManager scene there.
+  Must persist for the entire lifetime of the game.
+  
+  To add it as a global manager:
+  
+  Go to Project → Project Settings → Globals.
+  
+  Add your NetworkManager scene there.
 
 📡 MessageLayer
 
-Must also persist for the entire lifetime of the game.
+  Must also persist for the entire lifetime of the game.
+  
+  Add one of the premade message layers as a child of NetworkManager:
+  
+    KcpMessageLayer
+    
+    SteamMessageLayer
+    
+    SimulationMessageLayer
 
-Add one of the premade message layers as a child of NetworkManager:
-
-KcpMessageLayer
-
-SteamMessageLayer
-
-SimulationMessageLayer
-
-Or your own custom implementation
+Or your own custom implementation via the abstract Layer class
 
 Drag the node into the MsgLayer export on the NetworkManager.
 
@@ -38,11 +38,11 @@ It must be used together with another MessageLayer.
 See its documentation page for details.
 
 🛠️ Optional Node
+__________________
+
 🧪 NetworkDebugGUI
 
-Provides a simple debug interface.
-
-Lets you:
+Provides a simple debug interface to run tests and connect / host a server and client.
 
 🖥️ Host a server
 
