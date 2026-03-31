@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://ckh1vb4gn4lkm"]
+[gd_scene format=3 uid="uid://ckh1vb4gn4lkm"]
 
 [ext_resource type="Script" uid="uid://b40hip5n7qvsy" path="res://addons/arcane-networking/layer/kcp/KCPMessageLayer.cs" id="1_nuq7x"]
 [ext_resource type="Script" uid="uid://ba0q2a00cnsro" path="res://addons/arcane-networking/layer/kcp/highlevel/KcpConfig.cs" id="2_bjcx6"]
@@ -10,7 +10,7 @@ Mtu = 1400
 Interval = 10
 metadata/_custom_type_script = "uid://ba0q2a00cnsro"
 
-[node name="KcpMessageLayer" type="Node"]
+[node name="KcpMessageLayer" type="Node" unique_id=564656314]
 script = ExtResource("1_nuq7x")
 KCPConfig = SubResource("Resource_02tn6")
 Port = 26751

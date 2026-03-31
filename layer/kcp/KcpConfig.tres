@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="KcpConfig" format=3 uid="uid://bu4hudie5dii1"]
+
+[ext_resource type="Script" uid="uid://ba0q2a00cnsro" path="res://addons/arcane-networking/layer/kcp/highlevel/KcpConfig.cs" id="1_2rtfm"]
+
+[resource]
+script = ExtResource("1_2rtfm")
+RecvBufferSize = 7340032
+Mtu = 1300
+Interval = 10

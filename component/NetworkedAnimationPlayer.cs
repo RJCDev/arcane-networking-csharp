@@ -1,4 +1,3 @@
-using System;
 using Godot;
 
 namespace ArcaneNetworking;
@@ -10,9 +9,17 @@ public partial class NetworkedAnimationPlayer : NetworkedComponent
 
     public bool IsPlaying(string anim = "") => anim == "" ? LocalPlayer.IsPlaying() : LocalPlayer.CurrentAnimation == anim;
 
+    public void Play(string animationName, bool backwards = false)
+    {
+        if (AuthorityMode == AuthorityMode.Server)
+            PlayRelay(animationName, backwards);
+        else
+            PlayCommand(animationName, backwards);
+    }
+
     // Play
     [Command(Channels.Reliable)]
-    public void Play(string animationName, bool backwards = false) => PlayRelay(animationName, backwards);
+    public void PlayCommand(string animationName, bool backwards = false) => PlayRelay(animationName, backwards);
     [Relay(Channels.Reliable)]
     void PlayRelay(string animationName, bool backwards = false)
     {

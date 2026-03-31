@@ -22,8 +22,8 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     MovingAverage DelayAverage;
 
 	[ExportCategory("What To Sync")]
-    [Export] public bool SyncPosition = true;
-    [Export] public bool SyncRotation = true;
+    [Export] protected bool SyncPosition = true;
+    [Export] protected bool SyncRotation = true;
 
     [ExportCategory("Debug")]
     [Export] bool DebugEnabled;
@@ -51,29 +51,19 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     }
     public override void _AuthoritySet()
     {
-        if (TransformNode is RigidBody3D rb)
-        {
-            if (NetworkManager.AmIHeadless)
-            {
-                if (AuthorityMode == AuthorityMode.Server)
-                    rb.Freeze = false;
-                else
-                    rb.Freeze = true;
-            }
-            else if (NetworkManager.AmIClient)
-            {
-                if (AuthorityMode == AuthorityMode.Client && NetworkManager.AmIServer)
-                    rb.Freeze = false;
-                else
-                    rb.Freeze = true;
-            }
 
-        }
-       
     }
+    
     public override void _NetworkReady()
     {
         _AuthoritySet();
+    }
+
+    public void SetSyncing(bool syncing)
+    {
+        SyncPosition = syncing;
+        SyncRotation = syncing;
+        Reset();
     }
 
 	protected void Reset()
@@ -81,12 +71,17 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
 
         Snapshots.Clear();
+        DelayAverage = new(BufferDelay, 0.1f);
     }
     
 	public override void _Process(double delta)
     {
 		// Update render time
 		renderTime = NetworkTime.TickMS - (DelayAverage.Value + (long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
+
+        // Should we send at all?
+        if (!SyncPosition && !SyncRotation) 
+            return;
 
         if (NetworkTime.TickMS - lastWriteTime >= SendRateMs)
         {
@@ -259,7 +254,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     TransformSnapshot ReadSnapshot(Changed changed, float[] valuesChanged, long tickMS)
     {
         TransformSnapshot snap = Snapshots.Count > 0
-        ? Snapshots.Max // most recent one
+        ? Snapshots.Max
         : new();
 
         int readIndex = 0;

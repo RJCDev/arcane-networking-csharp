@@ -1,14 +1,14 @@
-[gd_scene load_steps=2 format=3 uid="uid://q7h7iejsra6j"]
+[gd_scene format=3 uid="uid://q7h7iejsra6j"]
 
 [ext_resource type="Script" uid="uid://dghpfxvdx8718" path="res://addons/arcane-networking/layer/LatencyLayer.cs" id="1_etj4p"]
 
-[node name="LatencyMessageLayer" type="Node"]
+[node name="LatencyMessageLayer" type="Node" unique_id=309297241]
 script = ExtResource("1_etj4p")
 Port = 26751
 
-[node name="Debug" type="CanvasLayer" parent="."]
+[node name="Debug" type="CanvasLayer" parent="." unique_id=170788022]
 
-[node name="Control" type="HBoxContainer" parent="Debug"]
+[node name="Control" type="HBoxContainer" parent="Debug" unique_id=23017464]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -17,11 +17,11 @@ offset_bottom = 141.0
 grow_horizontal = 0
 size_flags_vertical = 3
 
-[node name="Client Delay" type="VBoxContainer" parent="Debug/Control"]
+[node name="Client Delay" type="VBoxContainer" parent="Debug/Control" unique_id=389116588]
 custom_minimum_size = Vector2(46.39, 0)
 layout_mode = 2
 
-[node name="VSlider" type="VSlider" parent="Debug/Control/Client Delay"]
+[node name="VSlider" type="VSlider" parent="Debug/Control/Client Delay" unique_id=178251759]
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_horizontal = 1
@@ -29,7 +29,7 @@ max_value = 10.0
 step = 0.1
 ticks_position = 3
 
-[node name="Text" type="Label" parent="Debug/Control/Client Delay"]
+[node name="Text" type="Label" parent="Debug/Control/Client Delay" unique_id=331151846]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Client Delay"
@@ -37,18 +37,18 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Client Drop" type="VBoxContainer" parent="Debug/Control"]
+[node name="Client Drop" type="VBoxContainer" parent="Debug/Control" unique_id=1906839345]
 custom_minimum_size = Vector2(46.39, 0)
 layout_mode = 2
 
-[node name="VSlider" type="VSlider" parent="Debug/Control/Client Drop"]
+[node name="VSlider" type="VSlider" parent="Debug/Control/Client Drop" unique_id=590884640]
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_horizontal = 1
 max_value = 1.0
 step = 0.01
 
-[node name="Text" type="Label" parent="Debug/Control/Client Drop"]
+[node name="Text" type="Label" parent="Debug/Control/Client Drop" unique_id=510118266]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Client Droprate"

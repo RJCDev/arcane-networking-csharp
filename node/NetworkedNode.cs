@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Godot;
 using Godot.Collections;
 
@@ -39,6 +40,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
 {
     [ExportGroup("Network Identity")]
 
+    bool _preSpawn;
     /// The node that is under this NetworkedNode's control
     /// 
     public Node Node
@@ -126,13 +128,22 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
     // Actions
     public Action<int, int> OnOwnerChanged;
 
-    public override void _Ready() => _NetworkReady();
+    public async override void _Ready()
+    {
+        if (_preSpawn)
+        {
+            // Wait until we are connected to run network ready
+            while (!NetworkManager.AmIClient && !NetworkManager.AmIServer)
+                await Task.Delay(500);
+        }
+        _NetworkReady();
+    }
 
     public void _AuthoritySet()
     {
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
-            comp._AuthoritySet();
+            comp?._AuthoritySet();
         }
         if (Node is INetworkLogger node) node._AuthoritySet();
 
@@ -142,7 +153,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
     {
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
-            comp._NetworkReady();
+            comp?._NetworkReady();
         }
         if (Node is INetworkLogger node) node._NetworkReady();
 
@@ -152,7 +163,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
     {
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
-            comp._NetworkDestroy();
+            comp?._NetworkDestroy();
         } 
         if (Node is INetworkLogger node) node._NetworkDestroy();
 
@@ -162,7 +173,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
     {
         foreach (NetworkedComponent comp in NetworkedComponents)
         {
-            comp._NetworkUpdate(delta);
+            comp?._NetworkUpdate(delta);
         }
         if (Node is INetworkLogger node) node._NetworkUpdate(delta);
 
@@ -175,6 +186,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
         // We need to register it hashed by its path instead of by a random ID
         if (NetID == 0)
         {
+            _preSpawn = true;
             string path = GetPath().ToString();
             NetID = (uint)ExtensionMethods.StableHash(path);
 
@@ -186,18 +198,22 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
                 collisionCount++;
             }
         }
-
-        GD.Print("[Networked Node] Networked Node: " + Node.Name + " | " + NetID + " Registered");
-
+        
+        GD.PushWarning("[Networked Node] Networked Node: " + Node.Name + " | " + NetID + " Registered");
+        
         ChildEnteredTree += OnChildAdded;
     }
-
+    
     // Destroy all Networked Components
     public override void _ExitTree()
     {
+        if (!Node.IsQueuedForDeletion()) return; // Make sure its deleting, could have been reparented
+
         WorldManager.NetworkedNodes.Remove(NetID);
 
         ChildEnteredTree -= OnChildAdded;
+
+        _NetworkDestroy();
     }
 
     void OnChildAdded(Node child)
@@ -206,7 +222,7 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
         {
             if (NetworkedComponents.Contains(netComponent)) return; // Don't add twice!
 
-            GD.Print("[Networked Node] Networked Component: " + child.Name + " Was Registered In Networked Node: " + NetID + " | " + Node.Name);
+            GD.PushWarning("[Networked Node] Networked Component: " + child.Name + " Was Registered In Networked Node: " + NetID + " | " + Node.Name);
             netComponent.NetworkedNode = this;
            
             NetworkedComponents.Add(netComponent);

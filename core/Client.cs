@@ -15,7 +15,6 @@ public class Client
     public static Action OnClientConnected;
     public static Action OnClientAuthenticated;
     public static Action OnClientDisconnected;
-
     public static Action<NetworkedNode> OnClientSpawn;
 
     /// <summary>
@@ -131,7 +130,7 @@ public class Client
         NetworkPool.Recycle(reader);
     }
 
-    static bool Unpack(NetworkReader reader)
+    static bool Unpack(NetworkReader reader) 
     {
         if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
         {
@@ -174,7 +173,7 @@ public class Client
                             }
                             catch (Exception e)
                             {
-                                GD.PrintErr("[Client] RPC  " + unpack.Method.ToString() + " Failed to Execute! " + e.Message);
+                                GD.PrintErr("[Client] RPC  " + unpack.Method.ToString() + " Failed to Execute! " + e);
                                 return false;
                             }
                             
@@ -240,7 +239,7 @@ public class Client
     public static void Process(double delta)
     {
         foreach (var netNode in WorldManager.NetworkedNodes)
-            netNode.Value._NetworkUpdate(delta);
+            netNode.Value?._NetworkUpdate(delta);
 
         foreach (var batcher in serverConnection.Batchers)
         {
@@ -280,6 +279,7 @@ public class Client
         serverConnection.localID = packet.yourConnID;
 
         // Instantiate world, we are now authenticated so we can safely do this.
+
         WorldManager.LoadOnlineWorld();
 
         OnClientAuthenticated?.Invoke();
@@ -287,7 +287,7 @@ public class Client
     }
 
     static void OnPong(PongPacket packet)
-    {
+    {       
         long t0 = packet.pingSendTick; // client send (monotonic)
 
         long t1 = packet.pongSendTick; // server receive (Utc)
@@ -297,6 +297,8 @@ public class Client
         long t3 = NetworkTime.LocalTimeMs(); // client receive (monotonic)
 
         serverConnection.lastRTT = t3 - t0;
+
+        
 
         NetworkTime.AddTimeSample(t0, t1, t2, t3);
         NetworkTime.RTT.AddSample(serverConnection.lastRTT);
@@ -341,11 +343,12 @@ public class Client
 
             // Add to networked nodes list
             WorldManager.NetworkedNodes.Add(packet.netID, netNode);
-        }
-        else node = WorldManager.NetworkedNodes[packet.netID].Node;
 
-        // Add to world
-        WorldManager.ServerWorld.AddChild(node);
+            // Add to world
+            WorldManager.ServerWorld.AddChild(node);
+
+        }
+        else node = netNode.Node; // Retreive
 
         netNode.Enabled = true; // Set Process enabled
 
@@ -377,8 +380,6 @@ public class Client
 
             if (packet.destroy)
             {
-                netObject._NetworkDestroy();
-
                 // Remove from tree if we want to remove this NetworkedObject (keep reference in list though)
                 netObject.Node.QueueFree();
             }

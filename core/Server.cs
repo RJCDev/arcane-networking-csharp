@@ -46,25 +46,22 @@ public class Server
     /// Internal invoke handler to run the unpack method for a packet registered with RegisterPacketHandler<T>()
     /// </summary>
     /// <returns></returns>
-    internal static bool PacketInvoke(int packetHash, Packet packet, int fromConnection)
+    internal static void PacketInvoke(int packetHash, Packet packet, int fromConnection)
     {
         if (PacketInvokes.TryGetValue(packetHash, out var handler))
         {
             try
             {
                 handler(packet, fromConnection);
-                return true;
             }
             catch (Exception e)
             {
                 GD.PrintErr("[Server] Failed To Invoke Packet Handler! " + e);
-                return false;
             }
         }
         else
         {
             GD.PushError($"[Server] No handler registered for packet type {packet.GetType()}");
-            return false;
         }
     }
     internal static void RegisterInvokes()
@@ -162,7 +159,7 @@ public class Server
         NetworkPool.Recycle(reader);
     }
     
-    static bool Unpack(NetworkReader reader, int connID)
+    static bool Unpack(NetworkReader reader, int connID) // We return false if we want to disconnect
     {
         if (NetworkPacker.ReadHeader(reader, out byte type, out int hash)) // Do we have a valid packet header?
         {
@@ -177,7 +174,7 @@ public class Server
                     if (reader.Read(out Packet packet, ArcaneNetworking.PacketTypes[hash])) // Invoke our packet handler
                     {
                         //GD.Print("[Server] Packet Valid! " + hash);
-                        if (!PacketInvoke(hash, packet, connID)) return false;
+                        PacketInvoke(hash, packet, connID);
                     }
 
                     break;
@@ -197,7 +194,7 @@ public class Server
                             if (!WorldManager.NetworkedNodes.TryGetValue(callerNetID, out var netNode))
                             {
                                 GD.PushError("[Server] RPC pointed to invalid Networked Node! Hash: " + hash + " Caller ID: " + callerNetID);
-                                return false;
+                                return false; // Invalid networked node error, disconnect, syncronization lost, clearly a big problem happened here
                             }
                             try
                             {
@@ -206,20 +203,18 @@ public class Server
                             catch (Exception e)
                             {
                                 GD.PushError("[Server] RPC Failed to Execute! " + e);
-                                return false;
                             }
+                            
                         }
                         else
                         {
                             GD.PushError("[Server] RPC Method Hash not found! " + hash);
-                            return false;
                         }
 
                     }
                     else
                     {
                         GD.PushError("[Server] Could not read RPC Packet! " + hash);
-                        return false;
                     }
 
                     break;
@@ -228,7 +223,6 @@ public class Server
         else
         {
             GD.PushError("[Server] Packet header was invalid on receive!");
-            return false;
         }
 
         return true;
@@ -291,7 +285,7 @@ public class Server
     public static void Process(double delta)
     {
         foreach (var netNode in WorldManager.NetworkedNodes)
-            netNode.Value._NetworkUpdate(delta);
+            netNode.Value?._NetworkUpdate(delta);
             
         foreach (var conn in Connections)
         {
@@ -354,10 +348,7 @@ public class Server
     public static Node Spawn(uint prefabID, Vector3 position, Basis basis, Vector3 scale, NetworkConnection owner = null)
     {
         Node spawnedObject = NetworkManager.manager.NetworkNodeScenes[(int)prefabID].Instantiate();
-        NetworkedNode netNode;
-
-        // Finds its networked node, it should be a child of this spawned object
-        netNode = spawnedObject.FindChild<NetworkedNode>();
+        NetworkedNode netNode = spawnedObject.FindChild<NetworkedNode>();
 
         if (netNode == null)
         {
@@ -371,12 +362,9 @@ public class Server
         int netOwner = owner != null ? owner.GetRemoteID() : 0;
         netNode.PrefabID = prefabID;
         netNode.OwnerID = netOwner;
-
         netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
-        var quat = basis.GetRotationQuaternion().Normalized();
-
-        WorldManager.NetworkedNodes.Add(netNode.NetID, netNode);
+        var quat = basis.GetRotationQuaternion().Normalized();        
 
         SpawnNodePacket packet = new()
         {
@@ -388,22 +376,20 @@ public class Server
             ownerID = owner != null ? owner.GetRemoteID() : 0
         };
 
-        // We only need to add the child here if we are a headless server, else wait for the client to
-        if (NetworkManager.AmIHeadless)
-        {
-            netNode.Enabled = true; // Set Process enabled
+        // Add to world manager
+        WorldManager.NetworkedNodes.Add(netNode.NetID, netNode);
+        WorldManager.ServerWorld.AddChild(spawnedObject);
 
-            // Set Transform
-            if (spawnedObject is Node3D)
-            {
-                (spawnedObject as Node3D).Position = position;
-                (spawnedObject as Node3D).GlobalBasis = basis;
-            }
-
-            WorldManager.ServerWorld.AddChild(spawnedObject);
-
-        }
+        netNode.Enabled = true; // Set Process enabled
         
+        // Set Transform
+        if (spawnedObject is Node3D)
+        {
+            (spawnedObject as Node3D).Position = position;
+            (spawnedObject as Node3D).GlobalBasis = basis;
+        }
+
+
         GD.PushWarning("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
@@ -438,8 +424,6 @@ public class Server
             // Only if we are headless, if not then we will destroy when we get to the client
             if (NetworkManager.AmIHeadless)
             {
-                netNode._NetworkDestroy();
-
                 netNode.Node.QueueFree();
             } 
         }

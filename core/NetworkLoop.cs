@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Godot;
 
@@ -27,7 +28,7 @@ public class NetworkLoop
     }
     // Process loop
     public static void Process(double delta)
-    {
+    {		
         Poll();
 
         updateTimer += delta;
@@ -45,6 +46,7 @@ public class NetworkLoop
         }
         // Process our ping pong events
         PingPongs(delta);
+
     }
 
     static void PingPongs(double delta)
