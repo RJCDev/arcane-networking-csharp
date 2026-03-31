@@ -247,9 +247,7 @@ public class Server
 
         NetworkManager.AmIServer = true;
 
-        // Intiailize world ONLY if we are headless, we will intialize the world on the client if not
-        if (isHeadless) 
-            WorldManager.LoadOnlineWorld();
+        WorldManager.LoadOnlineWorld();
 
         GD.Print("[Server] Server Has Started!");
 

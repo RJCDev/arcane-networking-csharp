@@ -279,8 +279,9 @@ public class Client
         serverConnection.localID = packet.yourConnID;
 
         // Instantiate world, we are now authenticated so we can safely do this.
-
-        WorldManager.LoadOnlineWorld();
+        // Make sure we are only loading the online world if client only as we have loaded it on the server already if not
+        if (NetworkManager.AmIClientOnly)
+            WorldManager.LoadOnlineWorld();
 
         OnClientAuthenticated?.Invoke();
 
