@@ -376,19 +376,20 @@ public class Server
 
         // Add to world manager
         WorldManager.NetworkedNodes.Add(netNode.NetID, netNode);
-        WorldManager.ServerWorld.AddChild(spawnedObject);
 
-        netNode.Enabled = true; // Set Process enabled
-        
-        // Set Transform
-        if (spawnedObject is Node3D)
+        if (NetworkManager.AmIHeadless)
         {
-            (spawnedObject as Node3D).Position = position;
-            (spawnedObject as Node3D).GlobalBasis = basis;
+            WorldManager.ServerWorld.AddChild(spawnedObject);
+            netNode.Enabled = true; // Set Process enabled
+        
+            // Set Transform
+            if (spawnedObject is Node3D)
+            {
+                (spawnedObject as Node3D).Position = position;
+                (spawnedObject as Node3D).GlobalBasis = basis;
+            }
+            GD.PushWarning("[Server] Spawned Networked Node: " + netNode.NetID);
         }
-
-
-        GD.PushWarning("[Server] Spawned Networked Node: " + netNode.NetID);
 
         // Relay to Clients
         SendAll(packet, Channels.Reliable);

@@ -345,12 +345,11 @@ public class Client
             // Add to networked nodes list
             WorldManager.NetworkedNodes.Add(packet.netID, netNode);
 
-            // Add to world
-            WorldManager.ServerWorld.AddChild(node);
-
         }
         else node = netNode.Node; // Retreive
 
+        // Add to world
+        WorldManager.ServerWorld.AddChild(node);
         netNode.Enabled = true; // Set Process enabled
 
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
