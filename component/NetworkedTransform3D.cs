@@ -9,7 +9,6 @@ namespace ArcaneNetworking;
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedTransform
 {
-    [Export] bool ApplyVelocity = false;
 
     [ExportCategory("Interpolation And Corrections")]
     bool interp = true;
@@ -57,13 +56,5 @@ public partial class NetworkedTransform3D : NetworkedTransform
 
         // Apply transforms to node
         ApplyLocal();
-    }
-
-    protected override void ApplyLocal()
-    {
-        base.ApplyLocal();
-
-        if (ApplyVelocity && TransformNode is RigidBody3D rb)
-            rb.LinearVelocity = _velocity;
     }
 }
