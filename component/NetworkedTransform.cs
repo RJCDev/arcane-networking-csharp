@@ -321,10 +321,9 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
     /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
     public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
     {
-
         return new()
         {
-            SnaphotTime = SnaphotTime,
+            SnaphotTime = NetworkTime.Lerp(SnaphotTime, other.SnaphotTime, amount),
             Pos = Pos.Lerp(other.Pos, amount),
             Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
         };

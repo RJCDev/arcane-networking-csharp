@@ -80,15 +80,15 @@ public class NetworkTime
 
     }
 
-
-
+    public static long Lerp(long start, long end, float weight)
+        => (long)(start + (end - start) * weight); 
 
     public static float InverseLerp(long from, long to, long value)
     {
         if (from == to)
             return 0f; // Avoid division by zero
 
-        return Math.Clamp((float)(value - from) / (to - from), 0f, 1f);
+        return (float)(value - from) / (to - from);
     }
 
     /// <summary>
