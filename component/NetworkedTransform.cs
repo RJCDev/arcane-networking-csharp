@@ -17,8 +17,12 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     float SendsPerSec => 1.0f / SendRate;
 
     [Export(PropertyHint.Range, "5, 500, 1")] long BufferDelay = 50;
+
+    // Snapshot data
     protected readonly SortedSet<TransformSnapshot> Snapshots = [];
+    protected TransformSnapshot Last = default, Current = default;
     protected TransformSnapshot Local;
+
     MovingAverage DelayAverage;
 
 	[ExportCategory("What To Sync")]
@@ -81,8 +85,9 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 	public override void _Process(double delta)
     {
 		// Update render time
-		renderTime = NetworkTime.TickMS - ((long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
-
+        long latency = (long)SendRateMs + BufferDelay + (NetworkTime.RTT.Value / 2);
+		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
+            
         // Should we send at all?
         if (!SyncPosition && !SyncRotation) 
             return;
@@ -113,16 +118,28 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             }
         }
 
-		// Handle snapshots
+		// Get snapshots at this render time
         var (last, curr) = GetSnapshotPair(renderTime);
             
         if (!last.HasValue || !curr.HasValue)
-                    return;
+        {
+            if (Last == default || Current == default) return;
+
+            long frameDeltaMS = (long)(delta * 1000.0f);
+            // Slide time forward but collapse positions so extrapolation produces zero movement
+            Last = new TransformSnapshot { SnaphotTime = Last.SnaphotTime + frameDeltaMS, Pos = Current.Pos, Rot = Current.Rot };
+            Current = new TransformSnapshot { SnaphotTime = Current.SnaphotTime + frameDeltaMS, Pos = Current.Pos, Rot = Current.Rot };
+        }
+        else
+        {
+            Last = last.Value;
+            Current = curr.Value;
+        }
 
         // ONLY process snapshots if not owner
         if (!NetworkedNode.AmIOwner)
         {
-            HandleSnapshots(last.Value, curr.Value);
+            HandleSnapshots(Last, Current);
         }
         else // Read your own authorative snapshot into the buffer so we have a past if we switch owners
         {
@@ -130,11 +147,13 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             Snapshots.Add(snapshot);
         }
 
-
-        // Always de buffer to cleanup snapshots
-		while (Snapshots.Min.SnaphotTime < last.Value.SnaphotTime) // De-Buffer up to last
+        // Always debuffer to cleanup snapshots
+        if (last.HasValue)
         {
-            Snapshots.Remove(Snapshots.Min);
+            while (Snapshots.Count > 0 && Snapshots.Min.SnaphotTime < last.Value.SnaphotTime)
+            {
+                Snapshots.Remove(Snapshots.Min);
+            }
         }
        
     }
@@ -254,7 +273,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 	}
 
 	/// <summary>
-	/// Handle Snapshots between render time
+	///  Provides the 2 most recent snapshots in between the render time
 	/// </summary>
 	/// <param name="last"></param>
 	/// <param name="curr"></param>
@@ -335,7 +354,7 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
     {
         return new()
         {
-            SnaphotTime = SnaphotTime,
+            SnaphotTime = NetworkTime.Lerp(SnaphotTime, other.SnaphotTime, amount),
             Pos = Pos.Lerp(other.Pos, amount),
             Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
         };

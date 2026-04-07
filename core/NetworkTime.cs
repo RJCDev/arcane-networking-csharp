@@ -21,11 +21,11 @@ public class NetworkTime
     private static double bestOffsetMs = 0.0; // double for fractional ms during calc
     static double bestOffsetAcc = 0;
     private static bool hasOffset = false;
-    public static MovingAverage RTT = new();
+    public static MovingAverage RTT = new(0, 0.5);
    
     const long MaxJumpMs = 50;
 
-    public static void Reset() { RTT = new(); hasOffset = false; samples.Clear(); }
+    public static void Reset() { RTT = new(0, 0.5); hasOffset = false; samples.Clear(); }
 
 
     public static long LocalTimeMs() => // Monotonic Clock

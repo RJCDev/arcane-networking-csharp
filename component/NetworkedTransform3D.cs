@@ -13,15 +13,32 @@ public enum CorrectionMode
     NONE
 }
 
+/// <summary>
+/// Non-invasive NetworkTransform3D component for Node3D's and PhysicsBodies
+/// <para> None: </para>
+/// 
+/// <para> 1. Applies the most recent snapshot to the transform specified in TransformNode </para>
+/// 
+/// <para> Interpolation: </para>
+/// 
+/// <para> 1. Takes the last 2 snapshots and smooths between them utilizing the RenderTime variable </para>
+/// 
+/// <para> Extrapolation: </para>
+///
+/// <para> 3. Apply to local simulation (Linear / Angular Velocity) </para>
+/// <para> 1. Utilize interpolation above </para>
+/// <para> 2. Extrapolates to get predicted position utilizing the delta of the positions in the last 2 snapshots </para>
+/// <para> 3. Apply to local simulation (Linear / Angular Velocity) </para>
+/// </summary>
+
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedTransform
 {
-
-
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
 
-    [Export] public float ExtrapThreshold;
+    [Export] public float ExtrapFixThreshold = 0.5f;
+
     [Export] CorrectionMode CorrectionMode
     {
         get => _correctionMode;
@@ -34,8 +51,8 @@ public partial class NetworkedTransform3D : NetworkedTransform
 
     PhysicsBody3D _physicsBody = null;
     
-    public Vector3 LinearVelocity = Vector3.Zero;
-    public Vector3 AngularVelocity = Vector3.Zero;
+    public Vector3 LinearDelta = Vector3.Zero;
+    public Vector3 AngularDelta = Vector3.Zero;
 
     public override void _Ready()
     {
@@ -43,8 +60,18 @@ public partial class NetworkedTransform3D : NetworkedTransform
 
         if (TransformNode is PhysicsBody3D pb)
             _physicsBody = pb;
+        
+        NetworkedNode.OnOwnerChanged += _NewOwner;
+           
     }
     
+    void _NewOwner(int newOwner)
+    {
+        // Update weather we should use gravity or not
+        if (TransformNode is RigidBody3D rb)
+            rb.GravityScale = NetworkedNode.AmIOwner ? 1 : 0;
+        
+    }
 
     protected override void HandleSnapshots(TransformSnapshot last, TransformSnapshot curr)
     {   
@@ -52,87 +79,96 @@ public partial class NetworkedTransform3D : NetworkedTransform
         {
             case CorrectionMode.INTERPOLATION:
 
-                // Interpolation factor based on RenderTime
+                // 1. Interpolation factor based on RenderTime
                 float interpT = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
 
                 // Interpolate transform
                 Local = last.InterpWith(curr, interpT);
 
+                // 2. Apply to Node3D
+                ApplyLocal();
+
                 break;
 
             case CorrectionMode.EXTRAPOLATION:
-
+                
+                
                 // 1. Interpolate snapshots last and current
                 float interpE = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
+                // Interpolate transform
                 Local = last.InterpWith(curr, interpE);
 
-                // 2. Extrapolate based on velocity
-                long extrapDeltaMS = NetworkTime.TickMS - Local.SnaphotTime; // Time between interpolated and now
-                float snapshotDeltaS = extrapDeltaMS / 1000.0f;
-
-                if (snapshotDeltaS <= 0) 
-                {
-                    GD.Print(snapshotDeltaS + " " + extrapDeltaMS);
+                // 2. Extrapolate based on delta between now and where we want to be
+                long extrapDeltaMS = NetworkTime.TickMS - curr.SnaphotTime;
+                double snapshotDeltaS = extrapDeltaMS / 1000.0d;
+                if (snapshotDeltaS <= 0)
                     break; // Sanity check
-                }
+
+                // 3. Get extrapolated transform (closest possible thing we have to "now" on a remote client)
+                LinearDelta = curr.Pos - last.Pos;
+                AngularDelta = GetAngularDelta(last.Rot, curr.Rot);
 
                 TransformSnapshot extrap = new()
                 {
                     SnaphotTime = Local.SnaphotTime + extrapDeltaMS,
-                    Pos = Local.Pos + LinearVelocity,
-                    Rot = Local.Rot * Quaternion.FromEuler(AngularVelocity),
+                    Pos = Local.Pos + LinearDelta,
+                    Rot = Local.Rot * Quaternion.FromEuler(AngularDelta),
                 };
+                // Update Local
+                Local = extrap;
 
-                LinearVelocity = curr.Pos - Local.Pos;
-                AngularVelocity = GetAngularDelta(Local.Rot, curr.Rot);
+                // 4. Compute position error between where physics body is and where it should be
+                Vector3 positionError = extrap.Pos - TransformNode.GlobalPosition;
+                float linearError = positionError.Length();
+                Vector3 angularError = GetAngularDelta(extrap.Rot, TransformNode.Quaternion);
 
-                // // Dont over extrapolate if large movement (possibly teleport)
-                // if (LinearVelocity.LengthSquared() > ExtrapThreshold)
-                // {
-                //     ApplyLocal();
-                //     return;
-                // }
+                // 5. Steer toward extrapolated position via velocity — no direct position sets
+                // correctionTime scales with error: small drift = gentle, large gap = faster but still smooth
+                float correctionTime = Mathf.Clamp(linearError / 10.0f, 0.05f, 0.3f);
+                Vector3 correctionVelocity = positionError / correctionTime;
 
-
-                 GD.Print("Snapshot Curr Last Pos: " + curr.Pos + " " +  last.Pos);
-                    GD.Print("Local Pos: " + Local.Pos);
-                    GD.Print("Extrap Vel: " + LinearVelocity);
-                    GD.Print("Local SNapshot Time: " + Local.SnaphotTime);
-                    GD.Print("Extrap Delta: " + extrapDeltaMS);
-                    GD.Print("----");
-
-                // 3. Set velocity to keep simulation happy 
-                // TODO Send velocity instead of infer it from snapshots so we get proper acceleration prediction
-                // Something is wrong here
-
-
-                if (_physicsBody is RigidBody3D rb)
+               if (_physicsBody is RigidBody3D rb)
                 {
-                    rb.LinearVelocity = LinearVelocity / snapshotDeltaS;
-                    rb.AngularVelocity = AngularVelocity / snapshotDeltaS;
+                    float correctionWeight = Mathf.Clamp(linearError / ExtrapFixThreshold, 0.0f, 1.0f);
+                    rb.LinearVelocity = rb.LinearVelocity.Lerp(correctionVelocity, correctionWeight);
+
+                    // Time between the two snapshots, not between snapshot and now
+                    double snapshotIntervalS = (curr.SnaphotTime - last.SnaphotTime) / 1000.0d;
+
+                    Vector3 targetAngularVelocity = snapshotIntervalS > 0 
+                        ? AngularDelta / (float)snapshotIntervalS 
+                        : Vector3.Zero;
+
+                    rb.AngularVelocity = rb.AngularVelocity.Lerp(targetAngularVelocity, correctionWeight);
                 }
                 else if (_physicsBody is CharacterBody3D cb)
                 {
-                    cb.Velocity = AngularVelocity / snapshotDeltaS;
+                    float correctionWeight = Mathf.Clamp(linearError / ExtrapFixThreshold, 0.0f, 1.0f);
+                    cb.Velocity = cb.Velocity.Lerp(correctionVelocity, correctionWeight);
+
+                    TransformNode.Quaternion = extrap.Rot;
+
                 }
-                
-                // GD.Print("Local Time: " + Local.SnaphotTime + " | Render Time: " + (RenderTime + snapshotDeltaMS) + " | Extrap Snapshot Time: " + extrap.SnaphotTime);
-                // GD.Print("Current Time: " + curr.SnaphotTime + " | Last Time: " + last.SnaphotTime + " | Network Time: " + NetworkTime.TickMS);
-                // GD.Print("------");
-                // Interpolate transform
-                Local = extrap;
+                else
+                {
+                    // No physics body — apply directly to transform
+                    ApplyLocal();
+                }
+
 
                 break;
 
             case CorrectionMode.NONE: // No interpolation — just snap to current snapshot
 
                 Local = curr;
+                
+                ApplyLocal();
 
                 break;
             
         }
 
-        ApplyLocal();
+       
     
     }
 

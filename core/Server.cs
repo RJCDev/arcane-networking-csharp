@@ -360,7 +360,6 @@ public class Server
         int netOwner = owner != null ? owner.GetRemoteID() : 0;
         netNode.PrefabID = prefabID;
         netNode.OwnerID = netOwner;
-        netNode.OnOwnerChanged?.Invoke(netOwner, netOwner);
 
         var quat = basis.GetRotationQuaternion().Normalized();        
 
