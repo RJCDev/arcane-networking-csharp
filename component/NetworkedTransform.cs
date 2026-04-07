@@ -43,6 +43,10 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         else
         {
             TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults
+
+            if (ServerDebugMesh != null)
+                ServerDebugMesh.TopLevel = true;
+                
             Reset();
         }
 
@@ -77,7 +81,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 	public override void _Process(double delta)
     {
 		// Update render time
-		renderTime = NetworkTime.TickMS - (DelayAverage.Value + (long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
+		renderTime = NetworkTime.TickMS - ((long)SendRateMs + (1000 / NetworkManager.manager.NetworkRate) + BufferDelay); // The timestamp at which we are currently rendering
 
         // Should we send at all?
         if (!SyncPosition && !SyncRotation) 
@@ -98,27 +102,36 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             {
                 if (SyncPosition)
                 {
-                    ServerDebugMesh.Position = Vector3.Zero;
                     ServerDebugMesh.GlobalPosition = Snapshots.Max.Pos;
 
                 }
                 if (SyncRotation)
                 {
-                    ServerDebugMesh.Basis = Basis.Identity;
                     ServerDebugMesh.GlobalBasis = new Basis(Snapshots.Max.Rot);
 
                 }
             }
         }
-		
+
 		// Handle snapshots
-		var (last, curr) = GetSnapshotPair(renderTime);
-
+        var (last, curr) = GetSnapshotPair(renderTime);
+            
         if (!last.HasValue || !curr.HasValue)
-                return;
+                    return;
 
-		HandleSnapshots(last.Value, curr.Value);
+        // ONLY process snapshots if not owner
+        if (!NetworkedNode.AmIOwner)
+        {
+            HandleSnapshots(last.Value, curr.Value);
+        }
+        else // Read your own authorative snapshot into the buffer so we have a past if we switch owners
+        {
+            var snapshot = new TransformSnapshot(){ Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
+            Snapshots.Add(snapshot);
+        }
 
+
+        // Always de buffer to cleanup snapshots
 		while (Snapshots.Min.SnaphotTime < last.Value.SnaphotTime) // De-Buffer up to last
         {
             Snapshots.Remove(Snapshots.Min);
@@ -179,7 +192,8 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 
     void HandleWrite()
     {
-        // Update Position
+        // Update 
+       
         if (NetworkedNode.AmIOwner)
         {
             var (changed, changedValues) = GetChanged();
@@ -189,12 +203,12 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             {
                 if (NetworkManager.AmIServer && AuthorityMode == AuthorityMode.Server)
                     RelayChanged(changed, changedValues, NetworkTime.TickMS);
-            
+        
                 else if (NetworkManager.AmIClient && AuthorityMode == AuthorityMode.Client)
                     SendChanged(changed, changedValues, NetworkTime.TickMS);
-
             }
         }
+       
     }
 
     [Command(Channels.Unreliable, true)]
@@ -215,8 +229,6 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     [Relay(Channels.Unreliable, true, true)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
-        if (NetworkedNode.AmIOwner) return;
-        
 		var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
 		Snapshots.Add(snapshot);
 
@@ -323,7 +335,7 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
     {
         return new()
         {
-            SnaphotTime = NetworkTime.Lerp(SnaphotTime, other.SnaphotTime, amount),
+            SnaphotTime = SnaphotTime,
             Pos = Pos.Lerp(other.Pos, amount),
             Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
         };

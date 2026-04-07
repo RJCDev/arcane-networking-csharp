@@ -19,7 +19,9 @@ public partial class NetworkedTransform3D : NetworkedTransform
 
 
     [ExportCategory("Corrections")]
-    CorrectionMode _correctionMode = CorrectionMode.INTERPOLATION;
+    CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
+
+    [Export] public float ExtrapThreshold;
     [Export] CorrectionMode CorrectionMode
     {
         get => _correctionMode;
@@ -31,6 +33,10 @@ public partial class NetworkedTransform3D : NetworkedTransform
     }
 
     PhysicsBody3D _physicsBody = null;
+    
+    public Vector3 LinearVelocity = Vector3.Zero;
+    public Vector3 AngularVelocity = Vector3.Zero;
+
     public override void _Ready()
     {
         base._Ready();
@@ -38,6 +44,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
         if (TransformNode is PhysicsBody3D pb)
             _physicsBody = pb;
     }
+    
 
     protected override void HandleSnapshots(TransformSnapshot last, TransformSnapshot curr)
     {   
@@ -60,27 +67,53 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 Local = last.InterpWith(curr, interpE);
 
                 // 2. Extrapolate based on velocity
-                long snapshotDeltaMS = NetworkTime.TickMS - curr.SnaphotTime - (curr.SnaphotTime - last.SnaphotTime);
-                float snapshotDeltaS = snapshotDeltaMS / 1000.0f;
+                long extrapDeltaMS = NetworkTime.TickMS - Local.SnaphotTime; // Time between interpolated and now
+                float snapshotDeltaS = extrapDeltaMS / 1000.0f;
 
-                Vector3 linearVelocity = curr.Pos - last.Pos;
-                Vector3 angularVelocity = GetAngularDelta(last.Rot, curr.Rot);
-                
+                if (snapshotDeltaS <= 0) 
+                {
+                    GD.Print(snapshotDeltaS + " " + extrapDeltaMS);
+                    break; // Sanity check
+                }
+
                 TransformSnapshot extrap = new()
                 {
-                    SnaphotTime = Local.SnaphotTime + snapshotDeltaMS,
-                    Pos = Local.Pos + linearVelocity,
-                    Rot = Local.Rot * Quaternion.FromEuler(angularVelocity),
+                    SnaphotTime = Local.SnaphotTime + extrapDeltaMS,
+                    Pos = Local.Pos + LinearVelocity,
+                    Rot = Local.Rot * Quaternion.FromEuler(AngularVelocity),
                 };
+
+                LinearVelocity = curr.Pos - Local.Pos;
+                AngularVelocity = GetAngularDelta(Local.Rot, curr.Rot);
+
+                // // Dont over extrapolate if large movement (possibly teleport)
+                // if (LinearVelocity.LengthSquared() > ExtrapThreshold)
+                // {
+                //     ApplyLocal();
+                //     return;
+                // }
+
+
+                 GD.Print("Snapshot Curr Last Pos: " + curr.Pos + " " +  last.Pos);
+                    GD.Print("Local Pos: " + Local.Pos);
+                    GD.Print("Extrap Vel: " + LinearVelocity);
+                    GD.Print("Local SNapshot Time: " + Local.SnaphotTime);
+                    GD.Print("Extrap Delta: " + extrapDeltaMS);
+                    GD.Print("----");
+
+                // 3. Set velocity to keep simulation happy 
+                // TODO Send velocity instead of infer it from snapshots so we get proper acceleration prediction
+                // Something is wrong here
+
 
                 if (_physicsBody is RigidBody3D rb)
                 {
-                    rb.LinearVelocity = linearVelocity / snapshotDeltaS;
-                    rb.AngularVelocity = angularVelocity / snapshotDeltaS;
+                    rb.LinearVelocity = LinearVelocity / snapshotDeltaS;
+                    rb.AngularVelocity = AngularVelocity / snapshotDeltaS;
                 }
                 else if (_physicsBody is CharacterBody3D cb)
                 {
-                    cb.Velocity = linearVelocity / snapshotDeltaMS;
+                    cb.Velocity = AngularVelocity / snapshotDeltaS;
                 }
                 
                 // GD.Print("Local Time: " + Local.SnaphotTime + " | Render Time: " + (RenderTime + snapshotDeltaMS) + " | Extrap Snapshot Time: " + extrap.SnaphotTime);
@@ -107,12 +140,15 @@ public partial class NetworkedTransform3D : NetworkedTransform
     public Vector3 GetAngularDelta(Quaternion oldQuat, Quaternion newQuat)
     {
         // 1. Calculate the rotation difference (relative rotation)
-        // q_diff * old = new  =>  q_diff = new * old.Inverse()
+
+        if (!oldQuat.IsFinite() || !newQuat.IsFinite())
+            return Vector3.One;
+
         Quaternion qDiff = newQuat * oldQuat.Normalized().Inverse();
         qDiff = qDiff.Normalized();
 
         if (!qDiff.IsFinite())
-            return Vector3.Zero;
+            return Vector3.One;
 
         // 2. Extract the rotation axis and angle (in radians)
         // Godot Quaternions have GetAngle() and GetAxis() methods
