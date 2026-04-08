@@ -267,12 +267,10 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 	{
 		if (SyncPosition)
         {
-            TransformNode.Position = Vector3.Zero;
             TransformNode.GlobalPosition = Local.Pos;
         }
         if (SyncRotation)
         {
-            TransformNode.Basis = Basis.Identity;
             TransformNode.GlobalBasis = new Basis(Local.Rot);   
         }
 	}
@@ -357,11 +355,20 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
     /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
     public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
     {
-        return new()
+        Quaternion a = Rot;
+        Quaternion b = other.Rot;
+
+        // Ensure shortest path
+        if (a.Dot(b) < 0.0f)
+            b = -b;
+
+        return new TransformSnapshot
         {
-            SnaphotTime = NetworkTime.Lerp(SnaphotTime, other.SnaphotTime, amount),
+            SnaphotTime = SnaphotTime,
+
             Pos = Pos.Lerp(other.Pos, amount),
-            Rot = Rot.Normalized().Slerp(other.Rot.Normalized(), amount).Normalized(),
+
+            Rot = a.Slerp(b, amount),
         };
     }
 

@@ -97,15 +97,14 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 Local = last.InterpWith(curr, interpE);
 
                 // 2. Use Local snapshot time as the base
-                long currentTime = NetworkTime.TickMS;
-
-                double dt = (currentTime - RenderTime) / 1000.0d;
+                
+                double dt = (NetworkTime.TickMS - RenderTime) / 1000.0d;
                 if (dt <= 0.0)
                     return;
 
                 // 3. Snapshot interval (for velocity calc)
                 double snapshotIntervalS = (curr.SnaphotTime - last.SnaphotTime) / 1000.0d;
-                if (snapshotIntervalS <= 0.000001)
+                if (snapshotIntervalS <= 0.0)
                     return;
 
                 // 4. Compute velocities from snapshots
@@ -113,31 +112,17 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 Vector3 linearVelocity = linearDelta / (float)snapshotIntervalS;
 
                 Vector3 angularDelta = GetAngularDelta(last.Rot, curr.Rot);
-                Vector3 angularVelocity = angularDelta / (float)snapshotIntervalS;
-
-                // 5. Extrapolate forward FROM LOCAL (not curr)
-                Vector3 extrapPos = Local.Pos + linearVelocity * (float)dt;
-
-                // Rotation extrapolation from Local
-                Quaternion extrapRot = Local.Rot;
-
-                float angularSpeed = angularVelocity.Length();
-
-                if (angularSpeed > 0.0001f)
-                {
-                    float angle = angularSpeed * (float)dt;
-                    Vector3 axis = angularVelocity / angularSpeed;
-
-                    Quaternion deltaRot = new Quaternion(axis, angle);
-                    extrapRot = deltaRot * Local.Rot;
-                }
+                Vector3 omega = angularDelta / (float)snapshotIntervalS;
+                    
+                Quaternion omegaQuat = new Quaternion(omega.X, omega.Y, omega.Z, 0);
+                Quaternion derivative = omegaQuat * curr.Rot * 0.5f;
 
                 // 6. Build extrapolated snapshot
                 TransformSnapshot extrap = new()
                 {
-                    SnaphotTime = (long)currentTime,
-                    Pos = extrapPos,
-                    Rot = extrapRot,
+                    SnaphotTime = NetworkTime.TickMS,
+                    Pos = curr.Pos + linearVelocity * (float)dt,
+                    Rot = curr.Rot + derivative * (float)snapshotIntervalS,
                 };
 
                 Local = extrap;
@@ -162,7 +147,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
 
                     float angularCorrectionWeight = Mathf.Clamp(angularError, 0.0f, 1.0f);
 
-                    rb.AngularVelocity = rb.AngularVelocity.Lerp(angularVelocity, angularCorrectionWeight);
+                    rb.AngularVelocity = rb.AngularVelocity.Lerp(omega, angularCorrectionWeight);
                 }
                 else if (_physicsBody is CharacterBody3D cb)
                 {
