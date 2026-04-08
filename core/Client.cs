@@ -333,15 +333,6 @@ public class Client
                 return;
             }
 
-            // Set position if 3D
-            if (node is Node3D spawned3D)
-            {
-                //GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
-                spawned3D.Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
-                spawned3D.Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
-                spawned3D.Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
-            }
-
             // Add to networked nodes list
             WorldManager.NetworkedNodes.Add(packet.netID, netNode);
 
@@ -350,6 +341,16 @@ public class Client
 
         // Add to world
         WorldManager.ServerWorld.AddChild(node);
+        
+        // Set position if 3D
+        if (node is Node3D spawned3D)
+        {
+            //GD.Print("[Client] Fixing Position.... " + new Vector3(packet.position[0], packet.position[1], packet.position[2]));
+            spawned3D.Position = new Vector3(packet.position[0], packet.position[1], packet.position[2]);
+            spawned3D.Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
+            spawned3D.Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
+        }
+        
         netNode.Enabled = true; // Set Process enabled
 
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
