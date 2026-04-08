@@ -37,7 +37,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
 
-    [Export] public float TeleportThreshold = 1f;
+    [Export] public float TeleportThreshold = 5f;
 
     [Export] CorrectionMode CorrectionMode
     {
@@ -95,13 +95,20 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 // 1. Interpolate to buffered render time
                 float interpE = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
                 Local = last.InterpWith(curr, interpE);
-                
+
                 // 2. Extrapolate forward from render time → now
                 double dt = (NetworkTime.TickMS - RenderTime) / 1000.0d;
                 if (dt <= 0.0)
                     return;
 
                 TransformSnapshot extrap = Local.Extrapolate((float)dt);
+
+                // Interpolate if we arent close enough (just apply with no velocity)
+                if (TransformNode.GlobalPosition.DistanceSquaredTo(extrap.Origin) > TeleportThreshold * TeleportThreshold)
+                {
+                    ApplyLocal();
+                    return;
+                }
 
                 // 3. Apply correction depending on body type
                 if (_physicsBody is RigidBody3D rb)
