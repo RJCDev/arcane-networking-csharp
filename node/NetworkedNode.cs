@@ -38,6 +38,9 @@ public interface INetworkLogger
 [Icon("res://addons/arcane-networking/icon/networked_node.svg")]
 public sealed partial class NetworkedNode : Node, INetworkLogger
 {
+    [Signal]
+    public delegate void OnOwnerChangedEventHandler(int newOwner);
+
     [ExportGroup("Network Identity")]
 
     bool _preSpawn;
@@ -122,11 +125,19 @@ public sealed partial class NetworkedNode : Node, INetworkLogger
         }
        
     }
-    public int OwnerID;
+    int _ownerID;
+    public int OwnerID
+    {
+        get => _ownerID;
+        set
+        {
+            GD.Print("Owner: " + value + " Set On: " + Node.Name);
+            _ownerID = value;
+            EmitSignalOnOwnerChanged(_ownerID);
+        }
+    }
+    
     public object[] OwnerMeta = new object[64];
-
-    // Actions
-    public Action<int, int> OnOwnerChanged;
 
     public async override void _Ready()
     {
