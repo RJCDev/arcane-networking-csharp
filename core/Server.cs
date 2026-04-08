@@ -384,9 +384,10 @@ public class Server
             // Set Transform
             if (spawnedObject is Node3D)
             {
-                (spawnedObject as Node3D).Position = position;
+                (spawnedObject as Node3D).GlobalPosition = position;
                 (spawnedObject as Node3D).GlobalBasis = basis;
             }
+            
             GD.PushWarning("[Server] Spawned Networked Node: " + netNode.NetID);
         }
 
