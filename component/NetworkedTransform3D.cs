@@ -36,8 +36,6 @@ public partial class NetworkedTransform3D : NetworkedTransform
 {
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
-
-    [Export] float _correctionLinear = 5f, _correctionAngular = 10f;
     [Export] public float TeleportThreshold = 1f;
 
     [Export] CorrectionMode CorrectionMode
@@ -129,14 +127,14 @@ public partial class NetworkedTransform3D : NetworkedTransform
                     Rid bodyRid = rb.GetRid();
 
                     // Set the states via physics server
-                    Vector3 newVelocity = extrap.LinearVelocity  + posError * _correctionLinear;
+                    Vector3 newVelocity = extrap.LinearVelocity + posError;
                     PhysicsServer3D.BodySetState(
                         bodyRid, 
                         PhysicsServer3D.BodyState.LinearVelocity, 
                         newVelocity
                     );
 
-                    Vector3 angularVeloocity = extrap.AngularVelocity + rotAxis * (rotAngle * _correctionAngular);
+                    Vector3 angularVeloocity = extrap.AngularVelocity + rotAxis * rotAngle;
 
                     PhysicsServer3D.BodySetState(
                         bodyRid, 
