@@ -36,6 +36,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
 {
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
+
     [Export] public float TeleportThreshold = 1f;
 
     [Export] CorrectionMode CorrectionMode
@@ -94,7 +95,6 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 // 1. Interpolate to buffered render time
                 float interpE = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
                 Local = last.InterpWith(curr, interpE);
-
                 
                 // 2. Extrapolate forward from render time → now
                 double dt = (NetworkTime.TickMS - RenderTime) / 1000.0d;
@@ -127,19 +127,23 @@ public partial class NetworkedTransform3D : NetworkedTransform
                     Rid bodyRid = rb.GetRid();
 
                     // Set the states via physics server
-                    Vector3 newVelocity = extrap.LinearVelocity + posError;
+                    float posStiffness = 0.5f; // tweak between 0 and 1
+                    Vector3 newVelocity = extrap.LinearVelocity + posError * posStiffness / (float)dt;
+
                     PhysicsServer3D.BodySetState(
                         bodyRid, 
-                        PhysicsServer3D.BodyState.LinearVelocity, 
+                        PhysicsServer3D.BodyState.LinearVelocity,
                         newVelocity
                     );
 
-                    Vector3 angularVeloocity = extrap.AngularVelocity + rotAxis * rotAngle;
+                    float rotStiffness = 0.5f; // tweak between 0 and 1
+                    Vector3 correctionAngular = sinHalf > 0.0001f ? rotAxis * (rotAngle * rotStiffness / (float)dt) : Vector3.Zero;
+                    Vector3 angularVelocity = extrap.AngularVelocity + correctionAngular;
 
                     PhysicsServer3D.BodySetState(
                         bodyRid, 
                         PhysicsServer3D.BodyState.AngularVelocity, 
-                        angularVeloocity
+                        angularVelocity
                     );
                 }
                 else if (_physicsBody is CharacterBody3D cb)
