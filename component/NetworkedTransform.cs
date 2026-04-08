@@ -198,6 +198,11 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         if (SyncRotation)
         {
             Quaternion GlobalRot = TransformNode.GlobalBasis.GetRotationQuaternion();
+
+            // Shortest PathTh
+            if (Local.Rot.Dot(GlobalRot) < 0.0f)
+                GlobalRot = -GlobalRot;
+
 			if (Local.Rot.X != GlobalRot.X) { changes |= Changed.RotX; valuesChanged.Add(GlobalRot.X); }
 			if (Local.Rot.Y != GlobalRot.Y) { changes |= Changed.RotY; valuesChanged.Add(GlobalRot.Y); }
 			if (Local.Rot.Z != GlobalRot.Z) { changes |= Changed.RotZ; valuesChanged.Add(GlobalRot.Z); }

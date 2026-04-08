@@ -37,7 +37,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
 
-    [Export] public float ExtrapFixThreshold = 0.5f;
+    [Export] public float TeleportThreshold = 1f;
 
     [Export] CorrectionMode CorrectionMode
     {
@@ -74,7 +74,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
     }
 
     protected override void HandleSnapshots(TransformSnapshot last, TransformSnapshot curr)
-    {   
+    {           
         switch (_correctionMode)
         {
             case CorrectionMode.INTERPOLATION:
@@ -91,72 +91,91 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 break;
 
             case CorrectionMode.EXTRAPOLATION:
-                
-                
-                // 1. Interpolate snapshots last and current
+
+                // 1. Interpolate between last and current snapshot
                 float interpE = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
-                // Interpolate transform
                 Local = last.InterpWith(curr, interpE);
 
-                // 2. Extrapolate based on delta between now and where we want to be
-                long extrapDeltaMS = NetworkTime.TickMS - curr.SnaphotTime;
-                double snapshotDeltaS = extrapDeltaMS / 1000.0d;
-                if (snapshotDeltaS <= 0)
-                    break; // Sanity check
+                // 2. Use Local snapshot time as the base
+                long currentTime = NetworkTime.TickMS;
 
-                // 3. Get extrapolated transform (closest possible thing we have to "now" on a remote client)
-                LinearDelta = curr.Pos - last.Pos;
-                AngularDelta = GetAngularDelta(last.Rot, curr.Rot);
+                double dt = (currentTime - RenderTime) / 1000.0d;
+                if (dt <= 0.0)
+                    return;
 
+                // 3. Snapshot interval (for velocity calc)
+                double snapshotIntervalS = (curr.SnaphotTime - last.SnaphotTime) / 1000.0d;
+                if (snapshotIntervalS <= 0.000001)
+                    return;
+
+                // 4. Compute velocities from snapshots
+                Vector3 linearDelta = curr.Pos - last.Pos;
+                Vector3 linearVelocity = linearDelta / (float)snapshotIntervalS;
+
+                Vector3 angularDelta = GetAngularDelta(last.Rot, curr.Rot);
+                Vector3 angularVelocity = angularDelta / (float)snapshotIntervalS;
+
+                // 5. Extrapolate forward FROM LOCAL (not curr)
+                Vector3 extrapPos = Local.Pos + linearVelocity * (float)dt;
+
+                // Rotation extrapolation from Local
+                Quaternion extrapRot = Local.Rot;
+
+                float angularSpeed = angularVelocity.Length();
+
+                if (angularSpeed > 0.0001f)
+                {
+                    float angle = angularSpeed * (float)dt;
+                    Vector3 axis = angularVelocity / angularSpeed;
+
+                    Quaternion deltaRot = new Quaternion(axis, angle);
+                    extrapRot = deltaRot * Local.Rot;
+                }
+
+                // 6. Build extrapolated snapshot
                 TransformSnapshot extrap = new()
                 {
-                    SnaphotTime = Local.SnaphotTime + extrapDeltaMS,
-                    Pos = Local.Pos + LinearDelta,
-                    Rot = Local.Rot * Quaternion.FromEuler(AngularDelta),
+                    SnaphotTime = (long)currentTime,
+                    Pos = extrapPos,
+                    Rot = extrapRot,
                 };
-                // Update Local
+
                 Local = extrap;
 
-                // 4. Compute position error between where physics body is and where it should be
+                // 7. Correction
                 Vector3 positionError = extrap.Pos - TransformNode.GlobalPosition;
                 float linearError = positionError.Length();
-                Vector3 angularError = GetAngularDelta(extrap.Rot, TransformNode.Quaternion);
 
-                // 5. Steer toward extrapolated position via velocity — no direct position sets
-                // correctionTime scales with error: small drift = gentle, large gap = faster but still smooth
-                float correctionTime = Mathf.Clamp(linearError / 10.0f, 0.05f, 0.3f);
-                Vector3 correctionVelocity = positionError / correctionTime;
+                float linearCorrectionTime = Mathf.Clamp(linearError / 10f, 0.05f, 0.3f);
+                Vector3 correctionVelocity = positionError / linearCorrectionTime;
 
-               if (_physicsBody is RigidBody3D rb)
+                float linearCorrectionWeight = Mathf.Clamp(linearError, 0.0f, 1.0f);
+
+                if (_physicsBody is RigidBody3D rb)
                 {
-                    float correctionWeight = Mathf.Clamp(linearError / ExtrapFixThreshold, 0.0f, 1.0f);
-                    rb.LinearVelocity = rb.LinearVelocity.Lerp(correctionVelocity, correctionWeight);
+                    // Linear correction
+                    rb.LinearVelocity = rb.LinearVelocity.Lerp(correctionVelocity, linearCorrectionWeight);
 
-                    // Time between the two snapshots, not between snapshot and now
-                    double snapshotIntervalS = (curr.SnaphotTime - last.SnaphotTime) / 1000.0d;
+                    // Angular correction
+                    Quaternion currentRot = rb.GlobalTransform.Basis.GetRotationQuaternion();
+                    float angularError = currentRot.AngleTo(extrap.Rot);
 
-                    Vector3 targetAngularVelocity = snapshotIntervalS > 0 
-                        ? AngularDelta / (float)snapshotIntervalS 
-                        : Vector3.Zero;
+                    float angularCorrectionWeight = Mathf.Clamp(angularError, 0.0f, 1.0f);
 
-                    rb.AngularVelocity = rb.AngularVelocity.Lerp(targetAngularVelocity, correctionWeight);
+                    rb.AngularVelocity = rb.AngularVelocity.Lerp(angularVelocity, angularCorrectionWeight);
                 }
                 else if (_physicsBody is CharacterBody3D cb)
                 {
-                    float correctionWeight = Mathf.Clamp(linearError / ExtrapFixThreshold, 0.0f, 1.0f);
-                    cb.Velocity = cb.Velocity.Lerp(correctionVelocity, correctionWeight);
-
-                    TransformNode.Quaternion = extrap.Rot;
-
+                    cb.Velocity = cb.Velocity.Lerp(correctionVelocity, linearCorrectionWeight);
+                    TransformNode.GlobalBasis = new Basis(extrap.Rot);
                 }
                 else
                 {
-                    // No physics body — apply directly to transform
                     ApplyLocal();
                 }
-
-
                 break;
+
+            
 
             case CorrectionMode.NONE: // No interpolation — just snap to current snapshot
 
@@ -175,32 +194,31 @@ public partial class NetworkedTransform3D : NetworkedTransform
     // Get delta
     public Vector3 GetAngularDelta(Quaternion oldQuat, Quaternion newQuat)
     {
-        // 1. Calculate the rotation difference (relative rotation)
-
         if (!oldQuat.IsFinite() || !newQuat.IsFinite())
-            return Vector3.One;
+            return Vector3.Zero;
 
-        Quaternion qDiff = newQuat * oldQuat.Normalized().Inverse();
-        qDiff = qDiff.Normalized();
+        Quaternion delta = newQuat * oldQuat.Inverse();
 
-        if (!qDiff.IsFinite())
-            return Vector3.One;
+        // Ensure shortest path (VERY important)
+        if (delta.W < 0.0f)
+            delta = -delta;
 
-        // 2. Extract the rotation axis and angle (in radians)
-        // Godot Quaternions have GetAngle() and GetAxis() methods
-        float angle = qDiff.GetAngle();
-        Vector3 axis = qDiff.GetAxis();
+        delta = delta.Normalized();
 
-        // 3. Handle the shortest path (Quaternions double-cover rotations)
-        // If the angle is greater than PI, we should rotate the other way
-        if (angle > Mathf.Pi)
-        {
-            angle -= Mathf.Tau; // Subtract 2PI
-        }
+        float angle = 2.0f * Mathf.Acos(Mathf.Clamp(delta.W, -1.0f, 1.0f));
 
-        // 4. Velocity = (Axis Angle) / Time
-        return axis * angle;
+        // Clamp to avoid huge rotations (optional but recommended)
+        angle = Mathf.Wrap(angle, -Mathf.Pi, Mathf.Pi);
+
+        float sinHalfAngle = Mathf.Sqrt(1.0f - delta.W * delta.W);
+
+        Vector3 axis;
+        if (sinHalfAngle < 0.001f)
+            axis = new Vector3(delta.X, delta.Y, delta.Z);
+        else
+            axis = new Vector3(delta.X, delta.Y, delta.Z) / sinHalfAngle;
+
+        return axis * angle; // radians
     }
-
 
 }
