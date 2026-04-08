@@ -52,6 +52,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
                 ServerDebugMesh.TopLevel = true;
                 
             Reset();
+            
         }
 
         DelayAverage = new(BufferDelay, 0.1f);
@@ -76,7 +77,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 
 	protected void Reset()
     {
-        Local = new() { Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
+        Local = new() { Origin = TransformNode.GlobalPosition, Rotation = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
 
         Snapshots.Clear();
         DelayAverage = new(BufferDelay, 0.1f);
@@ -84,12 +85,13 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     
 	public override void _Process(double delta)
     {
+
 		// Update render time
         long latency = (long)SendRateMs + BufferDelay + (NetworkTime.RTT.Value / 2);
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
             
         // Should we send at all?
-        if (!SyncPosition && !SyncRotation) 
+        if (!SyncPosition && !SyncRotation)
             return;
 
         if (NetworkTime.TickMS - lastWriteTime >= SendRateMs)
@@ -98,6 +100,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             HandleWrite();
         }
 
+    
         // Debug
         if (ServerDebugMesh != null)
         {
@@ -107,12 +110,12 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             {
                 if (SyncPosition)
                 {
-                    ServerDebugMesh.GlobalPosition = Snapshots.Max.Pos;
+                    ServerDebugMesh.GlobalPosition = Snapshots.Max.Origin;
 
                 }
                 if (SyncRotation)
                 {
-                    ServerDebugMesh.GlobalBasis = new Basis(Snapshots.Max.Rot);
+                    ServerDebugMesh.GlobalBasis = new Basis(Snapshots.Max.Rotation);
 
                 }
             }
@@ -120,15 +123,15 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 
 		// Get snapshots at this render time
         var (last, curr) = GetSnapshotPair(renderTime);
-            
+        
         if (!last.HasValue || !curr.HasValue)
         {
             if (Last == default || Current == default) return;
 
             long frameDeltaMS = (long)(delta * 1000.0f);
             // Slide time forward but collapse positions so extrapolation produces zero movement
-            Last = new TransformSnapshot { SnaphotTime = Last.SnaphotTime + frameDeltaMS, Pos = Current.Pos, Rot = Current.Rot };
-            Current = new TransformSnapshot { SnaphotTime = Current.SnaphotTime + frameDeltaMS, Pos = Current.Pos, Rot = Current.Rot };
+            Last = new TransformSnapshot { SnaphotTime = Last.SnaphotTime + frameDeltaMS, Origin = Current.Origin, Rotation = Current.Rotation };
+            Current = new TransformSnapshot { SnaphotTime = Current.SnaphotTime + frameDeltaMS, Origin = Current.Origin, Rotation = Current.Rotation };
         }
         else
         {
@@ -136,14 +139,16 @@ public abstract partial class NetworkedTransform : NetworkedComponent
             Current = curr.Value;
         }
 
+ 
+
         // ONLY process snapshots if not owner
         if (!NetworkedNode.AmIOwner)
-        {
+        {   
             HandleSnapshots(Last, Current);
         }
         else // Read your own authorative snapshot into the buffer so we have a past if we switch owners
         {
-            var snapshot = new TransformSnapshot(){ Pos = TransformNode.GlobalPosition, Rot = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
+            var snapshot = new TransformSnapshot(){ Origin = TransformNode.GlobalPosition, Rotation = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
             Snapshots.Add(snapshot);
         }
 
@@ -186,29 +191,52 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         // Pos
         if (SyncPosition)
         {
-            if (Local.Pos.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
-			if (Local.Pos.Y != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
-			if (Local.Pos.Z != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
+            if (Local.Origin.X != TransformNode.GlobalPosition.X) { changes |= Changed.PosX; valuesChanged.Add(TransformNode.GlobalPosition.X); }
+			if (Local.Origin.Y != TransformNode.GlobalPosition.Y) { changes |= Changed.PosY; valuesChanged.Add(TransformNode.GlobalPosition.Y); }
+			if (Local.Origin.Z != TransformNode.GlobalPosition.Z) { changes |= Changed.PosZ; valuesChanged.Add(TransformNode.GlobalPosition.Z); }
 
-			Local.Pos = TransformNode.GlobalPosition;
+			Local.Origin = TransformNode.GlobalPosition;
 
-        }
+            // Velocity
+            if (TransformNode is RigidBody3D rb)
+            {
+                if (Local.LinearVelocity.X != rb.LinearVelocity.X) { changes |= Changed.LVelX; valuesChanged.Add(rb.LinearVelocity.X); }
+                if (Local.LinearVelocity.Y != rb.LinearVelocity.Y) { changes |= Changed.LVelY; valuesChanged.Add(rb.LinearVelocity.Y); }
+                if (Local.LinearVelocity.Z != rb.LinearVelocity.Z) { changes |= Changed.LVelZ; valuesChanged.Add(rb.LinearVelocity.Z); }
+
+                Local.LinearVelocity = rb.LinearVelocity;
+            }
+            else if (TransformNode is CharacterBody3D cb)
+            {
+                if (Local.LinearVelocity.X != cb.Velocity.X) { changes |= Changed.LVelX; valuesChanged.Add(cb.Velocity.X); }
+                if (Local.LinearVelocity.Y != cb.Velocity.Y) { changes |= Changed.LVelY; valuesChanged.Add(cb.Velocity.Y); }
+                if (Local.LinearVelocity.Z != cb.Velocity.Z) { changes |= Changed.LVelZ; valuesChanged.Add(cb.Velocity.Z); }
+
+                Local.LinearVelocity = cb.Velocity;
+            }
+        }   
 
         // Rot
         if (SyncRotation)
         {
             Quaternion GlobalRot = TransformNode.GlobalBasis.GetRotationQuaternion();
+            
+            if (Local.Rotation.X != GlobalRot.X) { changes |= Changed.RotX; valuesChanged.Add(GlobalRot.X); }
+            if (Local.Rotation.Y != GlobalRot.Y) { changes |= Changed.RotY; valuesChanged.Add(GlobalRot.Y); }
+            if (Local.Rotation.Z != GlobalRot.Z) { changes |= Changed.RotZ; valuesChanged.Add(GlobalRot.Z); }
+            if (Local.Rotation.W != GlobalRot.W) { changes |= Changed.RotW; valuesChanged.Add(GlobalRot.W); }
 
-            // Shortest PathTh
-            if (Local.Rot.Dot(GlobalRot) < 0.0f)
-                GlobalRot = -GlobalRot;
+            Local.Rotation = GlobalRot;
+            
+            // Velocity
+            if (TransformNode is RigidBody3D rb)
+            {
+                if (Local.AngularVelocity.X != rb.AngularVelocity.X) { changes |= Changed.AVelX; valuesChanged.Add(rb.AngularVelocity.X); }
+                if (Local.AngularVelocity.Y != rb.AngularVelocity.Y) { changes |= Changed.AVelY; valuesChanged.Add(rb.AngularVelocity.Y); }
+                if (Local.AngularVelocity.Z != rb.AngularVelocity.Z) { changes |= Changed.AVelZ; valuesChanged.Add(rb.AngularVelocity.Z); }
 
-			if (Local.Rot.X != GlobalRot.X) { changes |= Changed.RotX; valuesChanged.Add(GlobalRot.X); }
-			if (Local.Rot.Y != GlobalRot.Y) { changes |= Changed.RotY; valuesChanged.Add(GlobalRot.Y); }
-			if (Local.Rot.Z != GlobalRot.Z) { changes |= Changed.RotZ; valuesChanged.Add(GlobalRot.Z); }
-			if (Local.Rot.W != GlobalRot.W) { changes |= Changed.RotW; valuesChanged.Add(GlobalRot.W); }
-
-			Local.Rot = GlobalRot;
+                Local.AngularVelocity = rb.AngularVelocity;
+            }
         }
 
         return (changes, [.. valuesChanged]);
@@ -238,11 +266,11 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     [Command(Channels.Unreliable, true)]
     public void SendChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
-        // Only set on server if we as the server don't own this
-        if (!NetworkedNode.AmIOwner && NetworkManager.AmIHeadless)
-        { 
-            Local = ReadSnapshot(changed, valuesChanged, tickSent);
-            ApplyLocal();
+        // Add in here
+        if (NetworkManager.AmIHeadless)
+        {
+            var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
+		    Snapshots.Add(snapshot);
         }
 
         // Tell the clients their new info
@@ -267,11 +295,11 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 	{
 		if (SyncPosition)
         {
-            TransformNode.GlobalPosition = Local.Pos;
+            TransformNode.GlobalPosition = Local.Origin;
         }
         if (SyncRotation)
         {
-            TransformNode.GlobalBasis = new Basis(Local.Rot);   
+            TransformNode.GlobalBasis = new Basis(Local.Rotation); 
         }
 	}
 
@@ -289,65 +317,86 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     {
         TransformSnapshot snap = Snapshots.Count > 0
         ? Snapshots.Max
-        : new();
+        : new() { Rotation = Quaternion.Identity };
 
         int readIndex = 0;
 
-        snap.Pos = new()
+        snap.Origin = new()
         {
-            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : snap.Pos.X,
-            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : snap.Pos.Y,
-            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : snap.Pos.Z,
+            X = (changed & Changed.PosX) > 0 ? valuesChanged[readIndex++] : snap.Origin.X,
+            Y = (changed & Changed.PosY) > 0 ? valuesChanged[readIndex++] : snap.Origin.Y,
+            Z = (changed & Changed.PosZ) > 0 ? valuesChanged[readIndex++] : snap.Origin.Z,
         };
 
-        snap.Rot = new()
+        snap.LinearVelocity = new()
         {
-            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : snap.Rot.X,
-            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : snap.Rot.Y,
-            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : snap.Rot.Z,
-            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : snap.Rot.W,
+            X = (changed & Changed.LVelX) > 0 ? valuesChanged[readIndex++] : snap.LinearVelocity.X,
+            Y = (changed & Changed.LVelY) > 0 ? valuesChanged[readIndex++] : snap.LinearVelocity.Y,
+            Z = (changed & Changed.LVelZ) > 0 ? valuesChanged[readIndex++] : snap.LinearVelocity.Z,
+        };
+
+        snap.Rotation = new()
+        {
+            X = (changed & Changed.RotX) > 0 ? valuesChanged[readIndex++] : snap.Rotation.X,
+            Y = (changed & Changed.RotY) > 0 ? valuesChanged[readIndex++] : snap.Rotation.Y,
+            Z = (changed & Changed.RotZ) > 0 ? valuesChanged[readIndex++] : snap.Rotation.Z,
+            W = (changed & Changed.RotW) > 0 ? valuesChanged[readIndex++] : snap.Rotation.W,
+        };
+
+        snap.AngularVelocity = new()
+        {
+            X = (changed & Changed.AVelX) > 0 ? valuesChanged[readIndex++] : snap.AngularVelocity.X,
+            Y = (changed & Changed.AVelY) > 0 ? valuesChanged[readIndex++] : snap.AngularVelocity.Y,
+            Z = (changed & Changed.AVelZ) > 0 ? valuesChanged[readIndex++] : snap.AngularVelocity.Z,
         };
 
         snap.SnaphotTime = tickMS;
         return snap;
     }
-
-    public enum SendTime
+    
+    // A ushort describing what part of the transform was changed
+    public enum Changed : ushort
     {
-        Update,
-        Manual,
-    }
-    public enum InterpolationMode
-    {
-        None,
-        Process,
-        Physics,
-    }
-    // A byte describing what part of the transform was changed
-    public enum Changed : byte
-    {
+        // Position / Rotation
         None = 0,
+
         PosX = 1 << 0,
         PosY = 1 << 1,
         PosZ = 1 << 2,
+
         RotX = 1 << 4,
         RotY = 1 << 5,
         RotZ = 1 << 6,
         RotW = 1 << 7,
+
+        // Velocities (if needed)
+        LVelX = 1 << 8,
+        LVelY = 1 << 9,
+        LVelZ = 1 << 10,
+
+        AVelX = 1 << 11,
+        AVelY = 1 << 12,
+        AVelZ = 1 << 13,
+
     }
 }
 
 // A transform snapshot
 public struct TransformSnapshot : IComparable<TransformSnapshot>
 {
-    public Vector3 Pos;
-    public Quaternion Rot;
+    public Vector3 Origin;
+    public Quaternion Rotation;
+
+    public Vector3 LinearVelocity;
+    public Vector3 AngularVelocity;
 
     public long SnaphotTime;
     public TransformSnapshot()
     {
-        Pos = Vector3.Zero;
-        Rot = Quaternion.Identity;
+        Origin = Vector3.Zero;
+        Rotation = Quaternion.Identity;
+        LinearVelocity = Vector3.Zero;
+        AngularVelocity = Vector3.Zero;
     }
     /// <summary>
     /// TO Extrapolate, use a value larger than 1 for amount
@@ -355,20 +404,56 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
     /// <returns>A TransformSnapshot that has been Transformed from this TransformSnapshot To "After"</returns>
     public TransformSnapshot InterpWith(TransformSnapshot other, float amount)
     {
-        Quaternion a = Rot;
-        Quaternion b = other.Rot;
+        Quaternion a = Rotation.Normalized();
+        Quaternion b = other.Rotation.Normalized();
 
-        // Ensure shortest path
-        if (a.Dot(b) < 0.0f)
-            b = -b;
+        if (!a.IsFinite())
+            a = Quaternion.Identity;
+
+        if (!b.IsFinite())
+            b = Quaternion.Identity;
 
         return new TransformSnapshot
         {
             SnaphotTime = SnaphotTime,
 
-            Pos = Pos.Lerp(other.Pos, amount),
+            Origin = Origin.Lerp(other.Origin, amount),
 
-            Rot = a.Slerp(b, amount),
+            Rotation = a.Slerp(b, amount).Normalized(),
+
+            LinearVelocity = LinearVelocity.Lerp(other.LinearVelocity, amount),
+
+            AngularVelocity = AngularVelocity.Lerp(other.AngularVelocity, amount),
+        };
+    }
+
+    public TransformSnapshot Extrapolate(float dtSeconds)
+    {
+        Vector3 predictedPos = Origin + LinearVelocity * dtSeconds;
+
+        Quaternion predictedRotation = Rotation;
+
+        float angularSpeed = AngularVelocity.Length();
+        if (angularSpeed > 0.0001f)
+        {
+            Vector3 axis = AngularVelocity / angularSpeed;
+            float angle = angularSpeed * dtSeconds;
+
+            Quaternion deltaRot = new Quaternion(axis, angle);
+            predictedRotation = (deltaRot * Rotation).Normalized();
+        }
+
+        long dtMs = (long)(dtSeconds * 1000.0f);
+
+        return new TransformSnapshot()
+        {
+            SnaphotTime = SnaphotTime + dtMs,
+
+            Origin = predictedPos,
+            Rotation = predictedRotation,
+
+            LinearVelocity = LinearVelocity,
+            AngularVelocity = AngularVelocity,
         };
     }
 
@@ -380,7 +465,7 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
     {
         if (obj is TransformSnapshot s)
         {
-            return Pos == s.Pos && Rot == s.Rot ;
+            return Origin == s.Origin && Rotation == s.Rotation ;
         }
         else return false;
 
@@ -397,6 +482,6 @@ public struct TransformSnapshot : IComparable<TransformSnapshot>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Pos.GetHashCode(), Rot.GetHashCode());
+        return HashCode.Combine(Origin.GetHashCode(), Rotation.GetHashCode());
     }
 }

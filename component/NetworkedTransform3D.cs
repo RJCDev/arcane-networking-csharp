@@ -37,6 +37,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
 
+    [Export] float _correctionLinear = 5f, _correctionAngular = 10f;
     [Export] public float TeleportThreshold = 1f;
 
     [Export] CorrectionMode CorrectionMode
@@ -86,81 +87,91 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 Local = last.InterpWith(curr, interpT);
 
                 // 2. Apply to Node3D
-                ApplyLocal();
+                ApplyLocal();   
 
                 break;
 
             case CorrectionMode.EXTRAPOLATION:
-
-                // 1. Interpolate between last and current snapshot
+            {
+                // 1. Interpolate to buffered render time
                 float interpE = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
                 Local = last.InterpWith(curr, interpE);
 
-                // 2. Use Local snapshot time as the base
-                
+                // 2. Extrapolate forward from render time → now
                 double dt = (NetworkTime.TickMS - RenderTime) / 1000.0d;
                 if (dt <= 0.0)
                     return;
 
-                // 3. Snapshot interval (for velocity calc)
-                double snapshotIntervalS = (curr.SnaphotTime - last.SnaphotTime) / 1000.0d;
-                if (snapshotIntervalS <= 0.0)
-                    return;
+                TransformSnapshot extrap = Local.Extrapolate((float)dt);
 
-                // 4. Compute velocities from snapshots
-                Vector3 linearDelta = curr.Pos - last.Pos;
-                Vector3 linearVelocity = linearDelta / (float)snapshotIntervalS;
-
-                Vector3 angularDelta = GetAngularDelta(last.Rot, curr.Rot);
-                Vector3 omega = angularDelta / (float)snapshotIntervalS;
-                    
-                Quaternion omegaQuat = new Quaternion(omega.X, omega.Y, omega.Z, 0);
-                Quaternion derivative = omegaQuat * curr.Rot * 0.5f;
-
-                // 6. Build extrapolated snapshot
-                TransformSnapshot extrap = new()
-                {
-                    SnaphotTime = NetworkTime.TickMS,
-                    Pos = curr.Pos + linearVelocity * (float)dt,
-                    Rot = curr.Rot + derivative * (float)snapshotIntervalS,
-                };
-
-                Local = extrap;
-
-                // 7. Correction
-                Vector3 positionError = extrap.Pos - TransformNode.GlobalPosition;
-                float linearError = positionError.Length();
-
-                float linearCorrectionTime = Mathf.Clamp(linearError / 10f, 0.05f, 0.3f);
-                Vector3 correctionVelocity = positionError / linearCorrectionTime;
-
-                float linearCorrectionWeight = Mathf.Clamp(linearError, 0.0f, 1.0f);
-
+                // 3. Apply correction depending on body type
                 if (_physicsBody is RigidBody3D rb)
                 {
-                    // Linear correction
-                    rb.LinearVelocity = rb.LinearVelocity.Lerp(correctionVelocity, linearCorrectionWeight);
+                    Vector3 posError = extrap.Origin - rb.GlobalPosition;
 
-                    // Angular correction
-                    Quaternion currentRot = rb.GlobalTransform.Basis.GetRotationQuaternion();
-                    float angularError = currentRot.AngleTo(extrap.Rot);
+                    Quaternion currentRot = rb.GlobalBasis.GetRotationQuaternion().Normalized();
+                    Quaternion targetRot  = extrap.Rotation; // already normalized from Extrapolate()
+                    Quaternion rotError   = targetRot * currentRot.Inverse();
 
-                    float angularCorrectionWeight = Mathf.Clamp(angularError, 0.0f, 1.0f);
+                    // Ensure shortest path before extracting angle
+                    if (rotError.W < 0f)
+                        rotError = -rotError;
 
-                    rb.AngularVelocity = rb.AngularVelocity.Lerp(omega, angularCorrectionWeight);
+                    Vector3 rotAxis = new Vector3(rotError.X, rotError.Y, rotError.Z);
+                    float   sinHalf = rotAxis.Length();
+                    rotAxis         = sinHalf > 0.0001f ? rotAxis / sinHalf : Vector3.Zero;
+                    float rotAngle  = 2.0f * Mathf.Atan2(sinHalf, rotError.W);
+
+                    // Local.LinearVelocity/AngularVelocity are already the extrapolated velocities
+                    // so we just add the positional/rotational error correction on top
+                    // Get the RID of your physics body
+                    Rid bodyRid = rb.GetRid();
+
+                    // Set the states via physics server
+
+                    Vector3 newVelocity = extrap.LinearVelocity  + posError * _correctionAngular;
+                    PhysicsServer3D.BodySetState(
+                        bodyRid, 
+                        PhysicsServer3D.BodyState.LinearVelocity, 
+                        newVelocity
+                    );
+
+                    Vector3 angularVeloocity = extrap.AngularVelocity + rotAxis  * (rotAngle * _correctionAngular);
+
+                    PhysicsServer3D.BodySetState(
+                        bodyRid, 
+                        PhysicsServer3D.BodyState.AngularVelocity, 
+                        angularVeloocity
+                    );
                 }
                 else if (_physicsBody is CharacterBody3D cb)
                 {
-                    cb.Velocity = cb.Velocity.Lerp(correctionVelocity, linearCorrectionWeight);
-                    TransformNode.GlobalBasis = new Basis(extrap.Rot);
+                    const float SnapThreshold    = 0.5f;
+                    const float SmoothCorrection = 0.3f;
+
+                    Vector3 posError = extrap.Origin - cb.GlobalPosition;
+
+                    if (posError.Length() > SnapThreshold)
+                    {
+                        cb.GlobalPosition = extrap.Origin;
+                    }
+                    else
+                    {
+                        cb.GlobalPosition = cb.GlobalPosition.Lerp(extrap.Origin, SmoothCorrection);
+                    }
+
+                    cb.Quaternion = curr.Rotation;
+
+                    // Extrapolate() preserves velocity as-is, so this is already the predicted velocity
+                    cb.Velocity = extrap.LinearVelocity;
+                    cb.MoveAndSlide();
                 }
                 else
                 {
                     ApplyLocal();
                 }
-                break;
-
-            
+                    break;
+}
 
             case CorrectionMode.NONE: // No interpolation — just snap to current snapshot
 
