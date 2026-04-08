@@ -85,7 +85,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     
 	public override void _Process(double delta)
     {
-
+            
 		// Update render time
         long latency = (long)SendRateMs + BufferDelay + (NetworkTime.RTT.Value / 2);
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
@@ -299,7 +299,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         }
         if (SyncRotation)
         {
-            TransformNode.GlobalBasis = new Basis(Local.Rotation); 
+            TransformNode.GlobalBasis = new Basis(Local.Rotation);
         }
 	}
 

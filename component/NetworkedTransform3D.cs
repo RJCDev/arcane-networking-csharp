@@ -87,7 +87,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 Local = last.InterpWith(curr, interpT);
 
                 // 2. Apply to Node3D
-                ApplyLocal();   
+                ApplyLocal();
 
                 break;
 
@@ -97,6 +97,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 float interpE = NetworkTime.InverseLerp(last.SnaphotTime, curr.SnaphotTime, RenderTime);
                 Local = last.InterpWith(curr, interpE);
 
+                
                 // 2. Extrapolate forward from render time → now
                 double dt = (NetworkTime.TickMS - RenderTime) / 1000.0d;
                 if (dt <= 0.0)
@@ -128,15 +129,14 @@ public partial class NetworkedTransform3D : NetworkedTransform
                     Rid bodyRid = rb.GetRid();
 
                     // Set the states via physics server
-
-                    Vector3 newVelocity = extrap.LinearVelocity  + posError * _correctionAngular;
+                    Vector3 newVelocity = extrap.LinearVelocity  + posError * _correctionLinear;
                     PhysicsServer3D.BodySetState(
                         bodyRid, 
                         PhysicsServer3D.BodyState.LinearVelocity, 
                         newVelocity
                     );
 
-                    Vector3 angularVeloocity = extrap.AngularVelocity + rotAxis  * (rotAngle * _correctionAngular);
+                    Vector3 angularVeloocity = extrap.AngularVelocity + rotAxis * (rotAngle * _correctionAngular);
 
                     PhysicsServer3D.BodySetState(
                         bodyRid, 
