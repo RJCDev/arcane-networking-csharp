@@ -12,9 +12,19 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     [Export] protected Node3D TransformNode = null;
 
 	[ExportCategory("Send Rate")]
-    [Export] protected long SendRate = 60;
-    double SendRateMs => 1000.0d / SendRate;
-    float SendsPerSec => 1.0f / SendRate;
+    
+    long _sendRate = 60;
+    [Export] protected long SendRate
+    {
+        get => _sendRate;
+        set
+        {
+            _sendRate = value;
+            SendRateMs = _sendRate > 0 ? 1000 / _sendRate : 0;
+        }
+    }
+
+    protected long SendRateMs { get; private set; } = 1000 / 60;
 
     [Export(PropertyHint.Range, "5, 500, 1")] long BufferDelay = 50;
 
@@ -22,8 +32,6 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     protected readonly SortedSet<TransformSnapshot> Snapshots = [];
     protected TransformSnapshot Last = default, Current = default;
     protected TransformSnapshot Local;
-
-    MovingAverage DelayAverage;
 
 	[ExportCategory("What To Sync")]
     [Export] protected bool SyncPosition = true;
@@ -47,15 +55,10 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         else
         {
             TransformNode ??= NetworkedNode.Node as Node3D; // Set Defaults
-
-            if (ServerDebugMesh != null)
-                ServerDebugMesh.TopLevel = true;
                 
             Reset();
             
         }
-
-        DelayAverage = new(BufferDelay, 0.1f);
 
     }
     public override void _AuthoritySet()
@@ -72,7 +75,6 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     {
         SyncPosition = syncing;
         SyncRotation = syncing;
-        Reset();
     }
 
 	protected void Reset()
@@ -80,14 +82,13 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         Local = new() { Origin = TransformNode.GlobalPosition, Rotation = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
 
         Snapshots.Clear();
-        DelayAverage = new(BufferDelay, 0.1f);
     }
     
 	public override void _Process(double delta)
     {
             
-		// Update render time
-        long latency = (long)SendRateMs + BufferDelay + DelayAverage.Value + (NetworkTime.RTT.Value / 2);
+		// Update render timeMs + BufferDela
+        long latency = SendRateMs + (NetworkTime.RTT.Value / 2);
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
             
         // Should we send at all?
@@ -127,19 +128,25 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         if (!last.HasValue || !curr.HasValue)
         {
             if (Last == default || Current == default) return;
+            
+            // The time since the last snapshot
+            long snapDelta = NetworkTime.TickMS - Current.SnaphotTime;
 
-            long frameDeltaMS = (long)(delta * 1000.0f);
-            // Slide time forward but collapse positions so extrapolation produces zero movement
-            Last = new TransformSnapshot { SnaphotTime = Last.SnaphotTime + frameDeltaMS, Origin = Current.Origin, Rotation = Current.Rotation };
-            Current = new TransformSnapshot { SnaphotTime = Current.SnaphotTime + frameDeltaMS, Origin = Current.Origin, Rotation = Current.Rotation };
+            if (snapDelta >= SendRateMs)
+            {
+                // Slide time forward but collapse positions so extrapolation produces zero movement
+                Last = new TransformSnapshot { SnaphotTime = Last.SnaphotTime + SendRateMs, Origin = Current.Origin, Rotation = Current.Rotation };
+                Current = new TransformSnapshot { SnaphotTime = Current.SnaphotTime + SendRateMs, Origin = Current.Origin, Rotation = Current.Rotation };
+
+                Snapshots.Add(Last);
+                Snapshots.Add(Current);
+            }
         }
         else
         {
             Last = last.Value;
             Current = curr.Value;
         }
-
- 
 
         // ONLY process snapshots if not owner
         if (!NetworkedNode.AmIOwner)
@@ -283,8 +290,6 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 		var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
 		Snapshots.Add(snapshot);
 
-        DelayAverage.AddSample(NetworkTime.TickMS - Snapshots.Max.SnaphotTime); // Add a sample for the most recent delay
-
     }
 
 	/// <summary>
@@ -316,7 +321,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     {
         TransformSnapshot snap = Snapshots.Count > 0
         ? Snapshots.Max
-        : new() { Rotation = Quaternion.Identity };
+        : new() { Origin = TransformNode.GlobalPosition, Rotation = new Quaternion(TransformNode.GlobalBasis) }; // Init with transform node info
 
         int readIndex = 0;
 

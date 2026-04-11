@@ -34,6 +34,9 @@ public enum CorrectionMode
 [GlobalClass]
 public partial class NetworkedTransform3D : NetworkedTransform
 {
+    [Signal]
+    public delegate void OnTeleportEventHandler();
+
     [ExportCategory("Corrections")]
     CorrectionMode _correctionMode = CorrectionMode.EXTRAPOLATION;
 
@@ -75,6 +78,16 @@ public partial class NetworkedTransform3D : NetworkedTransform
 
     protected override void HandleSnapshots(TransformSnapshot last, TransformSnapshot curr)
     {           
+        // Check teleport FIRST
+        var distance = TransformNode.GlobalPosition.DistanceSquaredTo(curr.Origin);
+        if (distance > TeleportThreshold * TeleportThreshold)
+        {
+            Local = curr;
+            ApplyLocal();
+            EmitSignalOnTeleport();
+            return;
+        }
+
         switch (_correctionMode)
         {
             case CorrectionMode.INTERPOLATION:
@@ -100,15 +113,8 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 double dt = (NetworkTime.TickMS - RenderTime) / 1000.0d;
                 if (dt <= 0.0)
                     return;
-
+                
                 TransformSnapshot extrap = Local.Extrapolate((float)dt);
-
-                // Interpolate if we arent close enough (just apply with no velocity)
-                if (TransformNode.GlobalPosition.DistanceSquaredTo(extrap.Origin) > TeleportThreshold * TeleportThreshold)
-                {
-                    ApplyLocal();
-                    return;
-                }
 
                 // 3. Apply correction depending on body type
                 if (_physicsBody is RigidBody3D rb)
@@ -179,7 +185,7 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 {
                     ApplyLocal();
                 }
-                    break;
+                break;
 }
 
             case CorrectionMode.NONE: // No interpolation — just snap to current snapshot
@@ -191,8 +197,6 @@ public partial class NetworkedTransform3D : NetworkedTransform
                 break;
             
         }
-
-       
     
     }
 

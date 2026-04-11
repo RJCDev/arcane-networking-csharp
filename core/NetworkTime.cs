@@ -18,14 +18,15 @@ public class NetworkTime
     // Client Connection to server
     private const int MaxSamples = 32; // Max RTT Samples
     private static readonly List<Sample> samples = new(MaxSamples);
+    public static MovingAverage RTT = new(0, 0.05);
+
     private static double bestOffsetMs = 0.0; // double for fractional ms during calc
     static double bestOffsetAcc = 0;
     private static bool hasOffset = false;
-    public static MovingAverage RTT = new(0, 0.5);
-   
+
     const long MaxJumpMs = 50;
 
-    public static void Reset() { RTT = new(0, 0.5); hasOffset = false; samples.Clear(); }
+    public static void Reset() { RTT = new(0, 0.05); hasOffset = false; samples.Clear(); }
 
 
     public static long LocalTimeMs() => // Monotonic Clock
@@ -33,30 +34,37 @@ public class NetworkTime
 
     /// <summary>
     /// Add a new sync sample (t0 client send, t1 server receive, t2 server send, t3 client receive)
-    /// All t* are in milliseconds. t0, t3 must be LocalTimeMs(); t1,t2 are server Unix ms.
+    /// All t* are in milliseconds. t0, t3 must be LocalTimeMs();
     /// </summary>
-   public static void AddTimeSample(long t0, long t1, long t2, long t3)
+    public static void AddTimeSample(long t0, long t1, long t2, long t3)
     {
-        // Compute offset and delay
+        // Compute offset and delay (NTP-style)
         long offset = ((t1 - t0) + (t2 - t3)) / 2;
         long delay  = (t3 - t0) - (t2 - t1);
+
+        // // Sanity check: discard bad samples
+        // if (delay < 0 || delay > 1000) // >1s RTT is likely garbage
+        //     return;
 
         // Add sample to rolling buffer
         samples.Add(new Sample { Offset = offset, Delay = delay });
         if (samples.Count > MaxSamples)
             samples.RemoveAt(0);
 
-        // Sort by delay and pick the lowest 20%
-        var lowDelay = samples.OrderBy(s => s.Delay)
-                            .Take(Math.Max(1, samples.Count / 5))
-                            .ToList();
+        // Sort by delay and take lowest 20%
+        int takeCount = Math.Max(1, samples.Count / 5);
+        var lowDelay = samples
+            .OrderBy(s => s.Delay)
+            .Take(takeCount)
+            .ToList();
 
-        // Median offset of those low-delay samples
-        long median = lowDelay.OrderBy(s => s.Offset)
-                            .ElementAt(lowDelay.Count / 2)
-                            .Offset;
+        // Median offset from best samples
+        long median = lowDelay
+            .OrderBy(s => s.Offset)
+            .ElementAt(lowDelay.Count / 2)
+            .Offset;
 
-        // Initialize on first sync
+        // First-time initialization
         if (!hasOffset)
         {
             bestOffsetAcc = median;
@@ -65,19 +73,21 @@ public class NetworkTime
             return;
         }
 
-        // Ignore tiny fluctuations (less than ~1 ms)
+        // Ignore tiny fluctuations (< 1 ms)
         if (Math.Abs(median - bestOffsetMs) < 1.0)
             return;
 
-        // Smooth toward the median offset
+        // Save previous value for clamping
+        double prev = bestOffsetMs;
+
+        // Smooth toward median
         bestOffsetAcc = bestOffsetAcc * (1.0 - RTT.Smoothing) + median * RTT.Smoothing;
         bestOffsetMs  = bestOffsetAcc;
 
-        // Optional: clamp huge jumps (e.g. if a bad sample sneaks in)
-        double diff = bestOffsetMs - bestOffsetAcc;
+        // Clamp large jumps
+        double diff = bestOffsetMs - prev;
         if (Math.Abs(diff) > MaxJumpMs)
-            bestOffsetMs = bestOffsetAcc + Math.Sign(diff) * MaxJumpMs;
-
+            bestOffsetMs = prev + Math.Sign(diff) * MaxJumpMs;
     }
 
     public static long Lerp(long start, long end, float weight)
@@ -98,13 +108,14 @@ public class NetworkTime
     {
         get
         {
-            if (!hasOffset || NetworkManager.AmIServer)
-                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
             double local = LocalTimeMs();
-            return (long)Math.Round(local + bestOffsetMs);
+
+            if (!hasOffset)
+                return (long)local;
+
+            return (long)(local + bestOffsetMs);
         }
-    }
+}
 
     /// <summary>
     /// Expose last delay for debugging

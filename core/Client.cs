@@ -289,17 +289,15 @@ public class Client
 
     static void OnPong(PongPacket packet)
     {       
-        long t0 = packet.pingSendTick; // client send (monotonic)
+        long t0 = packet.pingSendTick; // client send
 
-        long t1 = packet.pongSendTick; // server receive (Utc)
+        long t1 = packet.pongSendTick; // server receive 
 
-        long t2 = packet.pongSendTick; // server send (Utc) We have to assume here as the server can't tell us after it sent the packet
+        long t2 = packet.pongSendTick; // server send
 
-        long t3 = NetworkTime.LocalTimeMs(); // client receive (monotonic)
+        long t3 = NetworkTime.LocalTimeMs(); // client receive
 
-        serverConnection.lastRTT = t3 - t0;
-
-        
+        serverConnection.lastRTT = t3 - t0;     
 
         NetworkTime.AddTimeSample(t0, t1, t2, t3);
         NetworkTime.RTT.AddSample(serverConnection.lastRTT);
@@ -350,7 +348,7 @@ public class Client
             spawned3D.Quaternion = new Quaternion(packet.rotation[0], packet.rotation[1], packet.rotation[2], packet.rotation[3]);
             spawned3D.Scale = new Vector3(packet.scale[0], packet.scale[1], packet.scale[2]);
         }
-
+        
         netNode.Enabled = true; // Set Process enabled
 
         if (netNode.AmIOwner && packet.prefabID == NetworkManager.manager.PlayerPrefabID)
