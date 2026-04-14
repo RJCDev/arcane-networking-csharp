@@ -33,6 +33,8 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     protected TransformSnapshot Last = default, Current = default;
     protected TransformSnapshot Local;
 
+    MovingAverage LatencyAvg = new();
+
 	[ExportCategory("What To Sync")]
     [Export] protected bool SyncPosition = true;
     [Export] protected bool SyncRotation = true;
@@ -82,13 +84,14 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         Local = new() { Origin = TransformNode.GlobalPosition, Rotation = TransformNode.Quaternion, SnaphotTime = NetworkTime.TickMS };
 
         Snapshots.Clear();
+        LatencyAvg = new();
     }
     
 	public override void _Process(double delta)
     {
             
 		// Update render timeMs + BufferDela
-        long latency = SendRateMs + (NetworkTime.RTT.Value / 2);
+        long latency = SendRateMs + LatencyAvg.Value;
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
             
         // Should we send at all?
@@ -289,6 +292,8 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     {
 		var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
 		Snapshots.Add(snapshot);
+
+        LatencyAvg.AddSample(NetworkTime.TickMS - tickSent);
 
     }
 

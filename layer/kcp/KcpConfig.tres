@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_2rtfm")
 RecvBufferSize = 7340032
-Mtu = 1300
+Mtu = 1400
 Interval = 10

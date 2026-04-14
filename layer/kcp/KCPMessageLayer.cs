@@ -20,8 +20,10 @@ namespace ArcaneNetworking
                 {
                     // Create NetworkConnection
                     var endpoint = KCPServer.GetClientEndPoint(id);
-                    GD.Print("[KCP] Client Connected! " + endpoint.Address.ToString() + " ID: " + id);
-                    NetworkConnection incoming = new(endpoint.Address.ToString(), (ushort)endpoint.Port, id);
+                    var ip = endpoint.Address.MapToIPv4().ToString();
+
+                    GD.Print("[KCP] Client Connected! " + ip + " ID: " + id);
+                    NetworkConnection incoming = new(ip, (ushort)endpoint.Port, id);
                     OnServerConnect?.Invoke(incoming);
                 },
                 (id, bytes, channel) => OnServerReceive?.Invoke(bytes, id), // Discard channel, doesn't really matter when incoming
