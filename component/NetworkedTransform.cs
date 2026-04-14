@@ -89,12 +89,13 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     
 	public override void _Process(double delta)
     {
-            
+        // Dont send if we aren't connected
+        if (NetworkManager.AmIClient && Client.serverConnection == null) return;
+
 		// Update render timeMs + BufferDela
         long latency = SendRateMs + LatencyAvg.Value;
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
 
-      
                     
         // Should we send at all?
         if (!SyncPosition && !SyncRotation)
@@ -293,8 +294,8 @@ public abstract partial class NetworkedTransform : NetworkedComponent
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
 		var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
-		Snapshots.Add(snapshot);
-
+		Snapshots.Add(snapshot);           
+            
         LatencyAvg.AddSample(NetworkTime.TickMS - tickSent);        
 
     }
