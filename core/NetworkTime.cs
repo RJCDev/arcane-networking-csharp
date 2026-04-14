@@ -26,6 +26,8 @@ public class NetworkTime
 
     const long MaxJumpMs = 50;
 
+    public static bool HasSamples() => RTT.HasData();
+    
     public static void Reset() { RTT = new(0, 0.05); hasOffset = false; samples.Clear(); }
 
 

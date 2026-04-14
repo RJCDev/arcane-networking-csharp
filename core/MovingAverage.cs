@@ -13,6 +13,8 @@ public class MovingAverage
         Smoothing = smooth;
     }
     public long Value => (long)Math.Round(movingAverage);
+
+    public bool HasData() => movingAverage != 0;
     public void AddSample(long sample)
     {
         if (movingAverage == 0)
