@@ -275,7 +275,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
        
     }
 
-    [Command(Channels.Reliable)]
+    [Command(Channels.Unreliable, true)]
     public void SendChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
         if (!NetworkedNode.AmIOwner && NetworkManager.AmIHeadless)
@@ -289,7 +289,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         
     }
 
-    [Relay(Channels.Reliable, false, true)]
+    [Relay(Channels.Unreliable, true, true)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
 		var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
