@@ -93,7 +93,9 @@ public abstract partial class NetworkedTransform : NetworkedComponent
 		// Update render timeMs + BufferDela
         long latency = SendRateMs + LatencyAvg.Value;
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
-            
+
+      
+                    
         // Should we send at all?
         if (!SyncPosition && !SyncRotation)
             return;
@@ -273,7 +275,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
        
     }
 
-    [Command(Channels.Unreliable, true)]
+    [Command(Channels.Reliable, true)]
     public void SendChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
         if (!NetworkedNode.AmIOwner && NetworkManager.AmIHeadless)
@@ -287,13 +289,13 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         
     }
 
-    [Relay(Channels.Unreliable, true, true)]
+    [Relay(Channels.Reliable, true, true)]
     public void RelayChanged(Changed changed, float[] valuesChanged, long tickSent)
     {
 		var snapshot = ReadSnapshot(changed, valuesChanged, tickSent);
 		Snapshots.Add(snapshot);
 
-        LatencyAvg.AddSample(NetworkTime.TickMS - tickSent);
+        LatencyAvg.AddSample(NetworkTime.TickMS - tickSent);        
 
     }
 
