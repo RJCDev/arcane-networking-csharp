@@ -92,7 +92,7 @@ public abstract partial class NetworkedTransform : NetworkedComponent
         if (!NetworkTime.HasSamples()) return;
 
 		// Update render timeMs + BufferDela
-        long latency = SendRateMs + LatencyAvg.Value;
+        long latency = SendRateMs + LatencyAvg.Value + BufferDelay;
 		renderTime = NetworkTime.TickMS - latency; // The timestamp at which we are currently rendering (account for latency)
                     
         // Should we send at all?
